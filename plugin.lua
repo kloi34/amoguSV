@@ -1,4 +1,4 @@
--- amoguSV v1 (20 June 2021)
+-- amoguSV v1 (21 June 2021)
 -- by kloi34
 
 -- Many SV tools and/or code snippets were stolen, so credit to those creators of the SV plugins:
@@ -16,7 +16,7 @@
 -- ** Coding Side Note **
 -- The 'Global Constants' section is located at the bottom of the code instead of here at the top
 -- because one of the constants uses references to functions; only after the functions are declared
--- can the constant be declared  with references to those functions. Including this constant
+-- can the constant be declared with references to those functions. Including this constant
 -- reduces redundancies and increases future code maintainability.
 
 ---------------------------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ function mainMenu()
     imgui.EndChild()
     
     imgui.SameLine(0, 20)
-    imgui.BeginChild("SV Menu", {300, 310}, false)
+    imgui.BeginChild("SV Menu", {300, 400}, false)
     MENUS[vars.optionNum](TOOL_OPTIONS[vars.optionNum])
     vars.hovered[2] = imgui.IsWindowHovered()
     imgui.EndChild()
@@ -94,20 +94,24 @@ function linearMenu(menuID)
         startSV = 2,
         endSV = 0,
         endSVOption = 1,
-        intermediatePoints = 16,
+        svPoints = 16,
         interlace = false,
         interlaceStartSV = -1,
-        interlaceEndSV = 0
+        interlaceEndSV = 0,
+        addTeleport = false,
+        veryStartTeleport = false,
+        teleportValue = 10000,
+        teleportDuration = 1.000
     }
     retrieveStateVariables(menuID, vars)
     
     local halfWidgetWidth = (DEFAULT_WIDGET_WIDTH - SAMELINE_SPACING) / 2
     
-    imgui.PushItemWidth(halfWidgetWidth)
+    imgui.PushItemWidth(halfWidgetWidth - imgui.CalcTextSize(" ")[1] / 2)
     _, vars.startSV = imgui.DragFloat("", vars.startSV, 0.01, -1000, 1000, "%.2fx")
-    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.SameLine(0, SAMELINE_SPACING + imgui.CalcTextSize(" ")[1])
     _, vars.endSV = imgui.DragFloat("Start/End SV", vars.endSV, 0.01, -1000, 1000, "%.2fx")
-    if imgui.Button("Swap End and Start", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button(" Swap End and Start ", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
         local temp = vars.startSV
         vars.startSV = vars.endSV
         vars.endSV = temp
@@ -116,28 +120,31 @@ function linearMenu(menuID)
     spacing()
     
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    _, vars.intermediatePoints = imgui.InputInt("SV Points", vars.intermediatePoints)
-    vars.intermediatePoints = forcePositive(vars.intermediatePoints)
+    _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints)
+    vars.svPoints = forcePositive(vars.svPoints)
     imgui.PopItemWidth()
     spacing()
     
-    imgui.Text("Last SV:")
+    imgui.Text("Very last SV:")
     for i = 1, #END_SV_TYPES do
         _, vars.endSVOption = imgui.RadioButton(END_SV_TYPES[i], vars.endSVOption, i)
         if i ~= #END_SV_TYPES then
             imgui.SameLine(0, 3 * SAMELINE_SPACING)
         end
     end
-    spacing()
+    separator()
     
     _, vars.interlace = imgui.Checkbox("Interlace with different linear", vars.interlace)
     
     if vars.interlace then
-        imgui.PushItemWidth(halfWidgetWidth)
-        _, vars.interlaceStartSV = imgui.DragFloat(" ", vars.interlaceStartSV, 0.01, -1000, 1000, "%.2fx")
-        imgui.SameLine(0, SAMELINE_SPACING)
-        _, vars.interlaceEndSV = imgui.DragFloat(" Start/End SV ", vars.interlaceEndSV, 0.01, -1000, 1000, "%.2fx")
-        if imgui.Button(" Swap End and Start ", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
+        spacing()
+        imgui.PushItemWidth(halfWidgetWidth - imgui.CalcTextSize(" ")[1] / 2)
+        _, vars.interlaceStartSV = imgui.DragFloat(" ", vars.interlaceStartSV, 0.01, -1000, 1000,
+                                                   "%.2fx")
+        imgui.SameLine(0, 0)
+        _, vars.interlaceEndSV = imgui.DragFloat(" Start/End SV ", vars.interlaceEndSV, 0.01,
+                                                 -1000, 1000, "%.2fx")
+        if imgui.Button("Swap End and Start", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
             local temp = vars.interlaceStartSV
             vars.interlaceStartSV = vars.interlaceEndSV
             vars.interlaceEndSV = temp
@@ -147,26 +154,45 @@ function linearMenu(menuID)
     end
     separator()
     
-    if imgui.Button("Place SVs Between Selected Notes") then
-        local offsets = uniqueSelectedNoteOffsets()
-        local SVs = {}
-        for i = 1, #offsets - 1 do
-            local someSVs = calculateLinearSV(vars.startSV, vars.endSV, offsets[i], offsets[i + 1],
-                                              vars.intermediatePoints, vars.endSVOption, vars.interlace,
-                                              vars.interlaceStartSV, vars.interlaceEndSV)
-            -- if we aren't placing the last set of linear SVs and haven't skipped the last SV yet
-            if i ~= #offsets - 1 and vars.endSVOption ~= 2 then
-                -- don't place the last SV
-                table.remove(someSVs, #someSVs)
-            end
-            for j = 1, #someSVs do
-                table.insert(SVs, someSVs[j])
-            end
+    _, vars.addTeleport = imgui.Checkbox("Add teleport SV at start", vars.addTeleport)
+    if vars.addTeleport then
+        spacing()
+       
+        if imgui.RadioButton("Only at very start", vars.veryStartTeleport) then
+            vars.veryStartTeleport = true
         end
+        imgui.SameLine(0, 3 * SAMELINE_SPACING)
+        if imgui.RadioButton("Every linear SV start", not vars.veryStartTeleport) then
+            vars.veryStartTeleport = false
+        end
+        spacing()
+        _, vars.teleportValue = imgui.DragFloat("Teleport SV", vars.teleportValue, 0.01, -100000,
+                                                100000, "%.2fx")
+        _, vars.teleportDuration = imgui.DragFloat("Duration", vars.teleportDuration, 0.01,
+                                                   0, 10, "%.3f ms")
+    end
+    separator()
+       
+    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25, 1.5 * DEFAULT_WIDGET_HEIGHT}) then
+        local SVs = calculateLinearSV(vars.startSV, vars.endSV, vars.svPoints, vars.endSVOption,
+                                      vars.interlace, vars.interlaceStartSV, vars.interlaceEndSV,
+                                      vars.addTeleport, vars.veryStartTeleport, vars.teleportValue,
+                                      vars.teleportDuration)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
     end
+    spacing()
+    saveStateVariables(menuID, vars)
+end
+
+function exponentialMenu(menuID)
+    local vars = {
+        startOffset = 0,
+        endOffset = 0
+    }
+    retrieveStateVariables(menuID, vars)
+    
     saveStateVariables(menuID, vars)
 end
 
@@ -195,11 +221,67 @@ end
 -- Creates the single SV menu
 function singleMenu(menuID)
     local vars = {
-        startOffset = 0,
-        endOffset = 0
+        skipSVAtNote = false,
+        svBefore = false,
+        svValueBefore = 0,
+        incrementBefore = 0.125,
+        svAfter = false,
+        svValueAfter = 0,
+        incrementAfter = 0.125,
+        svValue = 1
     }
     retrieveStateVariables(menuID, vars)
     
+    _, vars.svBefore = imgui.Checkbox("Add SV before note", vars.svBefore)
+    _, vars.svAfter = imgui.Checkbox("Add SV after note", vars.svAfter)
+    _, vars.skipSVAtNote = imgui.Checkbox("Skip SV at note", vars.skipSVAtNote)
+    separator()
+    if vars.svBefore then
+        _, vars.svValueBefore = imgui.DragFloat("SV before note", vars.svValueBefore, 0.01, -100000,
+                                                100000, "%.2fx")
+        _, vars.incrementBefore = imgui.DragFloat("Time before note", vars.incrementBefore, 0.01, 0,
+                                                  100000, "%.3f ms")
+    end
+    if not vars.skipSVAtNote then
+        if vars.svBefore then
+            spacing()
+        end
+        _, vars.svValue = imgui.DragFloat("SV at note", vars.svValue, 0.01, -100000, 100000, "%.2fx")
+    end
+    if vars.svAfter then
+        if vars.svBefore or not vars.skipSVAtNote then
+            spacing()
+        end
+        _, vars.svValueAfter = imgui.DragFloat("SV after note", vars.svValueAfter, 0.01, -100000,
+                                               100000, "%.2fx")
+        _, vars.incrementAfter = imgui.DragFloat("Time after note", vars.incrementAfter, 0.01, 0,
+                                                 100000, "%.3f ms")
+    end
+    
+    if vars.svBefore or (not vars.skipSVAtNote) or vars.svAfter then
+        separator()
+        if imgui.Button("Place SVs At Selected Notes", {DEFAULT_WIDGET_WIDTH,
+                        DEFAULT_WIDGET_HEIGHT}) then
+            local offsets = uniqueSelectedNoteOffsets()
+            local SVs = {}
+            for i = 1, #offsets do
+                if vars.svBefore then
+                    table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - vars.incrementBefore,
+                                 vars.svValueBefore))
+                end
+                if not vars.skipSVAtNote then
+                     table.insert(SVs, utils.CreateScrollVelocity(offsets[i], vars.svValue))
+                end
+                if vars.svAfter then
+                    table.insert(SVs, utils.CreateScrollVelocity(offsets[i] + vars.incrementAfter,
+                                 vars.svValueAfter))
+                end
+            end
+            if #SVs > 0 then
+                actions.PlaceScrollVelocityBatch(SVs)
+            end
+        end
+    end
     saveStateVariables(menuID, vars)
 end
 
@@ -236,7 +318,7 @@ function removeMenu(menuID)
     separator()
     
     if imgui.Button("Remove SVs") then
-        svsToRemove = {}
+        local svsToRemove = {}
         for i, sv in pairs(map.ScrollVelocities) do
             if sv.StartTime >= vars.startOffset and sv.StartTime <= vars.endOffset then
                 table.insert(svsToRemove, sv)
@@ -287,43 +369,74 @@ function separator()
 end
 
 -- Copied + modified from iceSV
-function calculateLinearSV(startSV, endSV, startOffset, endOffset, intermediatePoints, endSVOption,
-                           interlace, interlaceStartSV, interlaceEndSV)
-    local timeInterval = (endOffset - startOffset)/intermediatePoints
-    local velocityInterval = (endSV - startSV)/intermediatePoints
-    local interlaceVelocityInterval = (interlaceEndSV - interlaceStartSV)/intermediatePoints
-
+function calculateLinearSV(startSV, endSV, svPoints, endSVOption, interlace, interlaceStartSV,
+                           interlaceEndSV, addTeleport, veryStartTeleport, teleportValue,
+                           teleportDuration)
+    local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
+    for i = 1, #offsets - 1 do
+        local someSVs = {}
+        local startOffset = offsets[i]
+        local svPointsTemp = svPoints
+        if addTeleport then
+            if not (veryStartTeleport and i ~= 1) then
+                table.insert(someSVs, utils.CreateScrollVelocity(startOffset, teleportValue))
+                startOffset = startOffset + teleportDuration
+            end
+        end
+        local endOffset = offsets[i + 1]
+        local timeInterval = (endOffset - startOffset) / svPointsTemp
+        local velocityInterval = (endSV - startSV) / svPointsTemp
+        local interlaceVelocityInterval = (interlaceEndSV - interlaceStartSV) / svPointsTemp
 
-    if interlace then
-        for step = 0, intermediatePoints - 1 do
-            local offset = step * timeInterval + startOffset + (timeInterval * 0.5)
-            local velocity = step * interlaceVelocityInterval + interlaceStartSV
-            table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
+        if interlace then
+            for step = 0, svPointsTemp - 1 do
+                local offset = step * timeInterval + startOffset + (timeInterval * 0.5)
+                local velocity = step * interlaceVelocityInterval + interlaceStartSV
+                table.insert(someSVs, utils.CreateScrollVelocity(offset, velocity))
+            end
         end
-    end
-    if endSVOption == 2 then
-        intermediatePoints = intermediatePoints - 1
-    end
-    for step = 0, intermediatePoints do
-        local offset = step * timeInterval + startOffset
-        local velocity = step * velocityInterval + startSV
-        if (step == intermediatePoints and endSVOption == 3) then
-            velocity = 1
+        -- if skip end SV is selected
+        if endSVOption == 2 then
+            svPointsTemp = svPointsTemp - 1
         end
-        table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
+        for step = 0, svPointsTemp do
+            local offset = step * timeInterval + startOffset
+            local velocity = step * velocityInterval + startSV
+            if (step == svPoints and endSVOption == 3) then
+                velocity = 1
+            end
+            table.insert(someSVs, utils.CreateScrollVelocity(offset, velocity))
+        end
+        -- if we aren't placing the last set of linear SVs and haven't skipped the last SV yet
+        -- in the calculateLinearSV function
+        if i ~= #offsets - 1 and endSVOption ~= 2 then
+            -- skip the last SV
+            table.remove(someSVs, #someSVs)
+        end
+        for j = 1, #someSVs do
+            table.insert(SVs, someSVs[j])
+        end
     end
     return SVs
 end
 
-function forcePositive(num)
-    if num > 0 then
-        return num
+function generateLinearSV()
+    SVs = {}
+    return SVs
+end
+
+-- Makes a number positive by returning the same number or returning positive one 
+-- Parameters
+--    x : the number to force positive (Int or Float)
+function forcePositive(x)
+    if x > 0 then
+        return x
     end
     return 1
 end
 
--- Returns the (unique) offsets of the selected notes
+-- Returns the (unique) offsets of all currently selected notes sorted in ascending order
 function uniqueSelectedNoteOffsets()
     local offsets = {}
     for i, hitObject in pairs(state.SelectedHitObjects) do
@@ -365,8 +478,9 @@ END_SV_TYPES = {                   -- options for the last SV placed at the end 
     "Skip",
     "1.00x"   
 }
-TOOL_OPTIONS = {                        -- list of available tools for editing SVs
+TOOL_OPTIONS = {                   -- list of the available tools for editing SVs
     "Linear",
+    "Exponential",
     "Stutter",
     "Bezier",
     "Single",
