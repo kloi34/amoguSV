@@ -198,6 +198,8 @@ function exponentialMenu(menuID)
         avgSV = 1,
         intensity = 3,
         endSVOption = 1,
+        interlace = false,
+        interlaceMultiplier = -0.5,
         addTeleport = false,
         veryStartTeleport = false,
         teleportValue = 10000,
@@ -242,6 +244,14 @@ function exponentialMenu(menuID)
     end
     separator()
     
+     _, vars.interlace = imgui.Checkbox("Interlace with another exponential", vars.interlace)
+    if vars.interlace then
+        spacing()
+        _, vars.interlaceMultiplier = imgui.DragFloat("Interlace Ratio", vars.interlaceMultiplier, 0.01, -1000, 1000)
+        spacing()
+    end
+    separator()
+    
     _, vars.addTeleport = imgui.Checkbox("Add teleport SV at start", vars.addTeleport)
     if vars.addTeleport then
         spacing()
@@ -267,7 +277,8 @@ function exponentialMenu(menuID)
     if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
                     1.5 * DEFAULT_WIDGET_HEIGHT}) then
         local SVs = calculateExponentialSV(vars.exponentialIncrease, vars.svPoints, vars.avgSV,
-                                           vars.intensity, vars.endSVOption, vars.addTeleport,
+                                           vars.intensity, vars.endSVOption, vars.interlace,
+                                           vars.interlaceMultiplier, vars.addTeleport,
                                            vars.veryStartTeleport, vars.teleportValue,
                                            vars.teleportDuration)
         if #SVs > 0 then
@@ -526,7 +537,7 @@ end
 -- Returns a set of linear SVs
 -- Parameters
 --    startOffset  : start time of the linear SVs [Int]
---    timeInterval : time inbetween each consecutive SV [Int/Float]
+--    timeInterval : time in-between each consecutive SV [Int/Float]
 --    startSV      : starting value of the first SV [Int/Float]
 --    svIncrement  : change in SV value for each consecutive SV [Int/Float]
 --    svPoints     : number of SVs to place (excluding the very last SV) [Int]
@@ -546,8 +557,10 @@ function generateLinearSV(startOffset, timeInterval, startSV, svIncrement, svPoi
     return SVs
 end
 -- Returns a set of exponential SVs
+-- Parameters
 function calculateExponentialSV(exponentialIncrease, svPoints, avgSV, intensity, endSVOption,
-                                addTeleport, veryStartTeleport, teleportValue, teleportDuration)
+                                interlace, interlaceMultiplier, addTeleport, veryStartTeleport,
+                                teleportValue, teleportDuration)
     local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
     for i = 1, #offsets - 1 do
@@ -571,6 +584,16 @@ function calculateExponentialSV(exponentialIncrease, svPoints, avgSV, intensity,
         end
         for j = 1, #exponentialSVs do
             table.insert(SVs, exponentialSVs[j])
+        end
+        local interlaceSVs = {}
+        if interlace then
+            startOffset = startOffset + (0.5 * timeInterval)
+            local tempAvgSV = avgSV * interlaceMultiplier
+            interlaceSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
+                                                 svPoints, tempAvgSV, intensity, 2)
+        end
+        for j = 1, #interlaceSVs do
+            table.insert(SVs, interlaceSVs[j])
         end
     end
     return SVs
@@ -612,15 +635,18 @@ function generateExponentialSV(exponentialIncrease, startOffset, timeInterval, s
     end
     return SVs
 end
--- Returns the value for the last SV
+-- Returns the value for the last SV of a set of SVs
 -- Parameters
 --    velocity    : default/usual SV value for the end SV [Int/Float]
 --    endSVOption : option number for the last SV (based on global constant END_SV_TYPES) [Int]
 function endSVValue(velocity, endSVOption)
+    -- normal SV option
     if endSVOption == 1 then
         return velocity
+    -- skip SV option
     elseif endSVOption == 2 then
         return nil
+    -- 1.00x SV option
     else
         return 1
     end
