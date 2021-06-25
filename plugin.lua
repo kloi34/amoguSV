@@ -122,9 +122,10 @@ function linearMenu(menuID)
     _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints)
     vars.svPoints = mathClamp(vars.svPoints, 1, 1000)
     imgui.PopItemWidth()
-    spacing()
+    separator()
     
     imgui.Text("Very last SV:")
+    spacing()
     for i = 1, #END_SV_TYPES do
         _, vars.endSVOption = imgui.RadioButton(END_SV_TYPES[i], vars.endSVOption, i)
         if i ~= #END_SV_TYPES then
@@ -155,11 +156,11 @@ function linearMenu(menuID)
     _, vars.addTeleport = imgui.Checkbox("Add teleport SV at start", vars.addTeleport)
     if vars.addTeleport then
         spacing()
-        if imgui.RadioButton("Only at very start", vars.veryStartTeleport) then
+        if imgui.RadioButton("Only very start", vars.veryStartTeleport) then
             vars.veryStartTeleport = true
         end
         imgui.SameLine(0, 3 * SAMELINE_SPACING)
-        if imgui.RadioButton("Every linear SV start", not vars.veryStartTeleport) then
+        if imgui.RadioButton("Every linear start", not vars.veryStartTeleport) then
             vars.veryStartTeleport = false
         end
         spacing()
@@ -192,30 +193,83 @@ end
 --    menuID : name of the menu [String]
 function exponentialMenu(menuID)
     local vars = {
-        isExponential = false,
+        exponentialIncrease = false,
         svPoints = 16,
-        endOffset = 0
+        avgSV = 1,
+        intensity = 3,
+        endSVOption = 1,
+        addTeleport = false,
+        veryStartTeleport = false,
+        teleportValue = 10000,
+        teleportDuration = 1.000
     }
     retrieveStateVariables(menuID, vars)
-    if imgui.RadioButton("Exponential", vars.isExponential) then
-        vars.isExponential = true
+    imgui.Text("Exponential Type:")
+    spacing()
+    if imgui.RadioButton("Increase (speed up)", vars.exponentialIncrease) then
+        vars.exponentialIncrease = true
     end
-    if imgui.RadioButton("Geometric", not vars.isExponential) then
-        vars.isExponential = false
+    imgui.SameLine(0, 3 * SAMELINE_SPACING)
+    if imgui.RadioButton("Decay (slow down)", not vars.exponentialIncrease) then
+        vars.exponentialIncrease = false
     end
-    --[[if vars.isExponential then
-          
-    else
-        
-    end]]--
+    spacing()
+    _, vars.avgSV = imgui.DragFloat("Average SV", vars.avgSV, 0.01, -MAX_TELEPORT_VALUE,
+                                    MAX_TELEPORT_VALUE, "%.2fx")                
+    spacing()
+    
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints)
     vars.svPoints = mathClamp(vars.svPoints, 1, 1000)
     imgui.PopItemWidth()
     separator()
+    
+    imgui.Text("Exponential sharpness")
+    spacing()
+     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+     _, vars.intensity = imgui.DragFloat("Intensity", vars.intensity, 0.01, 1, 10, "%.2f")
+    vars.intensity = mathClamp(vars.intensity, 1, 10)
+    imgui.PopItemWidth()
+    separator()
+    
+    imgui.Text("Very last SV:")
+    spacing()
+    for i = 1, #END_SV_TYPES do
+        _, vars.endSVOption = imgui.RadioButton(END_SV_TYPES[i], vars.endSVOption, i)
+        if i ~= #END_SV_TYPES then
+            imgui.SameLine(0, 3 * SAMELINE_SPACING)
+        end
+    end
+    separator()
+    
+    _, vars.addTeleport = imgui.Checkbox("Add teleport SV at start", vars.addTeleport)
+    if vars.addTeleport then
+        spacing()
+        if imgui.RadioButton("Only very start", vars.veryStartTeleport) then
+            vars.veryStartTeleport = true
+        end
+        imgui.SameLine(0, 3 * SAMELINE_SPACING)
+        if imgui.RadioButton("Every exponential start", not vars.veryStartTeleport) then
+            vars.veryStartTeleport = false
+        end
+        spacing()
+        _, vars.teleportValue = imgui.DragFloat("Teleport SV", vars.teleportValue, 0.01,
+                                                -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+        vars.teleportValue = mathClamp(vars.teleportValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
+        _, vars.teleportDuration = imgui.DragFloat("Duration", vars.teleportDuration, 0.01,
+                                                   MIN_DURATION, MAX_TELEPORT_DURATION,
+                                                  "%.3f ms")                
+        vars.teleportDuration = mathClamp(vars.teleportDuration, MIN_DURATION,
+                                          MAX_TELEPORT_DURATION)
+    end
+    separator()
+    
     if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
                     1.5 * DEFAULT_WIDGET_HEIGHT}) then
-        local SVs = calculateExponentialSV()
+        local SVs = calculateExponentialSV(vars.exponentialIncrease, vars.svPoints, vars.avgSV,
+                                           vars.intensity, vars.endSVOption, vars.addTeleport,
+                                           vars.veryStartTeleport, vars.teleportValue,
+                                           vars.teleportDuration)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
@@ -310,8 +364,8 @@ function singleMenu(menuID)
     
     if vars.svBefore or (not vars.skipSVAtNote) or vars.svAfter then
         separator()
-        if imgui.Button("Place SVs At Selected Notes", {DEFAULT_WIDGET_WIDTH,
-                        DEFAULT_WIDGET_HEIGHT}) then
+        if imgui.Button("Place SVs At Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
+                        1.5 * DEFAULT_WIDGET_HEIGHT}) then
             local offsets = uniqueSelectedNoteOffsets()
             local SVs = {}
             for i = 1, #offsets do
@@ -367,7 +421,8 @@ function removeMenu(menuID)
     imgui.PopItemWidth()
     separator()
     
-    if imgui.Button("Remove SVs") then
+    if imgui.Button("Remove SVs", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
+                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
         local svsToRemove = {}
         for i, sv in pairs(map.ScrollVelocities) do
             if sv.StartTime >= vars.startOffset and sv.StartTime <= vars.endOffset then
@@ -490,12 +545,71 @@ function generateLinearSV(startOffset, timeInterval, startSV, svIncrement, svPoi
     end
     return SVs
 end
-function calculateExponentialSV()
+-- Returns a set of exponential SVs
+function calculateExponentialSV(exponentialIncrease, svPoints, avgSV, intensity, endSVOption,
+                                addTeleport, veryStartTeleport, teleportValue, teleportDuration)
+    local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
+    for i = 1, #offsets - 1 do
+        local startOffset = offsets[i]
+        if addTeleport then
+            -- if we want a teleport for each linear or we are at the very start
+            if (not veryStartTeleport) or i == 1 then
+                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
+                startOffset = startOffset + teleportDuration
+            end
+        end
+        local endOffset = offsets[i + 1]
+        local timeInterval = (endOffset - startOffset) / svPoints
+        local exponentialSVs = {}
+        if i ~= #offsets - 1 then
+            exponentialSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
+                                                   svPoints, avgSV, intensity, 2)
+        else
+            exponentialSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
+                                                   svPoints, avgSV, intensity,  endSVOption)
+        end
+        for j = 1, #exponentialSVs do
+            table.insert(SVs, exponentialSVs[j])
+        end
+    end
     return SVs
 end
-function generateExponentialSV()
+function generateExponentialSV(exponentialIncrease, startOffset, timeInterval, svPoints, avgSV,
+                               intensity, endSVOption)
     local SVs = {}
+    local svValues = {}
+    local xIncrement = 1 / svPoints
+    for step = 0, svPoints do
+        local x = (step + 0.5) * xIncrement * intensity
+        local velocity = (math.exp(x) / math.exp(1)) / intensity
+        table.insert(svValues, velocity)
+    end
+    local svTotal = 0
+    for i = 1, svPoints do
+        svTotal = svTotal + svValues[i]
+    end
+    local actualSVAverage = svTotal / svPoints
+    for i = 1, #svValues do
+        svValues[i] = (svValues[i] * avgSV) / actualSVAverage
+    end
+    for step = 0, svPoints do
+        local offset = step * timeInterval + startOffset
+        local velocity = svValues[step + 1]
+        if (not exponentialIncrease) then
+            if svPoints ~= step then
+                velocity = svValues[svPoints - step]
+            else
+                velocity = (math.exp(-0.5 * xIncrement * intensity) / math.exp(1)) / intensity
+            end
+        end
+        if step == svPoints then
+            velocity = endSVValue(velocity, endSVOption)
+        end
+        if velocity ~= nil then
+            table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
+        end
+    end
     return SVs
 end
 -- Returns the value for the last SV
