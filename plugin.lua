@@ -1,4 +1,4 @@
--- amoguSV v1 (25 June 2021)
+-- amoguSV v1 (26 June 2021)
 -- by kloi34
 
 -- Many SV tools and/or code snippets were stolen, so credit to those creators of the SV plugins:
@@ -107,9 +107,13 @@ function linearMenu(menuID)
     
     local halfWidgetWidth = (DEFAULT_WIDGET_WIDTH - SAMELINE_SPACING) / 2
     imgui.PushItemWidth(halfWidgetWidth - imgui.CalcTextSize(" ")[1] / 2)
-    _, vars.startSV = imgui.DragFloat("", vars.startSV, 0.01, -1000, 1000, "%.2fx")
+    _, vars.startSV = imgui.DragFloat("", vars.startSV, 0.01, -MAX_GENERAL_SV, MAX_GENERAL_SV,
+                                      "%.2fx")
+    vars.startSV = mathClamp(vars.startSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     imgui.SameLine(0, SAMELINE_SPACING + imgui.CalcTextSize(" ")[1])
-    _, vars.endSV = imgui.DragFloat("Start/End SV", vars.endSV, 0.01, -1000, 1000, "%.2fx")
+    _, vars.endSV = imgui.DragFloat("Start/End SV", vars.endSV, 0.01, -MAX_GENERAL_SV,
+                                    MAX_GENERAL_SV, "%.2fx")
+    vars.endSV = mathClamp(vars.endSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     if imgui.Button(" Swap End and Start ", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
         local temp = vars.startSV
         vars.startSV = vars.endSV
@@ -125,11 +129,13 @@ function linearMenu(menuID)
     if vars.interlace then
         spacing()
         imgui.PushItemWidth(halfWidgetWidth - imgui.CalcTextSize(" ")[1] / 2)
-        _, vars.interlaceStartSV = imgui.DragFloat(" ", vars.interlaceStartSV, 0.01, -1000, 1000,
-                                                   "%.2fx")
+        _, vars.interlaceStartSV = imgui.DragFloat(" ", vars.interlaceStartSV, 0.01,
+                                                   -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2fx")
+        vars.interlaceStartSV = mathClamp(vars.interlaceStartSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
         imgui.SameLine(0, 0)
         _, vars.interlaceEndSV = imgui.DragFloat(" Start/End SV ", vars.interlaceEndSV, 0.01,
-                                                 -1000, 1000, "%.2fx")
+                                                 -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2fx")
+        vars.interlaceEndSV = mathClamp(vars.interlaceEndSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
         if imgui.Button("Swap End and Start", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
             local temp = vars.interlaceStartSV
             vars.interlaceStartSV = vars.interlaceEndSV
@@ -182,11 +188,9 @@ function exponentialMenu(menuID)
     if imgui.RadioButton("Decay (slow down)", not vars.exponentialIncrease) then
         vars.exponentialIncrease = false
     end
-    spacing()
-    _, vars.avgSV = imgui.DragFloat("Average SV", vars.avgSV, 0.01, -MAX_TELEPORT_VALUE,
-                                    MAX_TELEPORT_VALUE, "%.2fx")                
-    spacing()
+    separator()
     
+    chooseAverageSV(vars)
     chooseSVPoints(vars)
     
     imgui.Text("Exponential sharpness")
@@ -219,13 +223,52 @@ end
 --    menuID : name of the menu [String]
 function stutterMenu(menuID)
     local vars = {
-        startOffset = 0,
-        endOffset = 0
+        startSV = 1.5,
+        svDuration = 0.5,
+        avgSV = 1,
+        endSVOption = 1,
+        linearStutter = false,
+        linearEndStutterSV = 2,
+        linearEndAvgSV = 1,
+        linearEndDuration = 0.5
     }
     retrieveStateVariables(menuID, vars)
+    
+    _, vars.startSV = imgui.DragFloat("Stutter start SV", vars.startSV, 0.01, -MAX_GENERAL_SV,
+                                      MAX_GENERAL_SV, "%.2fx")
+    vars.startSV = mathClamp(vars.startSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    _, vars.svDuration = imgui.SliderFloat("Duration", vars.svDuration, 0.01, 0.99, "%.2f")
+    vars.svDuration = mathClamp(vars.svDuration, 0.01, 0.99)
+    spacing()
+    
+    chooseAverageSV(vars)
+    chooseEndSV(vars)
+    
+    _, vars.linearStutter = imgui.Checkbox("Change stutter linearly over time", vars.linearStutter)
+    if vars.linearStutter then
+        spacing()
+        imgui.Text("Linearly end at:")
+        spacing()
+        
+        _, vars.linearEndStutterSV = imgui.DragFloat("Stutter start SV ", vars.linearEndStutterSV,
+                                                     0.01, -MAX_GENERAL_SV, MAX_GENERAL_SV,
+                                                     "%.2fx")
+        vars.linearEndStutterSV = mathClamp(vars.linearEndStutterSV, -MAX_GENERAL_SV,
+                                            MAX_GENERAL_SV)
+        _, vars.linearEndDuration = imgui.SliderFloat("Duration ", vars.linearEndDuration,
+                                                      0.01, 0.99, "%.2f")
+        vars.linearEndDuration = mathClamp(vars.linearEndDuration, 0.01, 0.99)
+        spacing()
+        _, vars.linearEndAvgSV = imgui.DragFloat("Average SV ", vars.linearEndAvgSV, 0.01,
+                                                 -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+        vars.linearEndAvgSV = mathClamp(vars.linearEndAvgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    end
+    separator()
     if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
                     1.5 * DEFAULT_WIDGET_HEIGHT}) then
-        local SVs = calculateStutterSV()
+        local SVs = calculateStutterSV(vars.startSV, vars.svDuration, vars.avgSV, vars.endSVOption,
+                                       vars.linearStutter, vars.linearEndStutterSV,
+                                       vars.linearEndDuration, vars.linearEndAvgSV)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
@@ -412,8 +455,6 @@ function separator()
     imgui.Separator()
     spacing()
 end
--- ** Code for next two functions for linear SV is copied from iceSV, but very modified **
-
 -- Calculates all linear SVs to place
 -- Returns a list of all calculated linear SVs [Table]
 -- Parameters
@@ -601,13 +642,62 @@ function generateExponentialSV(exponentialIncrease, startOffset, timeInterval, s
     end
     return SVs
 end
-function calculateStutterSV()
+-- Calculates all stutter SVs to place
+-- Returns a list of all calculated stutter SVs [Table]
+-- Parameters
+--    startSV            : starting value of the first SV in a single stutter [Int/Float]
+--    svDuration         : duration (percent) of the first SV in a single stutter [Float]
+--    avgSV              : average SV of the stutter [Int/Float]
+--    endSVOption        : option number for the last SV (based on constant END_SV_TYPES) [Int]
+--    linearStutter      : whether or not to linearly change the stutter over time [Boolean]
+--    linearEndStutterSV : linear end value of the first SV of the last stutter [Int/Float]
+--    linearEndDuration  : linear end value of the duration of the last stutter's first SV [Float]
+--    linearEndAvgSV     : linear end value of the average SV for the last stutter [Int/Float]
+function calculateStutterSV(startSV, svDuration, avgSV, endSVOption, linearStutter,
+                            linearEndStutterSV, linearEndDuration, linearEndAvgSV)
+    local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
+    local startSVList = {}
+    local svDurationList = {}
+    local avgSVList = {}
+    if linearStutter then
+        startSVList = generateLinearSet(startSV, linearEndStutterSV, #offsets - 1)
+        svDurationList = generateLinearSet(svDuration, linearEndDuration, #offsets - 1)
+        avgSVList = generateLinearSet(avgSV, linearEndAvgSV, #offsets - 1)
+    else
+        startSVList = generateLinearSet(startSV, startSV, #offsets - 1)
+        svDurationList = generateLinearSet(svDuration, svDuration, #offsets - 1)
+        avgSVList = generateLinearSet(avgSV, avgSV, #offsets - 1)
+    end
+    for i = 1, #offsets - 1 do
+        local startOffset = offsets[i]
+        local endOffset = offsets[i + 1]
+        local timeInterval = endOffset - startOffset
+        local stutterSVs = generateStutterSV(startOffset, timeInterval, startSVList[i],
+                                             svDurationList[i], avgSVList[i])
+        for j = 1, #stutterSVs do
+            table.insert(SVs, stutterSVs[j])
+        end
+    end
+    if endSVOption ~= 2 then
+        table.insert(SVs, utils.CreateScrollVelocity(offsets[#offsets], 1))
+    end
     return SVs
 end
-
-function generateStutterSV()
+-- Calculates a single set of stutter SVs
+-- Returns the set of stutter SVs [Table]
+-- Parameters
+--    startOffset  : start time of the stutter SV [Int]
+--    timeInterval : total time the stutter effect will last (milliseconds) [Int/Float]
+--    startSV      : starting value of the stutter SV [Int/Float]
+--    svDuration   : duration (percent) of the first SV in the stutter [Float]
+--    avgSV        : average SV of the stutter [Int/Float]
+function generateStutterSV(startOffset, timeInterval, startSV, svDuration, avgSV)
     local SVs = {}
+    table.insert(SVs, utils.CreateScrollVelocity(startOffset, startSV))
+    local stutterOffset = startOffset + svDuration * timeInterval
+    local stutterSV = (avgSV - startSV * svDuration) / (1 - svDuration)
+    table.insert(SVs, utils.CreateScrollVelocity(stutterOffset, stutterSV))
     return SVs
 end
 -- Returns the value of the last SV for a set of SVs [Int/Float]
@@ -675,6 +765,32 @@ end
 function sandwichStrings(string1, string2)
     return string2..string1..string2
 end
+-- Generates a linear set of equally-spaced numbers
+-- Returns the linear set of numbers [Table]
+-- Parameters
+--    startVal  : starting value of the set [Int/Float]
+--    endVal    : ending value of the set [Int/Float]
+--    numValues : number of values in the linear set [Int]
+function generateLinearSet(startVal, endVal, numValues)
+    if numValues >= 1 then
+        local increment = (endVal - startVal) / (numValues - 1)
+        local linearSet = {}
+        for i = 0, numValues - 1 do
+            table.insert(linearSet, startVal + i * increment)
+        end
+        return linearSet
+    end
+    return nil
+end
+-- Lets users choose the average SV
+-- Parameters
+--    vars : a reference to the variables of a menu [Table]
+function chooseAverageSV(vars)
+    _, vars.avgSV = imgui.DragFloat("Average SV", vars.avgSV, 0.01, -MAX_TELEPORT_VALUE,
+                                    MAX_TELEPORT_VALUE, "%.2fx")    
+    vars.avgSV = mathClamp(vars.avgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    spacing()
+end
 -- Lets users choose the number of SV points to place
 -- Parameters
 --    vars : a reference to the variables of a menu [Table]
@@ -721,7 +837,7 @@ function chooseTeleportSV(vars, menuID)
         vars.teleportValue = mathClamp(vars.teleportValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
         _, vars.teleportDuration = imgui.DragFloat("Duration", vars.teleportDuration, 0.01,
                                                    MIN_DURATION, MAX_TELEPORT_DURATION,
-                                                  "%.3f ms")                
+                                                  "%.3f ms")
         vars.teleportDuration = mathClamp(vars.teleportDuration, MIN_DURATION,
                                           MAX_TELEPORT_DURATION)
     end
@@ -738,7 +854,9 @@ function chooseInterlaceMultiplier(vars, menuID)
     if vars.interlace then
         spacing()
         _, vars.interlaceMultiplier = imgui.DragFloat("Interlace Ratio", vars.interlaceMultiplier,
-                                                      0.01, -1000, 1000)
+                                                      0.01, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+        vars.interlaceMultiplier = mathClamp(vars.interlaceMultiplier, -MAX_GENERAL_SV,
+                                             MAX_GENERAL_SV)
         spacing()
     end
     separator()
@@ -755,6 +873,7 @@ SAMELINE_SPACING = 5               -- value determining spacing between GUI item
 -- SV restrictions
 MAX_TELEPORT_VALUE = 100000        -- maximum (absolute) teleport SV value allowed
 MAX_TELEPORT_DURATION = 10         -- maximum teleport duration allowed (milliseconds)
+MAX_GENERAL_SV = 100               -- maximum (absolute) value allowed for general SVs (ex. avg SV)
 MIN_DURATION = 0.016               -- minimum duration allowed in general (milliseconds)
 MAX_DURATION = 10000               -- maximum duration allowed in general (milliseconds)
 
