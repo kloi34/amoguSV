@@ -1,4 +1,4 @@
--- amoguSV v1 (26 June 2021)
+-- amoguSV v1 (27 June 2021)
 -- by kloi34
 
 -- Many SV tools and/or code snippets were stolen, so credit to those creators of the SV plugins:
@@ -196,7 +196,7 @@ function exponentialMenu(menuID)
     imgui.Text("Exponential sharpness")
     spacing()
      imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-     _, vars.intensity = imgui.DragFloat("Intensity", vars.intensity, 0.01, 1, 10, "%.2f")
+     _, vars.intensity = imgui.SliderFloat("Intensity", vars.intensity, 1, 10, "%.2f")
     vars.intensity = mathClamp(vars.intensity, 1, 10)
     imgui.PopItemWidth()
     separator()
@@ -264,6 +264,7 @@ function stutterMenu(menuID)
         vars.linearEndAvgSV = mathClamp(vars.linearEndAvgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     end
     separator()
+    
     if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
                     1.5 * DEFAULT_WIDGET_HEIGHT}) then
         local SVs = calculateStutterSV(vars.startSV, vars.svDuration, vars.avgSV, vars.endSVOption,
@@ -292,11 +293,67 @@ end
 --    menuID : name of the menu [String]
 function sinusoidalMenu(menuID)
     local vars = {
-        startOffset = 0,
-        endOffset = 0
+        startAmplitude = 2,
+        endAmplitude = 2,
+        periods = 0.25,
+        shiftPeriods = 0,
+        svsPerQuarterPeriod = 8,
+        endSVOption = 1,
+        addTeleport = false,
+        veryStartTeleport = false,
+        teleportValue = 10000,
+        teleportDuration = 1.000
     }
     retrieveStateVariables(menuID, vars)
     
+    imgui.Text("Wave Amplitude:")
+    spacing()
+    _, vars.startAmplitude = imgui.DragFloat("Start", vars.startAmplitude, 0.01,
+                                             -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2f")
+    vars.startAmplitude = mathClamp(vars.startAmplitude, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    _, vars.endAmplitude = imgui.DragFloat("End", vars.endAmplitude, 0.01,
+                                           -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2f")
+    vars.endAmplitude = mathClamp(vars.endAmplitude, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    separator()
+    
+    _, vars.periods = imgui.InputFloat("Periods/Cycles", vars.periods, 0.25, 0.25, "%.2f")
+    vars.periods = forceQuarter(vars.periods)
+    vars.periods = mathClamp(vars.periods, 0.25, 20)
+    
+    local text = "Shift start by "
+    imgui.AlignTextToFramePadding()
+    imgui.Text(text)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH - imgui.CalcTextSize(text)[1] - 2 * SAMELINE_SPACING)
+    _, vars.shiftPeriods = imgui.InputFloat("Periods/Cycles ", vars.shiftPeriods, 0.25, 0.25, "%.2f")
+    vars.shiftPeriods = forceQuarter(vars.shiftPeriods)
+    vars.shiftPeriods = mathClamp(vars.shiftPeriods, 0, 0.75)
+    imgui.PopItemWidth()
+    spacing()
+    
+    imgui.Text("SV points per quarter period/cycle")
+    spacing()
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    _, vars.svsPerQuarterPeriod = imgui.InputInt(" ",
+                                                 vars.svsPerQuarterPeriod)
+    vars.svsPerQuarterPeriod = mathClamp(vars.svsPerQuarterPeriod, 1, 50)
+    imgui.PopItemWidth()
+    separator()
+    
+    chooseEndSV(vars)
+    chooseTeleportSV(vars, menuID)
+    
+    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
+                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+        local SVs = calculateSinusoidalSV(vars.startAmplitude, vars.endAmplitude, vars.periods,
+                                          vars.shiftPeriods, vars.svsPerQuarterPeriod,
+                                          vars.endSVOption, vars.addTeleport,
+                                          vars.veryStartTeleport, vars.teleportValue,
+                                          vars.teleportDuration)
+        if #SVs > 0 then
+            actions.PlaceScrollVelocityBatch(SVs)
+        end
+    end
     saveStateVariables(menuID, vars)
 end
 -- Creates the "Single SV" menu
@@ -487,13 +544,9 @@ function calculateLinearSV(startSV, endSV, svPoints, endSVOption, interlace, int
         local timeInterval = (endOffset - startOffset) / svPoints
         local svIncrement = (endSV - startSV) / svPoints
         local linearSVs = {}
-        if i ~= #offsets - 1 then
-            linearSVs = generateLinearSV(startOffset, timeInterval, startSV, svIncrement,
-                                         svPoints, 2)
-        else
-            linearSVs = generateLinearSV(startOffset, timeInterval, startSV, svIncrement,
-                                           svPoints, endSVOption)
-        end
+        local thisEndSVOption = getThisEndSVOption(i == #offsets - 1, endSVOption)
+        linearSVs = generateLinearSV(startOffset, timeInterval, startSV, svIncrement, svPoints,
+                                     thisEndSVOption)
         for j = 1, #linearSVs do
             table.insert(SVs, linearSVs[j])
         end
@@ -564,13 +617,9 @@ function calculateExponentialSV(exponentialIncrease, svPoints, avgSV, intensity,
         local endOffset = offsets[i + 1]
         local timeInterval = (endOffset - startOffset) / svPoints
         local exponentialSVs = {}
-        if i ~= #offsets - 1 then
-            exponentialSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
-                                                   svPoints, avgSV, intensity, 2)
-        else
-            exponentialSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
-                                                   svPoints, avgSV, intensity,  endSVOption)
-        end
+        local thisEndSVOption = getThisEndSVOption(i == #offsets - 1, endSVOption)
+        exponentialSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
+                                               svPoints, avgSV, intensity, thisEndSVOption)
         for j = 1, #exponentialSVs do
             table.insert(SVs, exponentialSVs[j])
         end
@@ -700,6 +749,60 @@ function generateStutterSV(startOffset, timeInterval, startSV, svDuration, avgSV
     table.insert(SVs, utils.CreateScrollVelocity(stutterOffset, stutterSV))
     return SVs
 end
+-- Calculates all sinusoidal SVs to place
+-- Returns a list of all calculated sinusoidal SVs [Table]
+-- Parameters
+function calculateSinusoidalSV(startAmplitude, endAmplitude, periods, shiftPeriods,
+                               svsPerQuarterPeriod, endSVOption, addTeleport, veryStartTeleport,
+                               teleportValue, teleportDuration)
+    local offsets = uniqueSelectedNoteOffsets()
+    local SVs = {}
+    for i = 1, #offsets - 1 do
+        local startOffset = offsets[i]
+        if addTeleport then
+            -- if we want a teleport for each sinusoidal or we are at the very start
+            if (not veryStartTeleport) or i == 1 then
+                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
+                startOffset = startOffset + teleportDuration
+            end
+        end
+        local endOffset = offsets[i + 1]
+        local timeInterval = endOffset - startOffset
+        local sinusoidalSVs = {}
+        local thisEndSVOption = getThisEndSVOption(i == #offsets - 1, endSVOption)
+        sinusoidalSVs = generateSinusoidalSV(startOffset, timeInterval, startAmplitude,
+                                             endAmplitude, periods, shiftPeriods,
+                                             svsPerQuarterPeriod, thisEndSVOption)
+        for j = 1, #sinusoidalSVs do
+            table.insert(SVs, sinusoidalSVs[j])
+        end
+    end
+    return SVs
+end
+-- Calculates a single set of sinusoidal SVs
+-- Returns the set of sinusoidal SVs [Table]
+-- Parameters
+function generateSinusoidalSV(startOffset, timeInterval, startAmplitude, endAmplitude, periods,
+                              shiftPeriods, svsPerQuarterPeriod, endSVOption)
+    local SVs = {}
+    local quarterPeriods = 4 * periods
+    local quarterShiftPeriods = 4 * shiftPeriods
+    local totalSVs = svsPerQuarterPeriod * quarterPeriods
+    local amplitudes = generateLinearSet(startAmplitude, endAmplitude, totalSVs + 1)
+    local timeIncrement = timeInterval / totalSVs
+    for i = 0, totalSVs do
+        local offset = startOffset + timeIncrement * i
+        local angle = (math.pi / 2) * ((i / svsPerQuarterPeriod) +  quarterShiftPeriods)
+        local velocity = amplitudes[i + 1] * math.sin(angle)
+        if i == totalSVs then
+            velocity = endSVValue(velocity, endSVOption)
+        end
+        if velocity ~= nil then
+            table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
+        end
+    end
+    return SVs
+end
 -- Returns the value of the last SV for a set of SVs [Int/Float]
 -- Parameters
 --    velocity    : default/usual SV value for the end SV [Int/Float]
@@ -764,6 +867,23 @@ end
 --    string2 : string to add on both sides [String]
 function sandwichStrings(string1, string2)
     return string2..string1..string2
+end
+-- Forces a number to be a multiple of one quarter
+-- Returns the forced number [Int/Float]
+-- Parameters
+--    x : number to force to be a multiple of one quarter [Int/Float]
+function forceQuarter(x)
+    return (math.floor(x * 4 + 0.5)) / 4
+end
+-- Returns the end SV option for a given set of SVs [Int]
+-- Parameters
+--    isVeryEnd   : whether or not the set of SVs is at the very end [Boolean]
+--    endSVOption : option number for the last SV (based on constant END_SV_TYPES) [Int]
+function getThisEndSVOption(isVeryEnd, endSVOption)
+    if isVeryEnd then
+        return endSVOption
+    end
+    return 2
 end
 -- Generates a linear set of equally-spaced numbers
 -- Returns the linear set of numbers [Table]
