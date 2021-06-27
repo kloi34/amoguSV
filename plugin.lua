@@ -189,18 +189,16 @@ function exponentialMenu(menuID)
         vars.exponentialIncrease = false
     end
     separator()
-    
-    chooseAverageSV(vars)
-    chooseSVPoints(vars)
-    
     imgui.Text("Exponential sharpness")
     spacing()
-     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
      _, vars.intensity = imgui.SliderFloat("Intensity", vars.intensity, 1, 10, "%.2f")
     vars.intensity = mathClamp(vars.intensity, 1, 10)
     imgui.PopItemWidth()
     separator()
     
+    chooseAverageSV(vars)
+    chooseSVPoints(vars)
     chooseEndSV(vars)
     chooseInterlaceMultiplier(vars, menuID)
     chooseTeleportSV(vars, menuID)
@@ -325,7 +323,8 @@ function sinusoidalMenu(menuID)
     imgui.Text(text)
     imgui.SameLine(0, SAMELINE_SPACING)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH - imgui.CalcTextSize(text)[1] - 2 * SAMELINE_SPACING)
-    _, vars.shiftPeriods = imgui.InputFloat("Periods/Cycles ", vars.shiftPeriods, 0.25, 0.25, "%.2f")
+    _, vars.shiftPeriods = imgui.InputFloat("Periods/Cycles ", vars.shiftPeriods, 0.25, 0.25,
+                                            "%.2f")
     vars.shiftPeriods = forceQuarter(vars.shiftPeriods)
     vars.shiftPeriods = mathClamp(vars.shiftPeriods, 0, 0.75)
     imgui.PopItemWidth()
@@ -334,8 +333,7 @@ function sinusoidalMenu(menuID)
     imgui.Text("SV points per quarter period/cycle")
     spacing()
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    _, vars.svsPerQuarterPeriod = imgui.InputInt(" ",
-                                                 vars.svsPerQuarterPeriod)
+    _, vars.svsPerQuarterPeriod = imgui.InputInt(" ", vars.svsPerQuarterPeriod)
     vars.svsPerQuarterPeriod = mathClamp(vars.svsPerQuarterPeriod, 1, 50)
     imgui.PopItemWidth()
     separator()
@@ -368,7 +366,11 @@ function singleMenu(menuID)
         svAfter = false,
         svValueAfter = 0,
         incrementAfter = 0.125,
-        svValue = 1
+        svValue = 1,
+        scaleSVLinearly = false,
+        svValueBeforeEnd = 0,
+        svValueEnd = 1,
+        svValueAfterEnd = 0
     }
     retrieveStateVariables(menuID, vars)
     
@@ -379,10 +381,10 @@ function singleMenu(menuID)
     separator()
     
     if vars.svBefore then
-        _, vars.svValueBefore = imgui.DragFloat("SV before note", vars.svValueBefore, 0.01,
+        _, vars.svValueBefore = imgui.DragFloat("SV before note ", vars.svValueBefore, 0.01,
                                                 -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
         vars.svValueBefore = mathClamp(vars.svValueBefore, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, vars.incrementBefore = imgui.DragFloat("Time before note", vars.incrementBefore, 0.01,
+        _, vars.incrementBefore = imgui.DragFloat("Time before", vars.incrementBefore, 0.01,
                                                   MIN_DURATION, MAX_DURATION, "%.3f ms")
         vars.incrementBefore = mathClamp(vars.incrementBefore, MIN_DURATION, MAX_DURATION)
     end
@@ -390,7 +392,7 @@ function singleMenu(menuID)
         if vars.svBefore then
             spacing()
         end
-        _, vars.svValue = imgui.DragFloat("SV at note", vars.svValue, 0.01, -MAX_TELEPORT_VALUE,
+        _, vars.svValue = imgui.DragFloat("SV at note ", vars.svValue, 0.01, -MAX_TELEPORT_VALUE,
                                           MAX_TELEPORT_VALUE, "%.2fx")
         vars.svValue = mathClamp(vars.svValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
     end
@@ -398,33 +400,56 @@ function singleMenu(menuID)
         if vars.svBefore or (not vars.skipSVAtNote) then
             spacing()
         end
-        _, vars.svValueAfter = imgui.DragFloat("SV after note", vars.svValueAfter, 0.01,
+        _, vars.svValueAfter = imgui.DragFloat("SV after note ", vars.svValueAfter, 0.01,
                                                -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
         vars.svValueAfter = mathClamp(vars.svValueAfter, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, vars.incrementAfter = imgui.DragFloat("Time after note", vars.incrementAfter, 0.01,
+        _, vars.incrementAfter = imgui.DragFloat("Time after", vars.incrementAfter, 0.01,
                                                  MIN_DURATION, MAX_DURATION, "%.3f ms")
         vars.incrementAfter = mathClamp(vars.incrementAfter, MIN_DURATION, MAX_DURATION)
     end
     
     if vars.svBefore or (not vars.skipSVAtNote) or vars.svAfter then
         separator()
+        _, vars.scaleSVLinearly = imgui.Checkbox("Scale SV values linearly over time", vars.scaleSVLinearly)
+        if vars.scaleSVLinearly then
+            spacing()
+            imgui.Text("End values for...")
+            spacing()
+            if vars.svBefore then
+                _, vars.svValueBeforeEnd = imgui.DragFloat("SV before note", vars.svValueBeforeEnd,
+                                                           0.01, -MAX_TELEPORT_VALUE,
+                                                           MAX_TELEPORT_VALUE, "%.2fx")
+                vars.svValueBeforeEnd = mathClamp(vars.svValueBeforeEnd, -MAX_TELEPORT_VALUE,
+                                                  MAX_TELEPORT_VALUE)
+            end
+            if (not vars.skipSVAtNote) then
+                if vars.svBefore then
+                    spacing()
+                end
+                _, vars.svValueEnd = imgui.DragFloat("SV at note", vars.svValueEnd, 0.01,
+                                                  -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+                vars.svValueEnd = mathClamp(vars.svValueEnd, -MAX_TELEPORT_VALUE,
+                                            MAX_TELEPORT_VALUE)
+            end
+            if vars.svAfter then
+                if vars.svBefore or (not vars.skipSVAtNote) then
+                    spacing()
+                end
+                _, vars.svValueAfterEnd = imgui.DragFloat("SV after note", vars.svValueAfterEnd,
+                                                          0.01, -MAX_TELEPORT_VALUE,
+                                                          MAX_TELEPORT_VALUE, "%.2fx")
+                vars.svValueAfterEnd = mathClamp(vars.svValueAfterEnd, -MAX_TELEPORT_VALUE,
+                                                 MAX_TELEPORT_VALUE)
+            end
+        end
+        separator()
         if imgui.Button("Place SVs At Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
                         1.5 * DEFAULT_WIDGET_HEIGHT}) then
-            local offsets = uniqueSelectedNoteOffsets()
-            local SVs = {}
-            for i = 1, #offsets do
-                if vars.svBefore then
-                    table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - vars.incrementBefore,
-                                 vars.svValueBefore))
-                end
-                if (not vars.skipSVAtNote) then
-                     table.insert(SVs, utils.CreateScrollVelocity(offsets[i], vars.svValue))
-                end
-                if vars.svAfter then
-                    table.insert(SVs, utils.CreateScrollVelocity(offsets[i] + vars.incrementAfter,
-                                 vars.svValueAfter))
-                end
-            end
+            local SVs = calculateSingleSV(vars.skipSVAtNote, vars.svBefore, vars.svValueBefore,
+                                          vars.incrementBefore, vars.svAfter, vars.svValueAfter,
+                                          vars.incrementAfter, vars.svValue, vars.scaleSVLinearly,
+                                          vars.svValueBeforeEnd, vars.svValueEnd,
+                                          vars.svValueAfterEnd)
             if #SVs > 0 then
                 actions.PlaceScrollVelocityBatch(SVs)
             end
@@ -752,6 +777,16 @@ end
 -- Calculates all sinusoidal SVs to place
 -- Returns a list of all calculated sinusoidal SVs [Table]
 -- Parameters
+--    startAmplitude      : starting amplitude of the sinusoidal wave [Int/Float]
+--    endAmplitude        : ending amplitude of the sinusoidal wave [Int/Float]
+--    periods             : number of periods/cycles the sinusoidal wave lasts [Int/Float]
+--    shiftPeriods        : number of periods/cycles to delay the sinusoidal wave [Int/Float]
+--    svsPerQuarterPeriod : number of SVs to place every quarter of a cycle [Int/Float]
+--    endSVOption         : option number for the last SV (based on constant END_SV_TYPES) [Int]
+--    addTeleport         : whether or not to add a teleport SV [Boolean]
+--    veryStartTeleport   : whether or not the teleport SV is only at the very start [Boolean]
+--    teleportValue       : value of the teleport SV [Int/Float] 
+--    teleportDuration    : duration of the teleport SV in milliseconds [Int/Float] 
 function calculateSinusoidalSV(startAmplitude, endAmplitude, periods, shiftPeriods,
                                svsPerQuarterPeriod, endSVOption, addTeleport, veryStartTeleport,
                                teleportValue, teleportDuration)
@@ -782,6 +817,14 @@ end
 -- Calculates a single set of sinusoidal SVs
 -- Returns the set of sinusoidal SVs [Table]
 -- Parameters
+--    startOffset         : start time of the sinusoidal SV [Int]
+--    timeInterval        : total time the sinusoidal SV will last (milliseconds) [Int/Float]
+--    startAmplitude      : starting amplitude of the sinusoidal wave [Int/Float]
+--    endAmplitude        : ending amplitude of the sinusoidal wave [Int/Float]
+--    periods             : number of periods/cycles the sinusoidal wave lasts [Int/Float]
+--    shiftPeriods        : number of periods/cycles to delay the sinusoidal wave [Int/Float]
+--    svsPerQuarterPeriod : number of SVs to place every quarter of a cycle [Int/Float]
+--    endSVOption         : option number for the last SV (based on constant END_SV_TYPES) [Int]
 function generateSinusoidalSV(startOffset, timeInterval, startAmplitude, endAmplitude, periods,
                               shiftPeriods, svsPerQuarterPeriod, endSVOption)
     local SVs = {}
@@ -799,6 +842,41 @@ function generateSinusoidalSV(startOffset, timeInterval, startAmplitude, endAmpl
         end
         if velocity ~= nil then
             table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
+        end
+    end
+    return SVs
+end
+-- Calculates all sinusoidal SVs to place
+-- Returns a list of all calculated sinusoidal SVs [Table]
+-- Parameters
+function calculateSingleSV(skipSVAtNote, svBefore, svValueBefore, incrementBefore, svAfter,
+                           svValueAfter, incrementAfter, svValue, scaleSVLinearly,
+                           svValueBeforeEnd, svValueEnd, svValueAfterEnd)
+    local offsets = uniqueSelectedNoteOffsets()
+    local SVs = {}
+    local svValuesBefore = {}
+    local svValuesAfter = {}
+    local svValuesAt = {}
+    if scaleSVLinearly then
+        svValuesBefore = generateLinearSet(svValueBefore, svValueBeforeEnd, #offsets)
+        svValuesAfter = generateLinearSet(svValueAfter, svValueAfterEnd, #offsets)
+        svValuesAt = generateLinearSet(svValue, svValueEnd, #offsets)
+    else
+        svValuesBefore = generateLinearSet(svValueBefore, svValueBefore, #offsets)
+        svValuesAfter = generateLinearSet(svValueAfter, svValueAfter, #offsets)
+        svValuesAt = generateLinearSet(svValue, svValue, #offsets)
+    end
+    for i = 1, #offsets do
+        if svBefore then
+            table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - incrementBefore,
+                         svValuesBefore[i]))
+        end
+        if (not skipSVAtNote) then
+             table.insert(SVs, utils.CreateScrollVelocity(offsets[i],  svValuesAt[i]))
+        end
+        if svAfter then
+            table.insert(SVs, utils.CreateScrollVelocity(offsets[i] + incrementAfter,
+                         svValuesAfter[i]))
         end
     end
     return SVs
@@ -885,30 +963,33 @@ function getThisEndSVOption(isVeryEnd, endSVOption)
     end
     return 2
 end
--- Generates a linear set of equally-spaced numbers
+-- Generates a linear set of equally-spaced numbers between two numbers (inclusive)
 -- Returns the linear set of numbers [Table]
 -- Parameters
 --    startVal  : starting value of the set [Int/Float]
 --    endVal    : ending value of the set [Int/Float]
---    numValues : number of values in the linear set [Int]
+--    numValues : number of values in the linear set (including the start and end values) [Int]
 function generateLinearSet(startVal, endVal, numValues)
-    if numValues >= 1 then
+    local linearSet = {}
+    if numValues > 1 then
         local increment = (endVal - startVal) / (numValues - 1)
-        local linearSet = {}
         for i = 0, numValues - 1 do
             table.insert(linearSet, startVal + i * increment)
         end
-        return linearSet
+    elseif numValues == 1 then
+        table.insert(linearSet, startVal)
     end
-    return nil
+    return linearSet
 end
 -- Lets users choose the average SV
 -- Parameters
 --    vars : a reference to the variables of a menu [Table]
 function chooseAverageSV(vars)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     _, vars.avgSV = imgui.DragFloat("Average SV", vars.avgSV, 0.01, -MAX_TELEPORT_VALUE,
                                     MAX_TELEPORT_VALUE, "%.2fx")    
     vars.avgSV = mathClamp(vars.avgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    imgui.PopItemWidth()
     spacing()
 end
 -- Lets users choose the number of SV points to place
