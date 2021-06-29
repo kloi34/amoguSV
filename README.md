@@ -16,4 +16,4 @@ More about these tools can be found at the [wiki page](https://github.com/kloi34
 ## Installation
 Press the green download code button on GitHub  
 Download as a ZIP file  
-Extract the ZIP file in the plugins folder, which is located in the main Quaver folder
+Extract the ZIP file in the plugins folder (located in the main Quaver folder)
