@@ -1,9 +1,9 @@
 # amoguSV
 > "The ultimate community-driven and open-source competitive SV plugin"
 
-This is an SV plugin for Quaver: the ultimate community-driven, and open-source competitive
+This is an SV plugin for [Quaver](https://github.com/Quaver), the ultimate community-driven and open-source competitive
 rhythm game. The plugin contains various tools for editing SVs quickly and efficiently.
-It's most similar to (i.e. 50% of SV features and code stolen from) iceSV.
+It's most similar to (i.e. 50% of SV features and code stolen from) [iceSV](https://github.com/IceDynamix/iceSV).
 
 Currently, the plugin supports the following SV tools:
 * Linear
