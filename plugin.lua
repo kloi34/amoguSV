@@ -1,4 +1,4 @@
--- amoguSV v1 (29 June 2021)
+-- amoguSV v1.0 (29 June 2021)
 -- by kloi34
 
 -- Many SV tool ideas and/or code snippets were stolen, and im also planning to steal more that I
@@ -35,6 +35,7 @@
 --      8. dampened harmonic motion svs 5head
 --      9. steal iceSV sv multiplier tool? and also steal svs range tool to copy paste svs?
 --      10. steal iceSV bezier parse
+--      11. make graphs in imgui to show the svs that are about to get placed 
 
 -- ** code side note **
 -- The 'Global Constants' section is located at the bottom of the code instead of here at the top
