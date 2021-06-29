@@ -2,7 +2,7 @@
 -- by kloi34
 
 -- Many SV tool ideas and/or code snippets were stolen, and im also planning to steal more that I
--- have yet to implement, so here is credit to the SV plugins and the creators behind them.
+-- have yet to implement, so here is credit to the SV plugins and the creators behind them:
 --    iceSV       (by IceDynamix)         @ https://github.com/IceDynamix/iceSV
 --    KeepStill   (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/KeepStill
 --    Vibrato     (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/Vibrato
@@ -11,11 +11,11 @@
 -- Plugin Info
 ---------------------------------------------------------------------------------------------------
 
--- This is a mapping plugin for the ultimate community-driven, and open-source competitive rhythm
--- game Quaver. The plugin contains various tools for editing SVs (Slider Velocities) quickly and
--- efficiently. It's most similar to (i.e. 50% of SV features and code stolen from) iceSV.
+-- This is an SV plugin for Quaver, the ultimate community-driven and open-source competitive
+-- rhythm game. The plugin contains various tools for editing SVs quickly and efficiently.
+-- It's most similar to (i.e. 50% of SV features and code stolen from) iceSV.
 
--- Things that still need working on/fixing :
+-- Things that still need working on/fixing:
 --      1. Make first time usability better / make plugin and plugin widgets for new-user more
 --         understandable in what they do/when to use them. Basically user-friendly upgrading.
 --      2. Cubic bezier. The implementation and code is copied directly from iceSV, but it is
