@@ -14,7 +14,14 @@ Currently, the plugin supports the following SV tools:
 * Single
 * Remove
 
-More about these tools can be found (later, when the wiki exists) at the [wiki page](https://github.com/kloi34/amoguSV/wiki)
+More details about these tools can be found at the [wiki page](https://github.com/kloi34/amoguSV/wiki)
+
 ## Installation
 1. Press the green download code button on GitHub and click on "Download ZIP"
-2. Once downloaded, extract the ZIP file to the plugins folder (located inside the main Quaver folder)
+2. Once downloaded, extract the ZIP file to the "Plugins" folder (located inside the main Quaver folder)
+
+## Related SV Plugin Links
+* [Plugin Guide for Quaver](https://github.com/IceDynamix/QuaverPluginGuide/blob/master/quaver_plugin_guide.md) by IceDynamix
+* [iceSV](https://github.com/IceDynamix/iceSV) by IceDynamix
+* [KeepStill](https://github.com/Illuminati-CRAZ/KeepStill) by Illuminati-CRAZ
+* [Vibrato](https://github.com/Illuminati-CRAZ/Vibrato) by Illuminati-CRAZ
