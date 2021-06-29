@@ -20,9 +20,9 @@
 --         understandable in what they do/when to use them. Basically user-friendly upgrading.
 --      2. Cubic bezier. The implementation and code is copied directly from iceSV, but it is
 --         computationally inefficient in the usage context of my plugin
---      3. Reducing redundancies in code (ex. addTeleport across 'calculate~~SV' functions is
+--      3. Reducing redundancies in code (ex. addTeleport across 'calculate___SV' functions is
 --         nearly identical)
---      4. Remove "Nomral" end SV options for stutter and cubic bezier
+--      4. Remove "Normal" end SV options for stutter and cubic bezier
 
 --  Optional things that I maybe want to add later
 --      1. Dedicated KeepStill+more SV tool 
