@@ -18,7 +18,7 @@ More details about these tools can be found at the [wiki page](https://github.co
 
 ## Installation
 1. Press the green download code button on GitHub and click on "Download ZIP"
-2. Once downloaded, extract the ZIP file to the "Plugins" folder (located inside the main Quaver folder)
+2. Extract the ZIP file to the "Plugins" folder (located inside the main Quaver folder)
 
 ## Related SV Plugin Links
 * [Plugin Guide for Quaver](https://github.com/IceDynamix/QuaverPluginGuide/blob/master/quaver_plugin_guide.md) by IceDynamix
