@@ -16,6 +16,6 @@ Currently, the plugin supports the following SV tools:
 
 More about these tools can be found (later, when the wiki exists) at the [wiki page](https://github.com/kloi34/amoguSV/wiki)
 ## Installation
-Press the green download code button on GitHub  
-Download as a ZIP file  
-Extract the ZIP file in the plugins folder (located in the main Quaver folder)
+1.) Press the green download code button on GitHub  
+2.) Download as a ZIP file  
+3.) Extract the ZIP file in the plugins folder (located in the main Quaver folder)
