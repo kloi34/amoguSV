@@ -1162,7 +1162,7 @@ end
 function chooseSVPoints(vars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints)
-    vars.svPoints = mathClamp(vars.svPoints, 1, 1000)
+    vars.svPoints = mathClamp(vars.svPoints, 1, 256)
     imgui.PopItemWidth()
     separator()
 end
