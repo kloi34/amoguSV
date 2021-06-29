@@ -1,9 +1,11 @@
--- amoguSV v1 (27 June 2021)
+-- amoguSV v1 (29 June 2021)
 -- by kloi34
 
--- Many SV tools and/or code snippets were stolen, so credit to those creators of the SV plugins:
+-- Many SV tool ideas and/or code snippets were stolen, and im also planning to steal more that I
+-- have yet to implement, so here is credit to the SV plugins and the creators behind them.
 --    iceSV       (by IceDynamix)         @ https://github.com/IceDynamix/iceSV
 --    KeepStill   (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/KeepStill
+--    Vibrato     (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/Vibrato
 
 ---------------------------------------------------------------------------------------------------
 -- Plugin Info
@@ -12,6 +14,27 @@
 -- This is a mapping plugin for the ultimate community-driven, and open-source competitive rhythm
 -- game Quaver. The plugin contains various tools for editing SVs (Slider Velocities) quickly and
 -- efficiently. It's most similar to (i.e. 50% of SV features and code stolen from) iceSV.
+
+-- Things that still need working on/fixing :
+--      1. Make first time usability better / make plugin and plugin widgets for new-user more
+--         understandable in what they do/when to use them. Basically user-friendly upgrading.
+--      2. Cubic bezier. The implementation and code is copied directly from iceSV, but it is
+--         computationally inefficient in the usage context of my plugin
+--      3. Reducing redundancies in code (ex. addTeleport across 'calculate~~SV' functions is
+--         nearly identical)
+--      4. Remove "Nomral" end SV options for stutter and cubic bezier
+
+--  Optional things that I maybe want to add later
+--      1. Dedicated KeepStill+more SV tool 
+--      2. Dedicated Vibrato+more SV tool 
+--      3. Option to skip placing SVs between every other note (or every third note, etc.)
+--      4. ?? Note animation by choosing which still frames to telport to ??
+--      5. A "presets" tool that can place reverse-scroll svs, bounce svs, etc.
+--      6. linearly spaced random svs that normalize to 1.00x?
+--      7. hyperbolic sv 5head, or any common function studied in school like quadratic
+--      8. dampened harmonic motion svs 5head
+--      9. steal iceSV sv multiplier tool? and also steal svs range tool to copy paste svs?
+--      10. steal iceSV bezier parse
 
 -- ** code side note **
 -- The 'Global Constants' section is located at the bottom of the code instead of here at the top
@@ -279,11 +302,50 @@ end
 --    menuID : name of the menu [String]
 function bezierMenu(menuID)
     local vars = {
-        startOffset = 0,
-        endOffset = 0
+        x1 = 0,
+        y1 = 0,
+        x2 = 0,
+        y2 = 1,
+        svPoints = 16,
+        avgSV = 1,
+        endSVOption = 1,
+        interlace = false,
+        interlaceMultiplier = -0.5,
+        addTeleport = false,
+        veryStartTeleport = false,
+        teleportValue = 10000,
+        teleportDuration = 1.000
     }
     retrieveStateVariables(menuID, vars)
     
+    imgui.Text("Cubic Bezier Parameters:")
+    spacing()
+    local coords = {vars.x1, vars.y1, vars.x2, vars.y2}
+    _, coords = imgui.DragFloat4("x1, y1, x2, y2", coords, 0.01, -1, 2, "%.2f")
+    vars.y2, vars.x1, vars.y1, vars.x2 = table.unpack(coords)
+    vars.x1 = mathClamp(vars.x1, 0, 1)
+    vars.y1 = mathClamp(vars.y1, -1, 2)
+    vars.x2 = mathClamp(vars.x2, 0, 1)
+    vars.y2 = mathClamp(vars.y2, -1, 2)
+    separator()
+    
+    chooseAverageSV(vars)
+    chooseSVPoints(vars)
+    chooseEndSV(vars)
+    chooseInterlaceMultiplier(vars, menuID)
+    chooseTeleportSV(vars, menuID)
+    
+    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
+                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+        local SVs = calculateBezierSV(vars.x1, vars.y1, vars.x2, vars.y2, vars.svPoints,
+                                      vars.avgSV, vars.endSVOption, vars.interlace,
+                                      vars.interlaceMultiplier, vars.addTeleport,
+                                      vars.veryStartTeleport, vars.teleportValue,
+                                      vars.teleportDuration)
+        if #SVs > 0 then
+            actions.PlaceScrollVelocityBatch(SVs)
+        end
+    end
     saveStateVariables(menuID, vars)
 end
 -- Creates the "Sinusoidal SV" menu
@@ -774,6 +836,107 @@ function generateStutterSV(startOffset, timeInterval, startSV, svDuration, avgSV
     table.insert(SVs, utils.CreateScrollVelocity(stutterOffset, stutterSV))
     return SVs
 end
+-- Calculates all bezier SVs to place
+-- Returns a list of all calculated bezier SVs [Table]
+-- Parameters
+function calculateBezierSV(x1, y1, x2, y2, svPoints, avgSV, endSVOption, interlace,
+                           interlaceMultiplier, addTeleport, veryStartTeleport, teleportValue,
+                           teleportDuration)
+    local offsets = uniqueSelectedNoteOffsets(svPoints)
+    local SVs = {}
+    for i = 1, #offsets - 1 do
+        local startOffset = offsets[i]
+        if addTeleport then
+            -- if we want a teleport for each bezier or we are at the very start
+            if (not veryStartTeleport) or i == 1 then
+                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
+                startOffset = startOffset + teleportDuration
+            end
+        end
+        local endOffset = offsets[i + 1]
+        --local timeInterval = endOffset - startOffset / svPoints
+        --local bezierSVs = generateBezierSV()
+        local skipEndSV = true
+        local bezierSVs = generateBezierSV(x1, y1, x2, y2, startOffset, endOffset, avgSV, svPoints,
+                                          skipEndSV, interlace, interlaceMultiplier)
+        for j = 1, #bezierSVs do
+            table.insert(SVs, bezierSVs[j])
+        end
+    end
+    --temporary
+    if endSVOption ~= 2 then
+        table.insert(SVs, utils.CreateScrollVelocity(offsets[#offsets], 1))
+    end
+    return SVs
+end
+-- Calculates a single set of bezier SVs
+-- Returns the set of bezier SVs [Table]
+-- Parameters
+--[[function generateBezierSV(x1, y1, x2, y2, startOffset, endOffset, avgSV, svPoints, true)
+    local SVs = {}
+    return SVs
+end
+--]]
+
+----***THE 2 FUNCTIONS BELOW RELATED TO BEZIER COPIED DIRECTLY FROM iceSV + SLIGHTLY MODIFIED***
+-- Will remake + add comments to the bezier functions once i get a better understanding of beziers
+-- As it stands right now, how the function is used is very computationally inefficient
+-- when there are 2+ notes. This is because the same bezier sample is calculated
+-- and thrown out x - 1 times where x is the number of notes selected to place bezier svs between
+-- @return table of scroll velocities
+function generateBezierSV(P1_x, P1_y, P2_x, P2_y, startOffset, endOffset, averageSV, intermediatePoints, skipEndSV, interlace,
+                           interlaceMultiplier)
+
+    local stepInterval = 1/intermediatePoints
+    local timeInterval = (endOffset - startOffset) * stepInterval
+
+    -- the larger this number, the more accurate the final sv is
+    -- ... and the longer it's going to take
+    local totalSampleSize = 2500
+    local allBezierSamples = {}
+    
+    for t=0, 1, 1/totalSampleSize do
+        local x = mathCubicBezier({0, P1_x, P2_x, 1}, t)
+        local y = mathCubicBezier({0, P1_y, P2_y, 1}, t)
+        table.insert(allBezierSamples, {x=x,y=y})
+    end
+
+    local SVs = {}
+    local positions = {}
+
+    local currentPoint = 0
+
+    for sampleCounter = 1, totalSampleSize, 1 do
+        if allBezierSamples[sampleCounter].x > currentPoint then
+            table.insert(positions, allBezierSamples[sampleCounter].y)
+            currentPoint = currentPoint + stepInterval
+        end
+    end
+
+    for i = 2, intermediatePoints, 1 do
+        local offset = (i-2) * timeInterval + startOffset
+        local velocity = (positions[i] - (positions[i-1] or 0)) * averageSV * intermediatePoints
+        velocity = math.floor(velocity * 100 + 0.5) / 100
+        SVs[i-1] = utils.CreateScrollVelocity(offset, velocity)
+    end
+
+    table.insert(SVs, utils.CreateScrollVelocity((intermediatePoints - 1) * timeInterval + startOffset, SVs[#SVs].Multiplier))
+    if interlace then
+        local numSVs = #SVs
+        for i = 1, numSVs do
+            table.insert(SVs, utils.CreateScrollVelocity(SVs[i].StartTime + timeInterval * 0.5, SVs[i].Multiplier * interlaceMultiplier))
+        end
+    end
+    if skipEndSV == false then
+        table.insert(SVs, utils.CreateScrollVelocity(endOffset, averageSV))
+    end
+    
+    return SVs
+end
+function mathCubicBezier(P, t)
+    return P[1] + 3*t*(P[2]-P[1]) + 3*t^2*(P[1]+P[3]-2*P[2]) + t^3*(P[4]-P[1]+3*P[2]-3*P[3])
+end
+
 -- Calculates all sinusoidal SVs to place
 -- Returns a list of all calculated sinusoidal SVs [Table]
 -- Parameters
