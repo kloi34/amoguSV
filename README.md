@@ -20,7 +20,7 @@ More details about these tools can be found at the [wiki page](https://github.co
 1. Press the green download code button on GitHub and click on "Download ZIP"
 2. Extract the ZIP file to the "Plugins" folder (located inside the main Quaver folder)
 
-## Related SV Plugin Links
+## Related Links
 * [Quaver Plugin Guide](https://github.com/IceDynamix/QuaverPluginGuide/blob/master/quaver_plugin_guide.md) by IceDynamix
 * [iceSV](https://github.com/IceDynamix/iceSV) by IceDynamix
 * [KeepStill](https://github.com/Illuminati-CRAZ/KeepStill) by Illuminati-CRAZ
