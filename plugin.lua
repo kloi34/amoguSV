@@ -1,8 +1,8 @@
--- amoguSV v1.0 (29 June 2021)
+-- amoguSV v1.1 (1 July 2021)
 -- by kloi34
 
--- Many SV tool ideas and/or code snippets were stolen, and im also planning to steal more that I
--- have yet to implement, so here is credit to the SV plugins and the creators behind them:
+-- Many SV tool ideas and/or code snippets were stolen, and I'm also planning to steal more that
+-- have yet to be implemented, so here is credit to the SV plugins and the creators behind them:
 --    iceSV       (by IceDynamix)         @ https://github.com/IceDynamix/iceSV
 --    KeepStill   (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/KeepStill
 --    Vibrato     (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/Vibrato
@@ -16,13 +16,9 @@
 -- It's most similar to (i.e. 50% of SV features and code stolen from) iceSV.
 
 -- Things that still need working on/fixing:
---      1. Make first time usability better / make plugin and plugin widgets for new-user more
---         understandable in what they do/when to use them. Basically user-friendly upgrading.
---      2. Cubic bezier. The implementation and code is copied directly from iceSV, but it is
---         computationally inefficient in the usage context of my plugin
---      3. Reducing redundancies in code (ex. addTeleport across 'calculate___SV' functions is
---         nearly identical)
---      4. Remove "Normal" end SV options for stutter and cubic bezier
+--      1. Cubic bezier stuff
+--      2. Decrease computations (reuse already calculated SV values if possible instead of
+--         recalculating every time)
 
 --  Optional things that I maybe want to add later
 --      1. Dedicated KeepStill+more SV tool 
@@ -65,11 +61,27 @@ function applyStyle()
     imgui.PushStyleVar( imgui_style_var.WindowRounding,     rounding )
     imgui.PushStyleVar( imgui_style_var.ChildRounding,      rounding )
     imgui.PushStyleVar( imgui_style_var.FrameRounding,      rounding )
+    imgui.PushStyleVar( imgui_style_var.GrabRounding,       rounding )
     
     -- Plugin Colors
-    imgui.PushStyleColor( imgui_col.Button,                 { 0.35, 0.36, 0.37, 1.00 } )
-    imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.45, 0.46, 0.47, 1.00 } )
-    imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.60, 0.61, 0.62, 1.00 } )
+    imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
+    imgui.PushStyleColor( imgui_col.FrameBg,                { 0.14, 0.24, 0.28, 1.00 } )
+    imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.24, 0.34, 0.38, 1.00 } )
+    imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.29, 0.39, 0.43, 1.00 } )
+    imgui.PushStyleColor( imgui_col.TitleBg,                { 0.41, 0.48, 0.65, 1.00 } )
+    imgui.PushStyleColor( imgui_col.TitleBgActive,          { 0.51, 0.58, 0.75, 1.00 } )
+    imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       { 0.51, 0.58, 0.75, 0.50 } )
+    imgui.PushStyleColor( imgui_col.CheckMark,              { 0.81, 0.88, 1.00, 1.00 } )
+    imgui.PushStyleColor( imgui_col.SliderGrab,             { 0.56, 0.63, 0.75, 1.00 } )
+    imgui.PushStyleColor( imgui_col.SliderGrabActive,       { 0.61, 0.68, 0.80, 1.00 } )
+    imgui.PushStyleColor( imgui_col.Button,                 { 0.31, 0.38, 0.50, 1.00 } )
+    imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.41, 0.48, 0.60, 1.00 } )
+    imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.51, 0.58, 0.70, 1.00 } )
+    imgui.PushStyleColor( imgui_col.Header,                 { 0.81, 0.88, 1.00, 0.40 } )
+    imgui.PushStyleColor( imgui_col.HeaderHovered,          { 0.81, 0.88, 1.00, 0.50 } )
+    imgui.PushStyleColor( imgui_col.HeaderActive,           { 0.81, 0.88, 1.00, 0.54 } )
+    imgui.PushStyleColor( imgui_col.Separator,              { 0.81, 0.88, 1.00, 0.30 } )
+    imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 0.81, 0.88, 1.00, 0.40 } )
 end
 -- Creates the main plugin menu
 function mainMenu()
@@ -77,7 +89,7 @@ function mainMenu()
     local menuID = "main"
     local vars = {
         hovered = {false, false, false},
-        optionNum = 1
+        toolOptionNum = 1
     }
     retrieveStateVariables(menuID, vars)
     
@@ -86,22 +98,22 @@ function mainMenu()
     imgui.Text("Tool Options")
     imgui.Unindent(indentVal)
     imgui.SameLine(0, 40)
-    local menuTitle = sandwichStrings(TOOL_OPTIONS[vars.optionNum].." SV", "         ")
-    imgui.Text(sandwichStrings(menuTitle, EMOTICONS[vars.optionNum]))
-    separator()
+    local menuTitle = sandwichStrings(TOOL_OPTIONS[vars.toolOptionNum].." SV", "         ")
+    imgui.Text(sandwichStrings(menuTitle, EMOTICONS[vars.toolOptionNum]))
     
     imgui.BeginChild("SV Tool Options", {100, #TOOL_OPTIONS * 18 + 13}, true)
     for i = 1, #TOOL_OPTIONS do
-        if imgui.Selectable(TOOL_OPTIONS[i], vars.optionNum == i) then
-            vars.optionNum = i
+        if imgui.Selectable(TOOL_OPTIONS[i], vars.toolOptionNum == i) then
+            vars.toolOptionNum = i
         end
     end
     vars.hovered[1] = imgui.IsWindowHovered()
     imgui.EndChild()
     
     imgui.SameLine(0, 20)
-    imgui.BeginChild("SV Menu", {300, 400}, false)
-    MENUS[vars.optionNum](TOOL_OPTIONS[vars.optionNum])
+    imgui.BeginChild("SV Menu", {280, 405}, false)
+    separator()
+    MENUS[vars.toolOptionNum](TOOL_OPTIONS[vars.toolOptionNum])
     vars.hovered[2] = imgui.IsWindowHovered()
     imgui.EndChild()
     
@@ -129,51 +141,40 @@ function linearMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    local halfWidgetWidth = (DEFAULT_WIDGET_WIDTH - SAMELINE_SPACING) / 2
-    imgui.PushItemWidth(halfWidgetWidth - imgui.CalcTextSize(" ")[1] / 2)
-    _, vars.startSV = imgui.DragFloat("", vars.startSV, 0.01, -MAX_GENERAL_SV, MAX_GENERAL_SV,
-                                      "%.2fx")
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    local linearSVValues = {vars.startSV, vars.endSV}
+    _, linearSVValues = imgui.InputFloat2("Start/End", linearSVValues, "%.2fx")
+    vars.startSV, vars.endSV = table.unpack(linearSVValues)
     vars.startSV = mathClamp(vars.startSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-    imgui.SameLine(0, SAMELINE_SPACING + imgui.CalcTextSize(" ")[1])
-    _, vars.endSV = imgui.DragFloat("Start/End SV", vars.endSV, 0.01, -MAX_GENERAL_SV,
-                                    MAX_GENERAL_SV, "%.2fx")
     vars.endSV = mathClamp(vars.endSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-    if imgui.Button(" Swap End and Start ", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button("Swap End and Start", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
         local temp = vars.startSV
         vars.startSV = vars.endSV
         vars.endSV = temp
     end
-    imgui.PopItemWidth()
     spacing()
-    
     chooseSVPoints(vars)
-    chooseEndSV(vars)
-    
-    _, vars.interlace = imgui.Checkbox("Interlace with different linear", vars.interlace)
+    separator()
+    chooseEndSV(vars, false)
+    _, vars.interlace = imgui.Checkbox("Interlace another linear", vars.interlace)
     if vars.interlace then
         spacing()
-        imgui.PushItemWidth(halfWidgetWidth - imgui.CalcTextSize(" ")[1] / 2)
-        _, vars.interlaceStartSV = imgui.DragFloat(" ", vars.interlaceStartSV, 0.01,
-                                                   -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2fx")
+        local interlaceSVValues = {vars.interlaceStartSV, vars.interlaceEndSV}
+        _, interlaceSVValues = imgui.InputFloat2("Start/End ", interlaceSVValues, "%.2fx")
+        vars.interlaceStartSV, vars.interlaceEndSV = table.unpack(interlaceSVValues)
         vars.interlaceStartSV = mathClamp(vars.interlaceStartSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-        imgui.SameLine(0, 0)
-        _, vars.interlaceEndSV = imgui.DragFloat(" Start/End SV ", vars.interlaceEndSV, 0.01,
-                                                 -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2fx")
         vars.interlaceEndSV = mathClamp(vars.interlaceEndSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-        if imgui.Button("Swap End and Start", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
+        if imgui.Button(" Swap End and Start ", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
             local temp = vars.interlaceStartSV
             vars.interlaceStartSV = vars.interlaceEndSV
             vars.interlaceEndSV = temp
         end
-        imgui.PopItemWidth()
-        spacing()
     end
     separator()
-    
     chooseTeleportSV(vars, menuID)
-       
-    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+    imgui.PopItemWidth()
+    
+    if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateLinearSV(vars.startSV, vars.endSV, vars.svPoints, vars.endSVOption,
                                       vars.interlace, vars.interlaceStartSV, vars.interlaceEndSV,
                                       vars.addTeleport, vars.veryStartTeleport, vars.teleportValue,
@@ -182,7 +183,6 @@ function linearMenu(menuID)
             actions.PlaceScrollVelocityBatch(SVs)
         end
     end
-    spacing()
     saveStateVariables(menuID, vars)
 end
 -- Creates the "Exponential SV" menu
@@ -203,32 +203,31 @@ function exponentialMenu(menuID)
         teleportDuration = 1.000
     }
     retrieveStateVariables(menuID, vars)
-    imgui.Text("Exponential type:")
-    spacing()
-    if imgui.RadioButton("Increase (speed up)", vars.exponentialIncrease) then
+    
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Behavior:")
+    imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+    if imgui.RadioButton("Speed up", vars.exponentialIncrease) then
         vars.exponentialIncrease = true
     end
-    imgui.SameLine(0, 3 * SAMELINE_SPACING)
-    if imgui.RadioButton("Decay (slow down)", not vars.exponentialIncrease) then
+    imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+    if imgui.RadioButton("Slow down", not vars.exponentialIncrease) then
         vars.exponentialIncrease = false
     end
-    separator()
-    imgui.Text("Exponential sharpness")
     spacing()
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-     _, vars.intensity = imgui.SliderFloat("Intensity", vars.intensity, 1, 10, "%.2f")
-    vars.intensity = mathClamp(vars.intensity, 1, 10)
-    imgui.PopItemWidth()
+    _, vars.intensity = imgui.InputFloat("Intensity (1-20)", vars.intensity, 0, 0, "%.2f")
+    vars.intensity = mathClamp(vars.intensity, 1, 20)
     separator()
-    
     chooseAverageSV(vars)
     chooseSVPoints(vars)
-    chooseEndSV(vars)
+    separator()
+    chooseEndSV(vars, false)
     chooseInterlaceMultiplier(vars, menuID)
     chooseTeleportSV(vars, menuID)
+    imgui.PopItemWidth()
     
-    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateExponentialSV(vars.exponentialIncrease, vars.svPoints, vars.avgSV,
                                            vars.intensity, vars.endSVOption, vars.interlace,
                                            vars.interlaceMultiplier, vars.addTeleport,
@@ -248,7 +247,7 @@ function stutterMenu(menuID)
         startSV = 1.5,
         svDuration = 0.5,
         avgSV = 1,
-        endSVOption = 1,
+        endSVOption = 2,
         linearStutter = false,
         linearEndStutterSV = 2,
         linearEndAvgSV = 1,
@@ -256,39 +255,36 @@ function stutterMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    _, vars.startSV = imgui.DragFloat("Stutter start SV", vars.startSV, 0.01, -MAX_GENERAL_SV,
-                                      MAX_GENERAL_SV, "%.2fx")
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    _, vars.startSV = imgui.InputFloat("Stutter start SV", vars.startSV, 0, 0, "%.2fx")
     vars.startSV = mathClamp(vars.startSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     _, vars.svDuration = imgui.SliderFloat("Duration", vars.svDuration, 0.01, 0.99, "%.2f")
     vars.svDuration = mathClamp(vars.svDuration, 0.01, 0.99)
     spacing()
-    
     chooseAverageSV(vars)
-    chooseEndSV(vars)
-    
+    separator()
+    chooseEndSV(vars, true)
     _, vars.linearStutter = imgui.Checkbox("Change stutter linearly over time", vars.linearStutter)
     if vars.linearStutter then
         spacing()
         imgui.Text("Linearly end at:")
         spacing()
-        
-        _, vars.linearEndStutterSV = imgui.DragFloat("Stutter start SV ", vars.linearEndStutterSV,
-                                                     0.01, -MAX_GENERAL_SV, MAX_GENERAL_SV,
-                                                     "%.2fx")
+        _, vars.linearEndStutterSV = imgui.InputFloat("Stutter start SV ", vars.linearEndStutterSV,
+                                                      0, 0, "%.2fx")
         vars.linearEndStutterSV = mathClamp(vars.linearEndStutterSV, -MAX_GENERAL_SV,
                                             MAX_GENERAL_SV)
         _, vars.linearEndDuration = imgui.SliderFloat("Duration ", vars.linearEndDuration,
                                                       0.01, 0.99, "%.2f")
         vars.linearEndDuration = mathClamp(vars.linearEndDuration, 0.01, 0.99)
         spacing()
-        _, vars.linearEndAvgSV = imgui.DragFloat("Average SV ", vars.linearEndAvgSV, 0.01,
-                                                 -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+        _, vars.linearEndAvgSV = imgui.InputFloat("Average SV ", vars.linearEndAvgSV, 0, 0,
+                                                  "%.2fx")
         vars.linearEndAvgSV = mathClamp(vars.linearEndAvgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     end
+    imgui.PopItemWidth()
     separator()
     
-    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateStutterSV(vars.startSV, vars.svDuration, vars.avgSV, vars.endSVOption,
                                        vars.linearStutter, vars.linearEndStutterSV,
                                        vars.linearEndDuration, vars.linearEndAvgSV)
@@ -309,7 +305,7 @@ function bezierMenu(menuID)
         y2 = 1,
         svPoints = 16,
         avgSV = 1,
-        endSVOption = 1,
+        endSVOption = 2,
         interlace = false,
         interlaceMultiplier = -0.5,
         addTeleport = false,
@@ -319,25 +315,28 @@ function bezierMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.Text("Cubic Bezier Parameters:")
-    spacing()
-    local coords = {vars.x1, vars.y1, vars.x2, vars.y2}
-    _, coords = imgui.DragFloat4("x1, y1, x2, y2", coords, 0.01, -1, 2, "%.2f")
-    vars.y2, vars.x1, vars.y1, vars.x2 = table.unpack(coords)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.Text("Cubic Bezier Points:")
+    local firstPoint = {vars.x1, vars.y1}
+    local secondPoint = {vars.x2, vars.y2}
+    _, firstPoint = imgui.InputFloat2("x1, y1", firstPoint, "%.2f")
+    _, secondPoint = imgui.InputFloat2("x2, y2", secondPoint, "%.2f")
+    vars.x1, vars.y1 = table.unpack(firstPoint)
+    vars.x2, vars.y2 = table.unpack(secondPoint)
     vars.x1 = mathClamp(vars.x1, 0, 1)
     vars.y1 = mathClamp(vars.y1, -1, 2)
     vars.x2 = mathClamp(vars.x2, 0, 1)
     vars.y2 = mathClamp(vars.y2, -1, 2)
     separator()
-    
     chooseAverageSV(vars)
     chooseSVPoints(vars)
-    chooseEndSV(vars)
+    separator()
+    chooseEndSV(vars, true)
     chooseInterlaceMultiplier(vars, menuID)
     chooseTeleportSV(vars, menuID)
+    imgui.PopItemWidth()
     
-    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateBezierSV(vars.x1, vars.y1, vars.x2, vars.y2, vars.svPoints,
                                       vars.avgSV, vars.endSVOption, vars.interlace,
                                       vars.interlaceMultiplier, vars.addTeleport,
@@ -359,7 +358,7 @@ function sinusoidalMenu(menuID)
         periods = 0.25,
         shiftPeriods = 0,
         svsPerQuarterPeriod = 8,
-        endSVOption = 1,
+        endSVOption = 2,
         addTeleport = false,
         veryStartTeleport = false,
         teleportValue = 10000,
@@ -367,45 +366,31 @@ function sinusoidalMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.Text("Wave Amplitude:")
-    spacing()
-    _, vars.startAmplitude = imgui.DragFloat("Start", vars.startAmplitude, 0.01,
-                                             -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2f")
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.Text("Amplitude:")
+    local amplitudes = {vars.startAmplitude, vars.endAmplitude}
+    _, amplitudes = imgui.InputFloat2("Start/End", amplitudes, "%.2fx")
+    vars.startAmplitude, vars.endAmplitude = table.unpack(amplitudes)
     vars.startAmplitude = mathClamp(vars.startAmplitude, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-    _, vars.endAmplitude = imgui.DragFloat("End", vars.endAmplitude, 0.01,
-                                           -MAX_GENERAL_SV, MAX_GENERAL_SV, "%.2f")
     vars.endAmplitude = mathClamp(vars.endAmplitude, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     separator()
-    
     _, vars.periods = imgui.InputFloat("Periods/Cycles", vars.periods, 0.25, 0.25, "%.2f")
     vars.periods = forceQuarter(vars.periods)
     vars.periods = mathClamp(vars.periods, 0.25, 20)
-    
-    local text = "Shift start by "
-    imgui.AlignTextToFramePadding()
-    imgui.Text(text)
-    imgui.SameLine(0, SAMELINE_SPACING)
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH - imgui.CalcTextSize(text)[1] - 2 * SAMELINE_SPACING)
-    _, vars.shiftPeriods = imgui.InputFloat("Periods/Cycles ", vars.shiftPeriods, 0.25, 0.25,
+    _, vars.shiftPeriods = imgui.InputFloat("Phase Shift", vars.shiftPeriods, 0.25, 0.25,
                                             "%.2f")
     vars.shiftPeriods = forceQuarter(vars.shiftPeriods)
     vars.shiftPeriods = mathClamp(vars.shiftPeriods, 0, 0.75)
-    imgui.PopItemWidth()
     spacing()
-    
-    imgui.Text("SV points per quarter period/cycle")
-    spacing()
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    _, vars.svsPerQuarterPeriod = imgui.InputInt(" ", vars.svsPerQuarterPeriod)
+    imgui.Text("For every 0.25 period/cycle, place...")
+    _, vars.svsPerQuarterPeriod = imgui.InputInt("SV points", vars.svsPerQuarterPeriod)
     vars.svsPerQuarterPeriod = mathClamp(vars.svsPerQuarterPeriod, 1, 50)
-    imgui.PopItemWidth()
     separator()
-    
-    chooseEndSV(vars)
+    chooseEndSV(vars, true)
     chooseTeleportSV(vars, menuID)
+    imgui.PopItemWidth()
     
-    if imgui.Button("Place SVs Between Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateSinusoidalSV(vars.startAmplitude, vars.endAmplitude, vars.periods,
                                           vars.shiftPeriods, vars.svsPerQuarterPeriod,
                                           vars.endSVOption, vars.addTeleport,
@@ -437,77 +422,70 @@ function singleMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    _, vars.svBefore = imgui.Checkbox("Add SV before note", vars.svBefore)
-    _, vars.svAfter = imgui.Checkbox("Add SV after note", vars.svAfter)
-    spacing()
-    _, vars.skipSVAtNote = imgui.Checkbox("Skip SV at note", vars.skipSVAtNote)
-    separator()
-    
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     if vars.svBefore then
-        _, vars.svValueBefore = imgui.DragFloat("SV before note ", vars.svValueBefore, 0.01,
-                                                -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+        imgui.Text("Before note:")
+        if vars.scaleSVLinearly then
+            local beforeSVValues = {vars.svValueBefore, vars.svValueBeforeEnd}
+            _, beforeSVValues = imgui.InputFloat2("Start/End SV", beforeSVValues, "%.2fx")
+            vars.svValueBefore, vars.svValueBeforeEnd = table.unpack(beforeSVValues)
+            vars.svValueBeforeEnd = mathClamp(vars.svValueBeforeEnd, -MAX_TELEPORT_VALUE,
+                                              MAX_TELEPORT_VALUE)
+        else
+            _, vars.svValueBefore = imgui.InputFloat("SV value", vars.svValueBefore, 0, 0, "%.2fx")
+        end
         vars.svValueBefore = mathClamp(vars.svValueBefore, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, vars.incrementBefore = imgui.DragFloat("Time before", vars.incrementBefore, 0.01,
-                                                  MIN_DURATION, MAX_DURATION, "%.3f ms")
+        _, vars.incrementBefore = imgui.InputFloat("Time before", vars.incrementBefore, 0, 0,
+                                                   "%.3f ms")
         vars.incrementBefore = mathClamp(vars.incrementBefore, MIN_DURATION, MAX_DURATION)
     end
     if (not vars.skipSVAtNote) then
         if vars.svBefore then
             spacing()
         end
-        _, vars.svValue = imgui.DragFloat("SV at note ", vars.svValue, 0.01, -MAX_TELEPORT_VALUE,
-                                          MAX_TELEPORT_VALUE, "%.2fx")
+        imgui.Text("At note:")
+        if vars.scaleSVLinearly then
+            local atNoteSVValues = {vars.svValue, vars.svValueEnd}
+            _, atNoteSVValues = imgui.InputFloat2("Start/End SV ", atNoteSVValues, "%.2fx")
+            vars.svValue, vars.svValueEnd = table.unpack(atNoteSVValues)
+            vars.svValueEnd = mathClamp(vars.svValueEnd, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
+        else
+            _, vars.svValue = imgui.InputFloat("SV value ", vars.svValue, 0, 0, "%.2fx")
+        end
         vars.svValue = mathClamp(vars.svValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
     end
     if vars.svAfter then
         if vars.svBefore or (not vars.skipSVAtNote) then
             spacing()
         end
-        _, vars.svValueAfter = imgui.DragFloat("SV after note ", vars.svValueAfter, 0.01,
-                                               -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+        imgui.Text("After note:")
+        if vars.scaleSVLinearly then
+            local afterSVValues = {vars.svValueAfter, vars.svValueAfterEnd}
+            _, afterSVValues = imgui.InputFloat2("Start/End SV  ", afterSVValues, "%.2fx")
+            vars.svValueAfter, vars.svValueAfterEnd = table.unpack(afterSVValues)
+            vars.svValueAfterEnd = mathClamp(vars.svValueAfterEnd, -MAX_TELEPORT_VALUE,
+                                             MAX_TELEPORT_VALUE)
+        else
+            _, vars.svValueAfter = imgui.InputFloat("SV value  ", vars.svValueAfter, 0, 0, "%.2fx")
+        end
         vars.svValueAfter = mathClamp(vars.svValueAfter, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, vars.incrementAfter = imgui.DragFloat("Time after", vars.incrementAfter, 0.01,
-                                                 MIN_DURATION, MAX_DURATION, "%.3f ms")
+        _, vars.incrementAfter = imgui.InputFloat("Time After", vars.incrementAfter, 0, 0,
+                                                   "%.3f ms")
         vars.incrementAfter = mathClamp(vars.incrementAfter, MIN_DURATION, MAX_DURATION)
     end
-    
-    if vars.svBefore or (not vars.skipSVAtNote) or vars.svAfter then
+    local inputExists = vars.svBefore or (not vars.skipSVAtNote) or vars.svAfter
+    if inputExists then
         separator()
-        _, vars.scaleSVLinearly = imgui.Checkbox("Scale SV values linearly over time", vars.scaleSVLinearly)
-        if vars.scaleSVLinearly then
-            spacing()
-            imgui.Text("End values for...")
-            spacing()
-            if vars.svBefore then
-                _, vars.svValueBeforeEnd = imgui.DragFloat("SV before note", vars.svValueBeforeEnd,
-                                                           0.01, -MAX_TELEPORT_VALUE,
-                                                           MAX_TELEPORT_VALUE, "%.2fx")
-                vars.svValueBeforeEnd = mathClamp(vars.svValueBeforeEnd, -MAX_TELEPORT_VALUE,
-                                                  MAX_TELEPORT_VALUE)
-            end
-            if (not vars.skipSVAtNote) then
-                if vars.svBefore then
-                    spacing()
-                end
-                _, vars.svValueEnd = imgui.DragFloat("SV at note", vars.svValueEnd, 0.01,
-                                                  -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
-                vars.svValueEnd = mathClamp(vars.svValueEnd, -MAX_TELEPORT_VALUE,
-                                            MAX_TELEPORT_VALUE)
-            end
-            if vars.svAfter then
-                if vars.svBefore or (not vars.skipSVAtNote) then
-                    spacing()
-                end
-                _, vars.svValueAfterEnd = imgui.DragFloat("SV after note", vars.svValueAfterEnd,
-                                                          0.01, -MAX_TELEPORT_VALUE,
-                                                          MAX_TELEPORT_VALUE, "%.2fx")
-                vars.svValueAfterEnd = mathClamp(vars.svValueAfterEnd, -MAX_TELEPORT_VALUE,
-                                                 MAX_TELEPORT_VALUE)
-            end
-        end
+    end
+    _, vars.svBefore = imgui.Checkbox("Add SV before note", vars.svBefore)
+    _, vars.svAfter = imgui.Checkbox("Add SV after note", vars.svAfter)
+    _, vars.skipSVAtNote = imgui.Checkbox("Skip SV at note", vars.skipSVAtNote)
+    _, vars.scaleSVLinearly = imgui.Checkbox("Scale SV values linearly over time", vars.scaleSVLinearly)
+    imgui.PopItemWidth(DEFAULT_WIDGET_WIDTH)
+
+    if inputExists then
         separator()
-        if imgui.Button("Place SVs At Selected Notes", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                        1.5 * DEFAULT_WIDGET_HEIGHT}) then
+        if imgui.Button("Place SVs At All Selected Notes", ACTION_BUTTON_SIZE) then
             local SVs = calculateSingleSV(vars.skipSVAtNote, vars.svBefore, vars.svValueBefore,
                                           vars.incrementBefore, vars.svAfter, vars.svValueAfter,
                                           vars.incrementAfter, vars.svValue, vars.scaleSVLinearly,
@@ -526,44 +504,55 @@ end
 function removeMenu(menuID)
     local vars = {
         startOffset = 0,
-        endOffset = 0
+        endOffset = 0,
+        inputTime = false
     }
     retrieveStateVariables(menuID, vars)
     
+    local currentButtonSize = {0.6 * DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}
+    local halfWidgetWidth = 100
+    imgui.Text("Remove SVs...")
+    spacing()
     imgui.AlignTextToFramePadding()
-    imgui.Text("From") 
-    imgui.SameLine(0, 2 * SAMELINE_SPACING + (30 - imgui.CalcTextSize("From")[1]))
-    if imgui.Button("Current", {0.3 * DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
-        vars.startOffset = state.SongTime
+    imgui.Text("From")
+    imgui.SameLine(0, 2 * SAMELINE_SPACING)
+    if vars.inputTime then
+        imgui.PushItemWidth(halfWidgetWidth)
+        _, vars.startOffset = imgui.InputFloat("", vars.startOffset, 0, 0, "%.3f ms")
+        imgui.PopItemWidth()
+        imgui.SameLine(0, 2 * SAMELINE_SPACING + 2)
+    else
+        imgui.Text(":  "..convertToTime(vars.startOffset).." (Start) ")
+        imgui.SameLine(0, 2 * SAMELINE_SPACING + 3)
     end
-    imgui.SameLine(0, SAMELINE_SPACING)
-    imgui.PushItemWidth(0.7 * DEFAULT_WIDGET_WIDTH)
-    _, vars.startOffset = imgui.InputInt("(Start)", vars.startOffset)
-    imgui.PopItemWidth()
-    
+    if imgui.Button("Set Current", currentButtonSize) then
+        vars.startOffset = math.floor(state.SongTime)
+    end
+    vars.startOffset = mathClamp(vars.startOffset, 0, MAX_MS_TIME)
     imgui.AlignTextToFramePadding()
+    imgui.Indent(imgui.CalcTextSize("From")[1] - imgui.CalcTextSize("To")[1])
     imgui.Text("To")
-    imgui.SameLine(0, 2 * SAMELINE_SPACING + (30 - imgui.CalcTextSize("To")[1]))
-    if imgui.Button(" Current" , {0.3 * DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
-        vars.endOffset = state.SongTime
+    imgui.Unindent(imgui.CalcTextSize("From")[1] - imgui.CalcTextSize("To")[1])
+    imgui.SameLine(0, 2 * SAMELINE_SPACING)
+    if vars.inputTime then
+        imgui.PushItemWidth(halfWidgetWidth)
+        _, vars.endOffset = imgui.InputFloat(" ", vars.endOffset, 0, 0, "%.3f ms")
+        imgui.PopItemWidth()
+        imgui.SameLine(0, SAMELINE_SPACING)
+    else
+        imgui.Text(":  "..convertToTime(vars.endOffset).." (End)")
+        imgui.SameLine(0, 4 * SAMELINE_SPACING + 2)
     end
-    imgui.SameLine(0, SAMELINE_SPACING)
-    imgui.PushItemWidth(0.7 * DEFAULT_WIDGET_WIDTH)
-    _, vars.endOffset = imgui.InputInt("(End)", vars.endOffset)
-    imgui.PopItemWidth()
+    if imgui.Button(" Set Current ", currentButtonSize) then
+        vars.endOffset = math.floor(state.SongTime)
+    end
+    vars.endOffset = mathClamp(vars.endOffset, 0, MAX_MS_TIME)
+    spacing()
+    _, vars.inputTime = imgui.Checkbox("Manually input time", vars.inputTime)
     separator()
     
-    if imgui.Button("Remove SVs", {1.5 * DEFAULT_WIDGET_WIDTH - 25,
-                    1.5 * DEFAULT_WIDGET_HEIGHT}) then
-        local svsToRemove = {}
-        for i, sv in pairs(map.ScrollVelocities) do
-            if sv.StartTime >= vars.startOffset and sv.StartTime <= vars.endOffset then
-                table.insert(svsToRemove, sv)
-            end
-        end
-        if #svsToRemove > 0 then
-            actions.RemoveScrollVelocityBatch(svsToRemove)
-        end
+    if imgui.Button("Remove SVs Between Times", ACTION_BUTTON_SIZE) then
+        removeSVs(vars.startOffset, vars.endOffset)
     end
     saveStateVariables(menuID, vars)
 end
@@ -620,14 +609,8 @@ function calculateLinearSV(startSV, endSV, svPoints, endSVOption, interlace, int
     local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
     for i = 1, #offsets - 1 do
-        local startOffset = offsets[i]
-        if addTeleport then
-            -- if we want a teleport for each linear or we are at the very start
-            if (not veryStartTeleport) or i == 1 then
-                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
-                startOffset = startOffset + teleportDuration
-            end
-        end
+        local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
+                                              i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
         local timeInterval = (endOffset - startOffset) / svPoints
         local svIncrement = (endSV - startSV) / svPoints
@@ -654,7 +637,7 @@ end
 -- Calculates a single set of linear SVs
 -- Returns the set of linear SVs [Table]
 -- Parameters
---    startOffset  : start time of the linear SVs [Int]
+--    startOffset  : start time of the linear SVs [Int/Float]
 --    timeInterval : time in-between each consecutive SV [Int/Float]
 --    startSV      : starting value of the first SV [Int/Float]
 --    svIncrement  : change in SV value for each consecutive SV [Int/Float]
@@ -694,14 +677,8 @@ function calculateExponentialSV(exponentialIncrease, svPoints, avgSV, intensity,
     local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
     for i = 1, #offsets - 1 do
-        local startOffset = offsets[i]
-        if addTeleport then
-            -- if we want a teleport for each exponential or we are at the very start
-            if (not veryStartTeleport) or i == 1 then
-                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
-                startOffset = startOffset + teleportDuration
-            end
-        end
+        local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
+                                              i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
         local timeInterval = (endOffset - startOffset) / svPoints
         local exponentialSVs = {}
@@ -729,7 +706,7 @@ end
 -- Returns the set of exponential SVs [Table]
 -- Parameters
 --    exponentialIncrease : whether or not the SVs will be exponentially increasing [Boolean]
---    startOffset         : start time of the exponential SVs [Int]
+--    startOffset         : start time of the exponential SVs [Int/Float]
 --    timeInterval        : time in-between each consecutive SV [Int/Float]
 --    svPoints            : number of SVs to place (excluding the very last SV) [Int]
 --    avgSV               : intended average SV [Int/Float]
@@ -824,7 +801,7 @@ end
 -- Calculates a single set of stutter SVs
 -- Returns the set of stutter SVs [Table]
 -- Parameters
---    startOffset  : start time of the stutter SV [Int]
+--    startOffset  : start time of the stutter SV [Int/Float]
 --    timeInterval : total time the stutter effect will last (milliseconds) [Int/Float]
 --    startSV      : starting value of the stutter SV [Int/Float]
 --    svDuration   : duration (percent) of the first SV in the stutter [Float]
@@ -846,14 +823,8 @@ function calculateBezierSV(x1, y1, x2, y2, svPoints, avgSV, endSVOption, interla
     local offsets = uniqueSelectedNoteOffsets(svPoints)
     local SVs = {}
     for i = 1, #offsets - 1 do
-        local startOffset = offsets[i]
-        if addTeleport then
-            -- if we want a teleport for each bezier or we are at the very start
-            if (not veryStartTeleport) or i == 1 then
-                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
-                startOffset = startOffset + teleportDuration
-            end
-        end
+        local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
+                                              i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
         --local timeInterval = endOffset - startOffset / svPoints
         --local bezierSVs = generateBezierSV()
@@ -957,14 +928,8 @@ function calculateSinusoidalSV(startAmplitude, endAmplitude, periods, shiftPerio
     local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
     for i = 1, #offsets - 1 do
-        local startOffset = offsets[i]
-        if addTeleport then
-            -- if we want a teleport for each sinusoidal or we are at the very start
-            if (not veryStartTeleport) or i == 1 then
-                table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
-                startOffset = startOffset + teleportDuration
-            end
-        end
+        local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
+                                              i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
         local timeInterval = endOffset - startOffset
         local sinusoidalSVs = {}
@@ -981,7 +946,7 @@ end
 -- Calculates a single set of sinusoidal SVs
 -- Returns the set of sinusoidal SVs [Table]
 -- Parameters
---    startOffset         : start time of the sinusoidal SV [Int]
+--    startOffset         : start time of the sinusoidal SV [Int/Float]
 --    timeInterval        : total time the sinusoidal SV will last (milliseconds) [Int/Float]
 --    startAmplitude      : starting amplitude of the sinusoidal wave [Int/Float]
 --    endAmplitude        : ending amplitude of the sinusoidal wave [Int/Float]
@@ -1149,34 +1114,30 @@ end
 -- Parameters
 --    vars : a reference to the variables of a menu [Table]
 function chooseAverageSV(vars)
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    _, vars.avgSV = imgui.DragFloat("Average SV", vars.avgSV, 0.01, -MAX_TELEPORT_VALUE,
-                                    MAX_TELEPORT_VALUE, "%.2fx")    
+    _, vars.avgSV = imgui.InputFloat("Average SV", vars.avgSV, 0, 0, "%.2fx")    
     vars.avgSV = mathClamp(vars.avgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-    imgui.PopItemWidth()
-    spacing()
 end
 -- Lets users choose the number of SV points to place
 -- Parameters
 --    vars : a reference to the variables of a menu [Table]
 function chooseSVPoints(vars)
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints)
+    _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints, 1, 1)
     vars.svPoints = mathClamp(vars.svPoints, 1, 256)
-    imgui.PopItemWidth()
-    separator()
 end
 -- Lets users choose the end SV type
 -- Parameters
---    vars : a reference to the variables of a menu [Table]
-function chooseEndSV(vars)
-    imgui.Text("Very last SV:")
-    spacing()
-    for i = 1, #END_SV_TYPES do
+--    vars     : a reference to the variables of a menu [Table]
+--    noNormal : whether or not to have the "Normal" end SV option [Boolean]
+function chooseEndSV(vars, noNormal)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Last SV:")
+    local startNum = 1
+    if noNormal then
+        startNum = 2
+    end
+    for i = startNum, #END_SV_TYPES do
+        imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
         _, vars.endSVOption = imgui.RadioButton(END_SV_TYPES[i], vars.endSVOption, i)
-        if i ~= #END_SV_TYPES then
-            imgui.SameLine(0, 3 * SAMELINE_SPACING)
-        end
     end
     separator()
 end
@@ -1188,59 +1149,143 @@ function chooseTeleportSV(vars, menuID)
     _, vars.addTeleport = imgui.Checkbox("Add teleport SV at start", vars.addTeleport)
     if vars.addTeleport then
         spacing()
-        if imgui.RadioButton("Only very start", vars.veryStartTeleport) then
-            vars.veryStartTeleport = true
-        end
-        imgui.SameLine(0, 3 * SAMELINE_SPACING)
-        if imgui.RadioButton("Every "..string.lower(menuID).." start",
-                             not vars.veryStartTeleport) then
-            vars.veryStartTeleport = false
-        end
-        spacing()
-        _, vars.teleportValue = imgui.DragFloat("Teleport SV", vars.teleportValue, 0.01,
-                                                -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE, "%.2fx")
+        _, vars.teleportValue = imgui.InputFloat("Teleport SV", vars.teleportValue, 0, 0, "%.2fx")
         vars.teleportValue = mathClamp(vars.teleportValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, vars.teleportDuration = imgui.DragFloat("Duration", vars.teleportDuration, 0.01,
-                                                   MIN_DURATION, MAX_TELEPORT_DURATION,
-                                                  "%.3f ms")
+        _, vars.teleportDuration = imgui.InputFloat("Duration", vars.teleportDuration, 0, 0,
+                                                    "%.3f ms")
         vars.teleportDuration = mathClamp(vars.teleportDuration, MIN_DURATION,
                                           MAX_TELEPORT_DURATION)
+        spacing()
+        if imgui.RadioButton("Very start", vars.veryStartTeleport) then
+            vars.veryStartTeleport = true
+        end
+        imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+        if imgui.RadioButton("Every "..string.lower(menuID), not vars.veryStartTeleport) then
+            vars.veryStartTeleport = false
+        end
     end
     separator()
 end
-
 -- Lets users choose and adjust interlace SV options
 -- Parameters
 --    vars   : a reference to the variables of a menu [Table]
 --    menuID : name of the menu of the variables [String]
 function chooseInterlaceMultiplier(vars, menuID)
-    _, vars.interlace = imgui.Checkbox("Interlace with another "..string.lower(menuID), 
-                                       vars.interlace)
+    _, vars.interlace = imgui.Checkbox("Interlace another "..string.lower(menuID), vars.interlace)
     if vars.interlace then
         spacing()
-        _, vars.interlaceMultiplier = imgui.DragFloat("Interlace Ratio", vars.interlaceMultiplier,
-                                                      0.01, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+        _, vars.interlaceMultiplier = imgui.InputFloat("Interlace multiplier", vars.interlaceMultiplier,
+                                                       0, 0, "%.2f")
         vars.interlaceMultiplier = mathClamp(vars.interlaceMultiplier, -MAX_GENERAL_SV,
                                              MAX_GENERAL_SV)
-        spacing()
     end
     separator()
 end
+-- Removes SVs in the map between two points of time
+-- Parameters
+--    startOffset : starting time (milliseconds) to begin removing SVs at [Int/Float]
+--    endOffset   : ending time (milliseconds) to stop removing SVs at [Int/Float]
+function removeSVs(startOffset, endOffset)
+    local svsToRemove = {}
+    for i, sv in pairs(map.ScrollVelocities) do
+        local isInBetween = (sv.StartTime >= startOffset and sv.StartTime <= endOffset) or
+                            (sv.StartTime >= endOffset and sv.StartTime <= startOffset)
+        if isInBetween then
+            table.insert(svsToRemove, sv)
+        end
+    end
+    if #svsToRemove > 0 then
+        actions.RemoveScrollVelocityBatch(svsToRemove)
+    end
+end
+-- ** Note ** The built-in utils.MillisecondsToTime function already exists for Quaver, but doesn't
+-- display hours. A slightly more efficient way to code the function below is to concatenate the
+-- hours to the output of the utils.MillisecondsToTime function (if hours > 0). I already coded
+-- this function before knowing this fact though, so I'm leaving this function as is.
+--
+-- Converts a given amount of time in milliseconds to hh:mm:ss format
+-- Returns the converted time as text [String]
+-- Parameters
+--    milliseconds : time in milliseconds to be converted [Int/Float]
+function convertToTime(milliseconds)
+    -- if-statment below is needed or else the returned string is messed up when milliseconds is
+    -- equal to negative zero 
+    if milliseconds == 0 then
+        return "00:00.000"
+    end
+    
+    local millisecondsLeft = milliseconds
+    local hours = math.floor(millisecondsLeft / (1000 * 60 * 60))
+    millisecondsLeft = millisecondsLeft % (1000 * 60 * 60)
+    local minutes = math.floor(millisecondsLeft / (1000 * 60))
+    millisecondsLeft = millisecondsLeft % (1000 * 60)
+    local seconds = math.floor(millisecondsLeft / 1000)
+    millisecondsLeft = millisecondsLeft % 1000
+    
+    local time = ""
+    if hours > 0 then
+        time =  hours..":"
+    end
+    if minutes < 10 then
+        time = time.."0"
+    end
+    time = time..minutes..":"
+    if seconds < 10 then
+        time = time.."0"
+    end
+    time = time..seconds.."."
+    if millisecondsLeft < 10 then
+        time = time.."0"
+    end
+    if millisecondsLeft < 100 then
+        time = time.."0"
+    end
+    -- have the time displayed down to the millisecond, no fractions of a millisecond
+    time = time..(math.floor(millisecondsLeft))
+    return time
+end
+-- Adds a teleport SV to the start of a set of SVs if applicable
+-- Returns the (adjusted) start offset based on the teleport [Int/Float]
+-- Parameters
+--    startOffset       : start time of the SV set being calculated [Int/Float]
+--    addTeleport       : whether or not to add a teleport SV [Boolean]
+--    veryStartTeleport : whether or not the teleport SV is only at the very start [Boolean]
+--    veryFirstSet      : whether or not the current SV set is the very first set [Boolean]
+--    teleportValue     : value of the teleport SV [Int/Float] 
+--    teleportDuration  : duration of the teleport SV in milliseconds [Int/Float] 
+--    SVs               : table of all SVs that will be calculated [Table]
+function determineTeleport(startOffset, addTeleport, veryStartTeleport, veryFirstSet,
+                           teleportValue, teleportDuration, SVs)
+    if addTeleport then
+        -- if we want a teleport for each set of SVs or we are at the very start
+        if (not veryStartTeleport) or veryFirstSet then
+            table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
+            startOffset = startOffset + teleportDuration
+        end
+    end
+    return startOffset
+end
+
 ---------------------------------------------------------------------------------------------------
 -- Global Constants
 ---------------------------------------------------------------------------------------------------
 
 -- IMGUI / GUI
+DEFAULT_WIDGET_WIDTH = 150         -- value determining the width of GUI widgets
 DEFAULT_WIDGET_HEIGHT = 26         -- value determining the height of GUI widgets
-DEFAULT_WIDGET_WIDTH = 200         -- value determining the width of GUI widgets
 SAMELINE_SPACING = 5               -- value determining spacing between GUI items on the same row
+ACTION_BUTTON_SIZE = {             -- dimensions of the button that places/removes SVs
+    1.75 * DEFAULT_WIDGET_WIDTH,
+    1.75 * DEFAULT_WIDGET_HEIGHT
+}
 
--- SV restrictions
+-- SV/Time restrictions
 MAX_TELEPORT_VALUE = 100000        -- maximum (absolute) teleport SV value allowed
 MAX_TELEPORT_DURATION = 10         -- maximum teleport duration allowed (milliseconds)
-MAX_GENERAL_SV = 100               -- maximum (absolute) value allowed for general SVs (ex. avg SV)
+MAX_GENERAL_SV = 1000              -- maximum (absolute) value allowed for general SVs (ex. avg SV)
 MIN_DURATION = 0.016               -- minimum duration allowed in general (milliseconds)
 MAX_DURATION = 10000               -- maximum duration allowed in general (milliseconds)
+MAX_MS_TIME = 7200000              -- maximum time (milliseconds) allowed ~ 2 hours
 
 -- Menu-related
 EMOTICONS = {                      -- emoticons to clutter menu titles and confuse users
