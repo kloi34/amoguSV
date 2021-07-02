@@ -14,10 +14,10 @@ Currently, the plugin supports the following SV tools:
 * Single
 * Remove
 
-Details about these tools can be found at the [wiki page](https://github.com/kloi34/amoguSV/wiki)
+I highly recommend you check out the [wiki page](https://github.com/kloi34/amoguSV/wiki) to learn about how to use these tools.
 
 ## Installation
-1. Press the green download code button on GitHub and click on "Download ZIP"
+1. Download the ZIP file by pressing the green download code button on GitHub and clicking "Download ZIP"
 2. Extract the ZIP file to the "Plugins" folder (located inside the main Quaver folder)
 
 ## Related Links
