@@ -16,7 +16,7 @@ Currently, the plugin supports the following SV tools:
 * Single
 * Remove
 
-I highly recommend you check out the [wiki page](https://github.com/kloi34/amoguSV/wiki) to learn about how to use these tools.
+I recommend you check out the [wiki page](https://github.com/kloi34/amoguSV/wiki) to learn about these tools.
 
 ## Installation
 1. Download the ZIP file by pressing the green download code button on GitHub and clicking "Download ZIP"
