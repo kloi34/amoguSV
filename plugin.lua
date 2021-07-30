@@ -1,8 +1,8 @@
--- amoguSV v1.1 (1 July 2021)
+-- amoguSV pre-v2.0 (29 July 2021) 
 -- by kloi34
 
--- Many SV tool ideas and/or code snippets were stolen, and I'm also planning to steal more that
--- have yet to be implemented, so here is credit to the SV plugins and the creators behind them:
+-- Many SV tool ideas were stolen, and I'm also planning to steal more that have yet to be
+-- implemented, so here is credit to the SV plugins and the creators behind them:
 --    iceSV       (by IceDynamix)         @ https://github.com/IceDynamix/iceSV
 --    KeepStill   (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/KeepStill
 --    Vibrato     (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/Vibrato
@@ -13,12 +13,18 @@
 
 -- This is an SV plugin for Quaver, the ultimate community-driven and open-source competitive
 -- rhythm game. The plugin contains various tools for editing SVs quickly and efficiently.
--- It's most similar to (i.e. 50% of SV features and code stolen from) iceSV.
+-- It's most similar to (i.e. 50% of SV features/ideas stolen from) iceSV.
 
 -- Things that still need working on/fixing:
---      1. Cubic bezier stuff
+--      1. Cubic bezier implementation
 --      2. Decrease computations (reuse already calculated SV values if possible instead of
 --         recalculating every time)
+--          ++ done with linear
+--          ++ done with exponential 
+--      3. Make first time useability better, tools easier to understand (adding tooltips?,
+--         short description of tool, actually finish the goddamn wiki)
+--      4. Organize code better, create a table of contents listing major sections of code,
+--         review comments, review code, review overall structure of the code
 
 --  Optional things that I maybe want to add later
 --      1. Dedicated KeepStill+more SV tool 
@@ -31,7 +37,11 @@
 --      8. dampened harmonic motion svs 5head
 --      9. steal iceSV sv multiplier tool? and also steal svs range tool to copy paste svs?
 --      10. steal iceSV bezier parse
---      11. make graphs in imgui to show the svs that are about to get placed 
+--      11. add a global toggle to allow placing SVs between offsets rather than notes
+
+--  Known issues
+--      1. Remove SV tool menu "current" button shifts to the right unintentionally if the remove
+--         time is set >= 1hrs
 
 -- ** code side note **
 -- The 'Global Constants' section is located at the bottom of the code instead of here at the top
@@ -52,9 +62,8 @@ end
 function applyStyle()
     -- Plugin Styles
     local rounding = 5
-    
-    imgui.PushStyleVar( imgui_style_var.WindowPadding,      { 8, 8 } )
-    imgui.PushStyleVar( imgui_style_var.FramePadding,       { 8, 5 } )
+    imgui.PushStyleVar( imgui_style_var.WindowPadding,      { PADDING_WIDTH, 8 } )
+    imgui.PushStyleVar( imgui_style_var.FramePadding,       { PADDING_WIDTH, 5 } )
     imgui.PushStyleVar( imgui_style_var.ItemSpacing,        { DEFAULT_WIDGET_HEIGHT / 2 - 1, 4 } )
     imgui.PushStyleVar( imgui_style_var.ItemInnerSpacing,   { SAMELINE_SPACING, 6 } )
     imgui.PushStyleVar( imgui_style_var.WindowBorderSize,   0        )
@@ -83,43 +92,44 @@ function applyStyle()
     imgui.PushStyleColor( imgui_col.Separator,              { 0.81, 0.88, 1.00, 0.30 } )
     imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 0.81, 0.88, 1.00, 0.40 } )
 end
--- Creates the main plugin menu
+-- Creates the main menu
 function mainMenu()
+    imgui.SetNextWindowSize(PLUGIN_WINDOW_SIZE)
     imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
     local menuID = "main"
     local vars = {
-        hovered = {false, false, false},
-        toolOptionNum = 1
+        isHovered = {false, false, false},
+        toolOptionNum = 0
     }
     retrieveStateVariables(menuID, vars)
     
-    local indentVal = 84 - imgui.CalcTextSize("Tool Options")[1]
-    imgui.Indent(indentVal)
-    imgui.Text("Tool Options")
-    imgui.Unindent(indentVal)
-    imgui.SameLine(0, 40)
-    local menuTitle = sandwichStrings(TOOL_OPTIONS[vars.toolOptionNum].." SV", "         ")
-    imgui.Text(sandwichStrings(menuTitle, EMOTICONS[vars.toolOptionNum]))
+    vars.isHovered[1] = imgui.IsWindowHovered()
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Current SV Tool:")
+    imgui.SameLine()
+    imgui.PushItemWidth(2 * DEFAULT_WIDGET_WIDTH)
+    _, vars.toolOptionNum = imgui.Combo("     ", vars.toolOptionNum, TOOL_OPTIONS, #TOOL_OPTIONS)
+    imgui.SameLine()
+    imgui.Text(EMOTICONS[vars.toolOptionNum + 1])
+    spacing()
     
-    imgui.BeginChild("SV Tool Options", {100, #TOOL_OPTIONS * 18 + 13}, true)
-    for i = 1, #TOOL_OPTIONS do
-        if imgui.Selectable(TOOL_OPTIONS[i], vars.toolOptionNum == i) then
-            vars.toolOptionNum = i
-        end
-    end
-    vars.hovered[1] = imgui.IsWindowHovered()
-    imgui.EndChild()
-    
-    imgui.SameLine(0, 20)
-    imgui.BeginChild("SV Menu", {280, 405}, false)
+    imgui.Columns(2, "SV Menus", false)
+    local menuWidth = 265
+    imgui.BeginChild("Left Menu", {menuWidth, 420}, true)
+    vars.isHovered[2] = imgui.IsWindowHovered()
+    local centeringIndent = (menuWidth - imgui.CalcTextSize("SETTINGS")[1] - 2 * PADDING_WIDTH) / 2
+    imgui.Indent(centeringIndent)
+    imgui.Text("SETTINGS")
+    imgui.Unindent(centeringIndent)
     separator()
-    MENUS[vars.toolOptionNum](TOOL_OPTIONS[vars.toolOptionNum])
-    vars.hovered[2] = imgui.IsWindowHovered()
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    -- creates the menu of the currently selected SV tool
+    MENUS[vars.toolOptionNum + 1](TOOL_OPTIONS[vars.toolOptionNum + 1])
+    vars.isHovered[3] = imgui.IsWindowHovered()
     imgui.EndChild()
     
     saveStateVariables(menuID, vars)
-    vars.hovered[3] = imgui.IsWindowHovered()
-    state.IsWindowHovered = vars.hovered[1] or vars.hovered[2] or vars.hovered[3]
+    state.IsWindowHovered = vars.isHovered[1] or vars.isHovered[2] or vars.isHovered[3]
     imgui.End()
 end
 -- Creates the "Linear SV" menu
@@ -137,43 +147,55 @@ function linearMenu(menuID)
         addTeleport = false,
         veryStartTeleport = false,
         teleportValue = 10000,
-        teleportDuration = 1.000
+        teleportDuration = 1.000,
+        linearSVs = {}
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    local updateSVGraph = #vars.linearSVs == 0
     local linearSVValues = {vars.startSV, vars.endSV}
-    _, linearSVValues = imgui.InputFloat2("Start/End", linearSVValues, "%.2fx")
+    _, linearSVValues = imgui.InputFloat2("Start/End SV", linearSVValues, "%.2fx")
+    updateSVGraph = updateSVGraph or (linearSVValues[1] ~=  vars.startSV)
+                    or (linearSVValues[2] ~= vars.endSV)
     vars.startSV, vars.endSV = table.unpack(linearSVValues)
     vars.startSV = mathClamp(vars.startSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     vars.endSV = mathClamp(vars.endSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-    if imgui.Button("Swap End and Start", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
-        local temp = vars.startSV
-        vars.startSV = vars.endSV
-        vars.endSV = temp
-    end
-    spacing()
-    chooseSVPoints(vars)
+    updateSVGraph = chooseSVPoints(vars) or updateSVGraph
     separator()
-    chooseEndSV(vars, false)
+    updateSVGraph = chooseEndSV(vars, false) or updateSVGraph
+    local oldInterlace = vars.interlace
+    local oldInterlaceStart = vars.interlaceStartSV
+    local oldInterlaceEnd = vars.interlaceEndSV
     _, vars.interlace = imgui.Checkbox("Interlace another linear", vars.interlace)
     if vars.interlace then
         spacing()
         local interlaceSVValues = {vars.interlaceStartSV, vars.interlaceEndSV}
-        _, interlaceSVValues = imgui.InputFloat2("Start/End ", interlaceSVValues, "%.2fx")
+        _, interlaceSVValues = imgui.InputFloat2("Start/End SV ", interlaceSVValues, "%.2fx")
         vars.interlaceStartSV, vars.interlaceEndSV = table.unpack(interlaceSVValues)
         vars.interlaceStartSV = mathClamp(vars.interlaceStartSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
         vars.interlaceEndSV = mathClamp(vars.interlaceEndSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
-        if imgui.Button(" Swap End and Start ", {DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}) then
-            local temp = vars.interlaceStartSV
-            vars.interlaceStartSV = vars.interlaceEndSV
-            vars.interlaceEndSV = temp
-        end
     end
+    updateSVGraph = updateSVGraph or (oldInterlace ~= vars.interlace)
+                    or (oldInterlaceStart ~= vars.interlaceStartSV)
+                    or (oldInterlaceEnd ~= vars.interlaceEndSV)
     separator()
     chooseTeleportSV(vars, menuID)
-    imgui.PopItemWidth()
+    imgui.EndChild()
     
+    imgui.NextColumn()
+    imgui.BeginChild("Right Menu", {260, 420})
+    if updateSVGraph then
+        vars.linearSVs = generateLinearSet(vars.startSV, vars.endSV, vars.svPoints + 1, 
+                                           vars.interlace, vars.interlaceStartSV,
+                                           vars.interlaceEndSV)
+        if vars.endSVOption ~= 1 then
+            table.remove(vars.linearSVs, #vars.linearSVs)
+        end
+        if vars.endSVOption == 3 then
+            table.insert(vars.linearSVs, 1)
+        end
+    end
+    plotSVs(vars.linearSVs, menuID)
     if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateLinearSV(vars.startSV, vars.endSV, vars.svPoints, vars.endSVOption,
                                       vars.interlace, vars.interlaceStartSV, vars.interlaceEndSV,
@@ -193,21 +215,23 @@ function exponentialMenu(menuID)
         exponentialIncrease = false,
         svPoints = 16,
         avgSV = 1,
-        intensity = 3,
+        intensity = 15,
         endSVOption = 1,
         interlace = false,
         interlaceMultiplier = -0.5,
         addTeleport = false,
         veryStartTeleport = false,
         teleportValue = 10000,
-        teleportDuration = 1.000
+        teleportDuration = 1.000,
+        exponentialSVs = {}
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    local updateSVGraph = #vars.exponentialSVs == 0
     imgui.AlignTextToFramePadding()
     imgui.Text("Behavior:")
     imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+    local oldBehavior = vars.exponentialIncrease
     if imgui.RadioButton("Speed up", vars.exponentialIncrease) then
         vars.exponentialIncrease = true
     end
@@ -215,18 +239,34 @@ function exponentialMenu(menuID)
     if imgui.RadioButton("Slow down", not vars.exponentialIncrease) then
         vars.exponentialIncrease = false
     end
+    updateSVGraph = (oldBehavior ~= vars.exponentialIncrease) or updateSVGraph
     spacing()
-    _, vars.intensity = imgui.InputFloat("Intensity (1-20)", vars.intensity, 0, 0, "%.2f")
-    vars.intensity = mathClamp(vars.intensity, 1, 20)
+    local oldIntensity = vars.intensity
+    _, vars.intensity = imgui.SliderInt("Intensity", vars.intensity, 1, 100)
+    vars.intensity = mathClamp(vars.intensity, 1, 100)
+    updateSVGraph = (oldIntensity ~= vars.intensity) or updateSVGraph
+    updateSVGraph = chooseAverageSV(vars) or updateSVGraph
+    updateSVGraph = chooseSVPoints(vars) or updateSVGraph
     separator()
-    chooseAverageSV(vars)
-    chooseSVPoints(vars)
-    separator()
-    chooseEndSV(vars, false)
-    chooseInterlaceMultiplier(vars, menuID)
+    updateSVGraph = chooseEndSV(vars, false) or updateSVGraph
+    updateSVGraph = chooseInterlaceMultiplier(vars, menuID) or updateSVGraph
     chooseTeleportSV(vars, menuID)
-    imgui.PopItemWidth()
+    imgui.EndChild()
     
+    imgui.NextColumn()
+    imgui.BeginChild("Right Menu", {260, 420})
+    if updateSVGraph then
+        vars.exponentialSVs = generateExponentialSet(vars.exponentialIncrease, vars.svPoints + 1,
+                                                     vars.avgSV, vars.intensity, vars.interlace,
+                                                     vars.interlaceMultiplier)
+        if vars.endSVOption ~= 1 then
+            table.remove(vars.exponentialSVs, #vars.exponentialSVs)
+        end
+        if vars.endSVOption == 3 then
+            table.insert(vars.exponentialSVs, 1)
+        end
+    end
+    plotSVs(vars.exponentialSVs, menuID)
     if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateExponentialSV(vars.exponentialIncrease, vars.svPoints, vars.avgSV,
                                            vars.intensity, vars.endSVOption, vars.interlace,
@@ -255,7 +295,6 @@ function stutterMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     _, vars.startSV = imgui.InputFloat("Stutter start SV", vars.startSV, 0, 0, "%.2fx")
     vars.startSV = mathClamp(vars.startSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     _, vars.svDuration = imgui.SliderFloat("Duration", vars.svDuration, 0.01, 0.99, "%.2f")
@@ -281,9 +320,10 @@ function stutterMenu(menuID)
                                                   "%.2fx")
         vars.linearEndAvgSV = mathClamp(vars.linearEndAvgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
     end
-    imgui.PopItemWidth()
-    separator()
+    imgui.EndChild()
     
+    imgui.NextColumn()
+    imgui.BeginChild("Right Menu", {260, 420})
     if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateStutterSV(vars.startSV, vars.svDuration, vars.avgSV, vars.endSVOption,
                                        vars.linearStutter, vars.linearEndStutterSV,
@@ -311,31 +351,46 @@ function bezierMenu(menuID)
         addTeleport = false,
         veryStartTeleport = false,
         teleportValue = 10000,
-        teleportDuration = 1.000
+        teleportDuration = 1.000,
+        bezierSVs = {}
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    imgui.Text("Cubic Bezier Points:")
+    local updateSVGraph = #vars.bezierSVs == 0
     local firstPoint = {vars.x1, vars.y1}
     local secondPoint = {vars.x2, vars.y2}
     _, firstPoint = imgui.InputFloat2("x1, y1", firstPoint, "%.2f")
     _, secondPoint = imgui.InputFloat2("x2, y2", secondPoint, "%.2f")
+    updateSVGraph = updateSVGraph or (firstPoint[1] ~= vars.x1) or (firstPoint[2] ~= vars.y1)
+                    or (secondPoint[1] ~= vars.x2) or (secondPoint[2] ~= vars.y2)
     vars.x1, vars.y1 = table.unpack(firstPoint)
     vars.x2, vars.y2 = table.unpack(secondPoint)
     vars.x1 = mathClamp(vars.x1, 0, 1)
     vars.y1 = mathClamp(vars.y1, -1, 2)
     vars.x2 = mathClamp(vars.x2, 0, 1)
     vars.y2 = mathClamp(vars.y2, -1, 2)
+    updateSVGraph = chooseAverageSV(vars) or updateSVGraph
+    updateSVGraph = chooseSVPoints(vars) or updateSVGraph
     separator()
-    chooseAverageSV(vars)
-    chooseSVPoints(vars)
-    separator()
-    chooseEndSV(vars, true)
-    chooseInterlaceMultiplier(vars, menuID)
+    updateSVGraph = chooseEndSV(vars, true) or updateSVGraph
+    updateSVGraph = chooseInterlaceMultiplier(vars, menuID) or updateSVGraph
     chooseTeleportSV(vars, menuID)
-    imgui.PopItemWidth()
+    imgui.EndChild()
     
+    imgui.NextColumn()
+    imgui.BeginChild("Right Menu", {260, 420})
+    --[[
+    if updateSVGraph then
+        --vars.bezierSVs = generate
+        if vars.endSVOption ~= 1 then
+            table.remove(vars.bezierSVs, #vars.bezierSVs)
+        end
+        if vars.endSVOption == 3 then
+            table.insert(vars.bezierSVs, 1)
+        end
+    end
+    --]]
+    --plotSVs(vars.bezierSVs, menuID)
     if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateBezierSV(vars.x1, vars.y1, vars.x2, vars.y2, vars.svPoints,
                                       vars.avgSV, vars.endSVOption, vars.interlace,
@@ -366,7 +421,6 @@ function sinusoidalMenu(menuID)
     }
     retrieveStateVariables(menuID, vars)
     
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     imgui.Text("Amplitude:")
     local amplitudes = {vars.startAmplitude, vars.endAmplitude}
     _, amplitudes = imgui.InputFloat2("Start/End", amplitudes, "%.2fx")
@@ -388,8 +442,10 @@ function sinusoidalMenu(menuID)
     separator()
     chooseEndSV(vars, true)
     chooseTeleportSV(vars, menuID)
-    imgui.PopItemWidth()
+    imgui.EndChild()
     
+    imgui.NextColumn()
+    imgui.BeginChild("Right Menu", {260, 420})
     if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateSinusoidalSV(vars.startAmplitude, vars.endAmplitude, vars.periods,
                                           vars.shiftPeriods, vars.svsPerQuarterPeriod,
@@ -421,8 +477,7 @@ function singleMenu(menuID)
         svValueAfterEnd = 0
     }
     retrieveStateVariables(menuID, vars)
-    
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+
     if vars.svBefore then
         imgui.Text("Before note:")
         if vars.scaleSVLinearly then
@@ -481,7 +536,6 @@ function singleMenu(menuID)
     _, vars.svAfter = imgui.Checkbox("Add SV after note", vars.svAfter)
     _, vars.skipSVAtNote = imgui.Checkbox("Skip SV at note", vars.skipSVAtNote)
     _, vars.scaleSVLinearly = imgui.Checkbox("Scale SV values linearly over time", vars.scaleSVLinearly)
-    imgui.PopItemWidth(DEFAULT_WIDGET_WIDTH)
 
     if inputExists then
         separator()
@@ -537,7 +591,6 @@ function removeMenu(menuID)
     if vars.inputTime then
         imgui.PushItemWidth(halfWidgetWidth)
         _, vars.endOffset = imgui.InputFloat(" ", vars.endOffset, 0, 0, "%.3f ms")
-        imgui.PopItemWidth()
         imgui.SameLine(0, SAMELINE_SPACING)
     else
         imgui.Text(":  "..convertToTime(vars.endOffset).." (End)")
@@ -581,7 +634,7 @@ function saveStateVariables(menuID, variables)
 end
 -- Adds vertical blank space on the GUI
 function spacing()
-    imgui.Dummy({0,5})
+    imgui.Dummy({0,1})
 end
 -- Adds a horizontal line separator on the GUI
 function separator()
@@ -608,54 +661,45 @@ function calculateLinearSV(startSV, endSV, svPoints, endSVOption, interlace, int
                            teleportDuration)
     local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
+    local linearSVValues = generateLinearSet(startSV, endSV, svPoints + 1, interlace, interlaceStartSV,
+                                             interlaceEndSV)
     for i = 1, #offsets - 1 do
         local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
                                               i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
-        local timeInterval = (endOffset - startOffset) / svPoints
-        local svIncrement = (endSV - startSV) / svPoints
-        local linearSVs = {}
-        local thisEndSVOption = getThisEndSVOption(i == #offsets - 1, endSVOption)
-        linearSVs = generateLinearSV(startOffset, timeInterval, startSV, svIncrement, svPoints,
-                                     thisEndSVOption)
-        for j = 1, #linearSVs do
-            table.insert(SVs, linearSVs[j])
-        end
-        
-        if interlace then
-            local interlaceSVInterval = (interlaceEndSV - interlaceStartSV) / svPoints
-            startOffset = startOffset + (timeInterval * 0.5)
-            local interlaceSVs = generateLinearSV(startOffset, timeInterval, interlaceStartSV,
-                                                  interlaceSVInterval, svPoints, 2)
-            for j = 1, #interlaceSVs do
-                table.insert(SVs, interlaceSVs[j])
-            end
+        local svOffsets = generateLinearSet(startOffset, endOffset, #linearSVValues, false, 0, 0)
+        for j = 1, #svOffsets - 1 do
+            table.insert(SVs, utils.CreateScrollVelocity(svOffsets[j], linearSVValues[j]))
         end
     end
+    addEndSV(SVs, offsets[#offsets], linearSVValues[#linearSVValues], endSVOption)
     return SVs
 end
--- Calculates a single set of linear SVs
--- Returns the set of linear SVs [Table]
+-- Generates a linear set of equally-spaced numbers between two numbers (inclusive)
+-- Returns the linear set of numbers [Table]
 -- Parameters
---    startOffset  : start time of the linear SVs [Int/Float]
---    timeInterval : time in-between each consecutive SV [Int/Float]
---    startSV      : starting value of the first SV [Int/Float]
---    svIncrement  : change in SV value for each consecutive SV [Int/Float]
---    svPoints     : number of SVs to place (excluding the very last SV) [Int]
---    endSVOption  : option number for the last SV (based on constant END_SV_TYPES) [Int]
-function generateLinearSV(startOffset, timeInterval, startSV, svIncrement, svPoints, endSVOption)
-    local SVs = {}
-    for step = 0, svPoints do
-        local offset = step * timeInterval + startOffset 
-        local velocity = step * svIncrement + startSV
-        if step == svPoints then
-            velocity = endSVValue(velocity, endSVOption)
+--    startVal   : starting value of the set [Int/Float]
+--    endVal     : ending value of the set [Int/Float]
+--    numValues  : total number of values in the linear set (including the end) [Int]
+--    interlace  : whether or not to interlace another set of linear SVs inbetween [Boolean]
+--    interStart : starting value of the interlace [Int/Float]
+--    interEnd   : ending value of the interlace [Int/Float]
+function generateLinearSet(startVal, endVal, numValues, interlace, interStart, interEnd)
+    local linearSet = {}
+    if numValues > 1 then
+        local increment = (endVal - startVal) / (numValues - 1)
+        local interlaceIncrement = (interEnd - interStart) / (numValues - 1)
+        for i = 0, numValues - 1 do
+            table.insert(linearSet, startVal + i * increment)
+            if interlace and (i ~= numValues - 1) then
+                table.insert(linearSet, interStart + i * interlaceIncrement)
+            end
         end
-        if velocity ~= nil then
-            table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
-        end
+    elseif numValues == 1 then
+        table.insert(linearSet, startVal)
+        table.insert(linearSet, interStart)
     end
-    return SVs
+    return linearSet
 end
 -- Calculates all exponential SVs to place
 -- Returns a list of all calculated exponential SVs [Table]
@@ -676,85 +720,51 @@ function calculateExponentialSV(exponentialIncrease, svPoints, avgSV, intensity,
                                 teleportValue, teleportDuration)
     local offsets = uniqueSelectedNoteOffsets()
     local SVs = {}
+    local exponentialSVValues = generateExponentialSet(exponentialIncrease, svPoints + 1, avgSV,
+                                                       intensity, interlace, interlaceMultiplier)
     for i = 1, #offsets - 1 do
         local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
                                               i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
-        local timeInterval = (endOffset - startOffset) / svPoints
-        local exponentialSVs = {}
-        local thisEndSVOption = getThisEndSVOption(i == #offsets - 1, endSVOption)
-        exponentialSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
-                                               svPoints, avgSV, intensity, thisEndSVOption)
-        for j = 1, #exponentialSVs do
-            table.insert(SVs, exponentialSVs[j])
-        end
-        
-        local interlaceSVs = {}
-        if interlace then
-            startOffset = startOffset + (0.5 * timeInterval)
-            local tempAvgSV = avgSV * interlaceMultiplier
-            interlaceSVs = generateExponentialSV(exponentialIncrease, startOffset, timeInterval,
-                                                 svPoints, tempAvgSV, intensity, 2)
-        end
-        for j = 1, #interlaceSVs do
-            table.insert(SVs, interlaceSVs[j])
+        local svOffsets =  generateLinearSet(startOffset, endOffset, #exponentialSVValues, false,
+                                             0, 0)
+        for j = 1, #svOffsets - 1 do
+            table.insert(SVs, utils.CreateScrollVelocity(svOffsets[j], exponentialSVValues[j]))
         end
     end
+    addEndSV(SVs, offsets[#offsets], exponentialSVValues[#exponentialSVValues], endSVOption)
     return SVs
 end
--- Calculates a single set of exponential SVs
--- Returns the set of exponential SVs [Table]
+-- Calculates a single set of exponential values
+-- Returns the set of exponential values [Table]
 -- Parameters
---    exponentialIncrease : whether or not the SVs will be exponentially increasing [Boolean]
---    startOffset         : start time of the exponential SVs [Int/Float]
---    timeInterval        : time in-between each consecutive SV [Int/Float]
---    svPoints            : number of SVs to place (excluding the very last SV) [Int]
---    avgSV               : intended average SV [Int/Float]
---    intensity           : how sharp/rapid the exponential increase/decrease will be [Int/Float]
---    endSVOption         : option number for the last SV (based on constant END_SV_TYPES) [Int]
-function generateExponentialSV(exponentialIncrease, startOffset, timeInterval, svPoints, avgSV,
-                               intensity, endSVOption)
-    local SVs = {}
-    local svValues = {}
-    local xIncrement = 1 / svPoints
-    
-    -- calculates expected exponential SV values
-    for step = 0, svPoints do
-        local x = (step + 0.5) * xIncrement * intensity
+--    exponentialIncrease : whether or not the values will be exponentially increasing [Boolean]
+--    numValues           : total number of values in the exponential set (including the end) [Int]
+--    avgSV               : intended average value of the set [Int/Float]
+--    intensity           : value determining sharpness/rapidness of exponential change [Int/Float]
+--    interlace           : whether or not to interlace another exponential set inbetween [Boolean]
+--    interlaceMultiplier : multiplier of interlaced values relalative to usual values [Int/Float]
+function generateExponentialSet(exponentialIncrease, numValues, avgSV, intensity, interlace,
+                                interlaceMultiplier)
+    local exponentialSet = {}
+    -- reduce intensity scaling to produce more managable numbers
+    intensity = intensity / 5
+    for i = 0, numValues - 1 do
+        local x 
+        if exponentialIncrease then
+            x = (i + 0.5) * intensity / numValues  
+        else
+            x = (numValues - i - 0.5) * intensity / numValues  
+        end
         local velocity = (math.exp(x) / math.exp(1)) / intensity
-        table.insert(svValues, velocity)
-    end
-    
-    -- calculate the "total SV" to use to find the average of the expected exponential SV.
-    local svTotal = 0
-    for i = 1, svPoints do
-        svTotal = svTotal + svValues[i]
-    end
-    local actualSVAverage = svTotal / svPoints
-    
-    -- correct each expected SV value so that the SVs altogether achieves the user-inputted average
-    for i = 1, #svValues do
-        svValues[i] = (svValues[i] * avgSV) / actualSVAverage
-    end
-    
-    for step = 0, svPoints do
-        local offset = step * timeInterval + startOffset
-        local velocity = svValues[step + 1]
-        if (not exponentialIncrease) then
-            if svPoints ~= step then
-                velocity = svValues[svPoints - step]
-            else
-                velocity = (math.exp(-0.5 * xIncrement * intensity) / math.exp(1)) / intensity
-            end
-        end
-        if step == svPoints then
-            velocity = endSVValue(velocity, endSVOption)
-        end
-        if velocity ~= nil then
-            table.insert(SVs, utils.CreateScrollVelocity(offset, velocity))
+        table.insert(exponentialSet, velocity)
+        -- adds interlaced values when appropriate
+        if interlace and (i ~= numValues - 1) then
+            table.insert(exponentialSet, velocity * interlaceMultiplier)
         end
     end
-    return SVs
+    normalizeValues(exponentialSet, avgSV)
+    return exponentialSet
 end
 -- Calculates all stutter SVs to place
 -- Returns a list of all calculated stutter SVs [Table]
@@ -775,13 +785,13 @@ function calculateStutterSV(startSV, svDuration, avgSV, endSVOption, linearStutt
     local svDurationList = {}
     local avgSVList = {}
     if linearStutter then
-        startSVList = generateLinearSet(startSV, linearEndStutterSV, #offsets - 1)
-        svDurationList = generateLinearSet(svDuration, linearEndDuration, #offsets - 1)
-        avgSVList = generateLinearSet(avgSV, linearEndAvgSV, #offsets - 1)
+        startSVList = generateLinearSet(startSV, linearEndStutterSV, #offsets - 1, false, 0, 0)
+        svDurationList = generateLinearSet(svDuration, linearEndDuration, #offsets - 1, false, 0, 0)
+        avgSVList = generateLinearSet(avgSV, linearEndAvgSV, #offsets - 1, false, 0, 0)
     else
-        startSVList = generateLinearSet(startSV, startSV, #offsets - 1)
-        svDurationList = generateLinearSet(svDuration, svDuration, #offsets - 1)
-        avgSVList = generateLinearSet(avgSV, avgSV, #offsets - 1)
+        startSVList = generateLinearSet(startSV, startSV, #offsets - 1, false, 0, 0)
+        svDurationList = generateLinearSet(svDuration, svDuration, #offsets - 1, false, 0, 0)
+        avgSVList = generateLinearSet(avgSV, avgSV, #offsets - 1, false, 0, 0)
     end
     for i = 1, #offsets - 1 do
         local startOffset = offsets[i]
@@ -793,9 +803,7 @@ function calculateStutterSV(startSV, svDuration, avgSV, endSVOption, linearStutt
             table.insert(SVs, stutterSVs[j])
         end
     end
-    if endSVOption ~= 2 then
-        table.insert(SVs, utils.CreateScrollVelocity(offsets[#offsets], 1))
-    end
+    addEndSV(SVs, offsets[#offsets], 1, endSVOption)
     return SVs
 end
 -- Calculates a single set of stutter SVs
@@ -987,13 +995,13 @@ function calculateSingleSV(skipSVAtNote, svBefore, svValueBefore, incrementBefor
     local svValuesAfter = {}
     local svValuesAt = {}
     if scaleSVLinearly then
-        svValuesBefore = generateLinearSet(svValueBefore, svValueBeforeEnd, #offsets)
-        svValuesAfter = generateLinearSet(svValueAfter, svValueAfterEnd, #offsets)
-        svValuesAt = generateLinearSet(svValue, svValueEnd, #offsets)
+        svValuesBefore = generateLinearSet(svValueBefore, svValueBeforeEnd, #offsets, false, 0, 0)
+        svValuesAfter = generateLinearSet(svValueAfter, svValueAfterEnd, #offsets, false, 0, 0)
+        svValuesAt = generateLinearSet(svValue, svValueEnd, #offsets, false, 0, 0)
     else
-        svValuesBefore = generateLinearSet(svValueBefore, svValueBefore, #offsets)
-        svValuesAfter = generateLinearSet(svValueAfter, svValueAfter, #offsets)
-        svValuesAt = generateLinearSet(svValue, svValue, #offsets)
+        svValuesBefore = generateLinearSet(svValueBefore, svValueBefore, #offsets, false, 0, 0)
+        svValuesAfter = generateLinearSet(svValueAfter, svValueAfter, #offsets, false, 0, 0)
+        svValuesAt = generateLinearSet(svValue, svValue, #offsets, false, 0, 0)
     end
     for i = 1, #offsets do
         if svBefore then
@@ -1010,17 +1018,17 @@ function calculateSingleSV(skipSVAtNote, svBefore, svValueBefore, incrementBefor
     end
     return SVs
 end
--- Returns the value of the last SV for a set of SVs [Int/Float]
+-- Adds the last SV to a set of SVs [Int/Float]
 -- Parameters
+--    SVs
+--    endOffset
 --    velocity    : default/usual SV value for the end SV [Int/Float]
 --    endSVOption : option number for the last SV (based on global constant END_SV_TYPES) [Int]
-function endSVValue(velocity, endSVOption)
+function addEndSV(SVs, endOffset, velocity, endSVOption)
     if endSVOption == 1 then -- normal SV option
-        return velocity
-    elseif endSVOption == 2 then -- skip SV option
-        return nil
-    else -- 1.00x SV option
-        return 1
+        table.insert(SVs, utils.CreateScrollVelocity(endOffset, velocity))
+    elseif endSVOption == 3 then -- 1.00x SV option
+        table.insert(SVs, utils.CreateScrollVelocity(endOffset, 1))
     end
 end
 -- Restricts a number to be within a closed interval
@@ -1067,14 +1075,6 @@ function uniqueByTime(offsets)
     end
     return uniqueTimes
 end
--- Concatenates two strings by sandwiching one string between two of another string
--- Returns the result of the concatenated strings [String]
--- Parameters
---    string1 : string to put in the middle [String]
---    string2 : string to add on both sides [String]
-function sandwichStrings(string1, string2)
-    return string2..string1..string2
-end
 -- Forces a number to be a multiple of one quarter
 -- Returns the forced number [Int/Float]
 -- Parameters
@@ -1092,45 +1092,35 @@ function getThisEndSVOption(isVeryEnd, endSVOption)
     end
     return 2
 end
--- Generates a linear set of equally-spaced numbers between two numbers (inclusive)
--- Returns the linear set of numbers [Table]
--- Parameters
---    startVal  : starting value of the set [Int/Float]
---    endVal    : ending value of the set [Int/Float]
---    numValues : number of values in the linear set (including the start and end values) [Int]
-function generateLinearSet(startVal, endVal, numValues)
-    local linearSet = {}
-    if numValues > 1 then
-        local increment = (endVal - startVal) / (numValues - 1)
-        for i = 0, numValues - 1 do
-            table.insert(linearSet, startVal + i * increment)
-        end
-    elseif numValues == 1 then
-        table.insert(linearSet, startVal)
-    end
-    return linearSet
-end
 -- Lets users choose the average SV
+-- Returns whether or not a new average SV was inputted [Boolean]
 -- Parameters
 --    vars : a reference to the variables of a menu [Table]
 function chooseAverageSV(vars)
+    local oldAvg = vars.avgSV
     _, vars.avgSV = imgui.InputFloat("Average SV", vars.avgSV, 0, 0, "%.2fx")    
     vars.avgSV = mathClamp(vars.avgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    return oldAvg ~= vars.avgSV
 end
 -- Lets users choose the number of SV points to place
+-- Returns whether or not a new number of SV points was inputted [Boolean]
 -- Parameters
 --    vars : a reference to the variables of a menu [Table]
 function chooseSVPoints(vars)
+    local oldSVPoints = vars.svPoints
     _, vars.svPoints = imgui.InputInt("SV points", vars.svPoints, 1, 1)
     vars.svPoints = mathClamp(vars.svPoints, 1, 256)
+    return oldSVPoints ~= vars.svPoints
 end
 -- Lets users choose the end SV type
+-- Returns whether or not a new end SV was chosen [Boolean]
 -- Parameters
 --    vars     : a reference to the variables of a menu [Table]
 --    noNormal : whether or not to have the "Normal" end SV option [Boolean]
 function chooseEndSV(vars, noNormal)
     imgui.AlignTextToFramePadding()
-    imgui.Text("Last SV:")
+    imgui.Text("End SV:")
+    local oldOption = vars.endSVOption
     local startNum = 1
     if noNormal then
         startNum = 2
@@ -1140,6 +1130,7 @@ function chooseEndSV(vars, noNormal)
         _, vars.endSVOption = imgui.RadioButton(END_SV_TYPES[i], vars.endSVOption, i)
     end
     separator()
+    return oldOption ~= vars.endSVOption
 end
 -- Lets users choose and adjust teleport SV options
 -- Parameters
@@ -1164,22 +1155,25 @@ function chooseTeleportSV(vars, menuID)
             vars.veryStartTeleport = false
         end
     end
-    separator()
 end
 -- Lets users choose and adjust interlace SV options
+-- Returns whether or not the interlace checkbox or the interlace multiplier changed [Boolean]
 -- Parameters
 --    vars   : a reference to the variables of a menu [Table]
 --    menuID : name of the menu of the variables [String]
 function chooseInterlaceMultiplier(vars, menuID)
+    local oldInterlace = vars.interlace
+    local oldMultiplier = vars.interlaceMultiplier
     _, vars.interlace = imgui.Checkbox("Interlace another "..string.lower(menuID), vars.interlace)
     if vars.interlace then
         spacing()
-        _, vars.interlaceMultiplier = imgui.InputFloat("Interlace multiplier", vars.interlaceMultiplier,
-                                                       0, 0, "%.2f")
+        _, vars.interlaceMultiplier = imgui.InputFloat("Lace multiplier",
+                                                       vars.interlaceMultiplier, 0, 0, "%.2f")
         vars.interlaceMultiplier = mathClamp(vars.interlaceMultiplier, -MAX_GENERAL_SV,
                                              MAX_GENERAL_SV)
     end
     separator()
+    return oldInterlace ~= vars.interlace or oldMultiplier ~= vars.interlaceMultiplier
 end
 -- Removes SVs in the map between two points of time
 -- Parameters
@@ -1257,35 +1251,92 @@ end
 function determineTeleport(startOffset, addTeleport, veryStartTeleport, veryFirstSet,
                            teleportValue, teleportDuration, SVs)
     if addTeleport then
-        -- if we want a teleport for each set of SVs or we are at the very start
-        if (not veryStartTeleport) or veryFirstSet then
+        -- adds a teleport and adjusts the start offset if we are at the very first set or want a
+        -- teleport for each set
+        if veryFirstSet or (not veryStartTeleport) then
             table.insert(SVs, utils.CreateScrollVelocity(startOffset, teleportValue))
             startOffset = startOffset + teleportDuration
         end
     end
     return startOffset
 end
-
+-- Creates a bar graph/plot of SVs
+-- Parameters
+--    SVs    : list of numerical SV values [Table]    
+--    menuID : name of the current menu [String]
+function plotSVs(SVs, menuID)
+    imgui.Text("Projected "..menuID.." SVs:")
+    local minSV = math.min(table.unpack(SVs))
+    local maxSV = math.max(table.unpack(SVs))
+    local absMaxSV = math.max(math.abs(minSV), math.abs(maxSV))
+    -- Defaultly, set the plot range to +- the absolute max SV value
+    local minScale = -absMaxSV
+    local maxScale = absMaxSV
+    -- Restricts the plot range to non-positive values when all SV values are non-positive
+    if maxSV <= 0 then
+        maxScale = 0
+    -- Restricts the plot range to non-negative values when all SV values are non-negative
+    elseif minSV >= 0 then
+        minScale = 0
+    end
+    imgui.PlotHistogram("   ", SVs, #SVs, 0, "", minScale, maxScale, {ACTION_BUTTON_SIZE[1], 100})
+end
+function plotNotePath(SVs, isStutter, stutterDuration)
+    imgui.Text("Projected Note Motion (Distance vs Time)")
+end
+-- Calculates the average value of a set of numbers
+-- Returns the average value of the set [Int/Float]
+-- Parameters
+--    values : set of numbers [Table]
+function getAverage(values)
+    if #values == 0 then
+        return nil
+    end
+    return totalSum(values) / #values
+end
+-- Calculates the total sum of a set of numbers
+-- Returns the total sum of the set [Int/Float]
+-- Parameters
+--    values : set of numbers [Table]
+function totalSum(values)
+    local sum = 0
+    for i, value in pairs(values) do
+        sum = sum + value
+    end
+    return sum
+end
+-- Normalizes a set of values to achieve a target average
+-- Parameters
+--    values        : set of numbers [Table]
+--    targetAverage : average value that is aimed for [Int/Float]
+function normalizeValues(values, targetAverage)
+    local valuesAverage = getAverage(values)
+    for i = 1, #values do
+        values[i] = (values[i] * targetAverage) / valuesAverage
+    end
+end
 ---------------------------------------------------------------------------------------------------
 -- Global Constants
 ---------------------------------------------------------------------------------------------------
 
 -- IMGUI / GUI
-DEFAULT_WIDGET_WIDTH = 150         -- value determining the width of GUI widgets
+PLUGIN_WINDOW_SIZE = {560, 500}    -- dimensions (width and height) of the plugin window
+DEFAULT_WIDGET_WIDTH = 160         -- value determining the width of GUI widgets
 DEFAULT_WIDGET_HEIGHT = 26         -- value determining the height of GUI widgets
 SAMELINE_SPACING = 5               -- value determining spacing between GUI items on the same row
+PADDING_WIDTH = 8                  -- value determining window and frame padding
 ACTION_BUTTON_SIZE = {             -- dimensions of the button that places/removes SVs
-    1.75 * DEFAULT_WIDGET_WIDTH,
-    1.75 * DEFAULT_WIDGET_HEIGHT
+    1.6 * DEFAULT_WIDGET_WIDTH,
+    1.6 * DEFAULT_WIDGET_HEIGHT
 }
 
 -- SV/Time restrictions
-MAX_TELEPORT_VALUE = 100000        -- maximum (absolute) teleport SV value allowed
+MAX_TELEPORT_VALUE = 1000000       -- maximum (absolute) teleport SV value allowed
 MAX_TELEPORT_DURATION = 10         -- maximum teleport duration allowed (milliseconds)
 MAX_GENERAL_SV = 1000              -- maximum (absolute) value allowed for general SVs (ex. avg SV)
 MIN_DURATION = 0.016               -- minimum duration allowed in general (milliseconds)
 MAX_DURATION = 10000               -- maximum duration allowed in general (milliseconds)
-MAX_MS_TIME = 7200000              -- maximum time (milliseconds) allowed ~ 2 hours
+MAX_MS_TIME = 7200000              -- maximum song time (milliseconds) allowed ~ 2 hours
 
 -- Menu-related
 EMOTICONS = {                      -- emoticons to clutter menu titles and confuse users
