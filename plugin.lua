@@ -1,4 +1,4 @@
--- amoguSV pre-v2.0 (21 Aug 2021) 
+-- amoguSV pre-v2.0 (22 Aug 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -26,8 +26,8 @@
 --      4. Organize code better, create a table of contents listing major sections of code,
 --         review + ADD comments, review code, review overall structure of the code
 --      5. Change displacement + bezier points to slider instead of input
---      6. fix linearly changing stutter implementation
---      7. Implement displace option (it does nothing right now if activated)
+--      6. Implement displace option (it does nothing right now if activated)
+--      7. Revamp + upgrade the "Remove" menu
 
 -- Optional things that I maybe want to add later
 --      1. Dedicated KeepStill+more SV tool 
@@ -61,10 +61,10 @@
 -- IMGUI / GUI
 DEFAULT_WIDGET_HEIGHT = 26         -- value determining the height of GUI widgets
 DEFAULT_WIDGET_WIDTH = 160         -- value determining the width of GUI widgets
-MENU_SIZE_LEFT = {265, 440}        -- dimensions of the left side of the menu (IMGUI child window)
-MENU_SIZE_RIGHT = {260, 440}       -- dimensions of the right side of the menu (IMGUI child window)
+MENU_SIZE_LEFT = {265, 465}        -- dimensions of the left side of the menu (IMGUI child window)
+MENU_SIZE_RIGHT = {260, 465}       -- dimensions of the right side of the menu (IMGUI child window)
 PADDING_WIDTH = 8                  -- value determining window and frame padding
-PLUGIN_WINDOW_SIZE = {560, 520}    -- dimensions (width and height) of the plugin window
+PLUGIN_WINDOW_SIZE = {560, 540}    -- dimensions (width and height) of the plugin window
 SAMELINE_SPACING = 5               -- value determining spacing between GUI items on the same row
 ACTION_BUTTON_SIZE = {             -- dimensions of the button that places/removes SVs
     1.6 * DEFAULT_WIDGET_WIDTH,
@@ -154,7 +154,8 @@ function mainMenu()
     local menuID = "main"
     local vars = {
         isHovered = {false, false, false},
-        toolOptionNum = 0
+        toolOptionNum = 0,
+        betweenOffsetsNotNotes = false,
     }
     retrieveStateVariables(menuID, vars)
     
@@ -181,7 +182,7 @@ function mainMenu()
     -- creates the menu of the currently selected SV tool
     local menuFunctionName = string.lower(TOOL_OPTIONS[toolIndex]).."Menu"
     
-    _G[menuFunctionName](TOOL_OPTIONS[toolIndex], toolIndex)
+    vars.betweenOffsetsNotNotes = _G[menuFunctionName](TOOL_OPTIONS[toolIndex], toolIndex, vars.betweenOffsetsNotNotes)
     vars.isHovered[3] = imgui.IsWindowHovered()
     imgui.EndChild()
     
@@ -189,7 +190,7 @@ function mainMenu()
     state.IsWindowHovered = vars.isHovered[1] or vars.isHovered[2] or vars.isHovered[3]
     imgui.End()
 end
-function rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex)
+function rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex, betweenOffsetsNotNotes)
     imgui.BeginChild("Right Menu", MENU_SIZE_RIGHT)
     if updateSVGraph then
         local generatorFunctionName = "generate"..TOOL_OPTIONS[toolIndex].."Set"
@@ -222,29 +223,70 @@ function rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex)
         imgui.Text(round(math.min(table.unpack(vars.svValues)), 2).."x")
         table.insert(vars.svValues, tempLastValue)
     else
+        imgui.Text("Average SV:")
         imgui.Text("Stutter First SV:")
         imgui.Text("Stutter Second SV:")
         imgui.NextColumn()
+        imgui.Text(round(vars.avgSV, 2).."x")
         imgui.Text(round(vars.svValues[1], 2).."x")
         imgui.Text(round(vars.svValues[2], 2).."x")
     end
     imgui.Columns(1)
     separator()
-    if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
-        local SVs = generateSVs(vars.svValues, vars.addTeleport, vars.veryStartTeleport,
-                                vars.teleportValue, vars.teleportDuration, vars.endSVOption,
-                                vars.displace, vars.displacement, vars.stutterDuration,
-                                vars.linearStutter, vars.linearEndStutterSV, vars.linearEndDuration, vars.linearEndAvgSV)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Place SVs between:")
+    imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+    if imgui.RadioButton("Notes", not betweenOffsetsNotNotes) then
+        betweenOffsetsNotNotes = false
+    end
+    imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+    if imgui.RadioButton("Offsets", betweenOffsetsNotNotes) then
+        betweenOffsetsNotNotes = true
+    end
+    spacing()
+    if betweenOffsetsNotNotes then
+        if imgui.Button("Current", {DEFAULT_WIDGET_WIDTH * 0.4, DEFAULT_WIDGET_HEIGHT}) then
+            vars.startOffset = state.SongTime
+        end
+        imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.75)
+        _, vars.startOffset = imgui.InputInt("Start Offset", vars.startOffset)
+        
+        if imgui.Button(" Current ", {DEFAULT_WIDGET_WIDTH * 0.4, DEFAULT_WIDGET_HEIGHT}) then
+            vars.endOffset = state.SongTime
+        end
+        imgui.SameLine(0, SAMELINE_SPACING)
+        _, vars.endOffset = imgui.InputInt("End Offset", vars.endOffset)
+    end
+    local svButtonText = "Place SVs "
+    if betweenOffsetsNotNotes then
+        svButtonText = svButtonText.."Between Start/End Offsets"
+        spacing()
+    else
+        svButtonText = svButtonText.."Between Selected Notes"
+    end
+    if imgui.Button(svButtonText, ACTION_BUTTON_SIZE) then
+        local offsets = {vars.startOffset, vars.endOffset}
+        if (not betweenOffsetsNotNotes) then
+            offsets = uniqueSelectedNoteOffsets()
+        end
+        local SVs = generateSVs(offsets, vars.svValues, vars.addTeleport,
+                                vars.veryStartTeleport, vars.teleportValue,
+                                vars.teleportDuration, vars.endSVOption, vars.displace,
+                                vars.displacement, vars.stutterDuration, vars.linearStutter,
+                                vars.linearEndStutterSV, vars.linearEndDuration,
+                                vars.linearEndAvgSV, vars.avgSV)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
     end
+    return betweenOffsetsNotNotes
 end
 
 -- Creates the Linear SV menu
 -- Parameters
 --    menuID : name of the menu [String]
-function linearMenu(menuID, toolIndex)
+function linearMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         startSV = 2,
         endSV = 0,
@@ -261,7 +303,9 @@ function linearMenu(menuID, toolIndex)
         displacement = 150,
         svValues = {},
         svValuesPreview = {},
-        noteDistanceVsTime = {}
+        noteDistanceVsTime = {},
+        startOffset = 0,
+        endOffset = 0
     }
     retrieveStateVariables(menuID, vars)
     
@@ -299,13 +343,14 @@ function linearMenu(menuID, toolIndex)
     
     imgui.NextColumn()
     local svSetInfo = {vars.startSV, vars.endSV, vars.svPoints + 1, vars.interlace, vars.interlaceStartSV, vars.interlaceEndSV}
-    rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex)
+    betweenOffsetsNotNotes = rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex, betweenOffsetsNotNotes)
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 -- Creates the "Exponential SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function exponentialMenu(menuID, toolIndex)
+function exponentialMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         exponentialIncrease = false,
         svPoints = 16,
@@ -322,21 +367,23 @@ function exponentialMenu(menuID, toolIndex)
         displacement = 150,
         svValues = {},
         svValuesPreview = {},
-        noteDistanceVsTime = {}
+        noteDistanceVsTime = {},
+        startOffset = 0,
+        endOffset = 0
     }
     retrieveStateVariables(menuID, vars)
     
     local updateSVGraph = #vars.svValues == 0
     imgui.AlignTextToFramePadding()
     imgui.Text("Behavior:")
-    imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
     local oldBehavior = vars.exponentialIncrease
-    if imgui.RadioButton("Speed up", vars.exponentialIncrease) then
-        vars.exponentialIncrease = true
-    end
     imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
     if imgui.RadioButton("Slow down", not vars.exponentialIncrease) then
         vars.exponentialIncrease = false
+    end
+    imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+    if imgui.RadioButton("Speed up", vars.exponentialIncrease) then
+        vars.exponentialIncrease = true
     end
     updateSVGraph = (oldBehavior ~= vars.exponentialIncrease) or updateSVGraph
     spacing()
@@ -357,13 +404,14 @@ function exponentialMenu(menuID, toolIndex)
     imgui.NextColumn()
     local svSetInfo = {vars.exponentialIncrease, vars.svPoints + 1, vars.avgSV, vars.intensity,
                        vars.interlace, vars.interlaceMultiplier}
-    rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex)
+    betweenOffsetsNotNotes = rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex, betweenOffsetsNotNotes)
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 -- Creates the "Stutter SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function stutterMenu(menuID, toolIndex)
+function stutterMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         startSV = 1.5,
         stutterDuration = 0.5,
@@ -378,6 +426,8 @@ function stutterMenu(menuID, toolIndex)
         svValues = {},
         svValuesPreview = {},
         noteDistanceVsTime = {},
+        startOffset = 0,
+        endOffset = 0
     }
     retrieveStateVariables(menuID, vars)
     
@@ -416,13 +466,14 @@ function stutterMenu(menuID, toolIndex)
     
     imgui.NextColumn()
     local svSetInfo = {vars.startSV, vars.stutterDuration, vars.avgSV}
-    rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex)
+    betweenOffsetsNotNotes = rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex, betweenOffsetsNotNotes)
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 -- Creates the "Bezier SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function bezierMenu(menuID, toolIndex)
+function bezierMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         calculationMethodOption = 0,
         x1 = 0,
@@ -442,6 +493,8 @@ function bezierMenu(menuID, toolIndex)
         displacement = 150,
         bezierSVValues = {},
         noteDistanceVsTime = {},
+        startOffset = 0,
+        endOffset = 0
     }
     retrieveStateVariables(menuID, vars)
     
@@ -505,11 +558,12 @@ function bezierMenu(menuID, toolIndex)
         end
     end
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 -- Creates the "Sinusoidal SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function sinusoidalMenu(menuID, toolIndex)
+function sinusoidalMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         startAmplitude = 2,
         endAmplitude = 2,
@@ -525,7 +579,9 @@ function sinusoidalMenu(menuID, toolIndex)
         displacement = 150,
         svValues = {},
         svValuesPreview = {},
-        noteDistanceVsTime = {}
+        noteDistanceVsTime = {},
+        startOffset = 0,
+        endOffset = 0
     }
     retrieveStateVariables(menuID, vars)
     local updateSVGraph = #vars.svValues == 0
@@ -565,13 +621,14 @@ function sinusoidalMenu(menuID, toolIndex)
     imgui.NextColumn()
     local svSetInfo = {vars.startAmplitude, vars.endAmplitude, vars.periods, vars.shiftPeriods,
                        vars.svsPerQuarterPeriod}
-    rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex)
+    betweenOffsetsNotNotes = rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex, betweenOffsetsNotNotes)
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 -- Creates the "Single SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function singleMenu(menuID, toolIndex)
+function singleMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         skipSVAtNote = false,
         svBefore = false,
@@ -584,7 +641,9 @@ function singleMenu(menuID, toolIndex)
         scaleSVLinearly = false,
         svValueBeforeEnd = 0,
         svValueEnd = 1,
-        svValueAfterEnd = 0
+        svValueAfterEnd = 0,
+        startOffset = 0,
+        endOffset = 0
     }
     retrieveStateVariables(menuID, vars)
 
@@ -663,11 +722,12 @@ function singleMenu(menuID, toolIndex)
         end
     end
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 -- Creates the "Remove SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function removeMenu(menuID, toolIndex)
+function removeMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     local vars = {
         startOffset = 0,
         endOffset = 0,
@@ -722,6 +782,7 @@ function removeMenu(menuID, toolIndex)
         removeSVs(vars.startOffset, vars.endOffset)
     end
     saveStateVariables(menuID, vars)
+    return betweenOffsetsNotNotes
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -897,10 +958,9 @@ function determineTeleport(startOffset, addTeleport, veryStartTeleport, veryFirs
     return startOffset
 end
 
-function generateSVs(svValues, addTeleport, veryStartTeleport, teleportValue, teleportDuration,
+function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleportValue, teleportDuration,
                      endSVOption, displace, displacement, stutterDuration, linearStutter,
-                     linearEndStutterSV, linearEndDuration, linearEndAvgSV)
-    local offsets = uniqueSelectedNoteOffsets()
+                     linearEndStutterSV, linearEndDuration, linearEndAvgSV, stutterAvgSV)
     local SVs = {}
     local startSVList = {}
     local svDurationList = {}
@@ -908,7 +968,7 @@ function generateSVs(svValues, addTeleport, veryStartTeleport, teleportValue, te
     if stutterDuration ~= nil and linearStutter then
         startSVList = generateLinearSet(svValues[1], linearEndStutterSV, #offsets - 1, false, 0, 0)
         svDurationList = generateLinearSet(stutterDuration, linearEndDuration, #offsets - 1, false, 0, 0)
-        avgSVList = generateLinearSet(avgSV, linearEndAvgSV, #offsets - 1, false, 0, 0)
+        avgSVList = generateLinearSet(stutterAvgSV, linearEndAvgSV, #offsets - 1, false, 0, 0)
     end
     for i = 1, #offsets - 1 do
         local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
@@ -1029,7 +1089,7 @@ function calculateBezierSV(x1, y1, x2, y2, svPoints, avgSV, endSVOption, interla
                            interlaceMultiplier, addTeleport, veryStartTeleport, teleportValue,
                            teleportDuration, displace, displacement)
     local bezierSVValues = generateBezierSetIceSV(x1, y1, x2, y2, avgSV, svPoints + 2, interlace, interlaceMultiplier)
-    return generateSVs(bezierSVValues, addTeleport, veryStartTeleport, teleportValue,
+    return generateSVs(uniqueSelectedNoteOffsets(), bezierSVValues, addTeleport, veryStartTeleport, teleportValue,
                        teleportDuration, endSVOption, displace, displacement)
 end
 -- Removes SVs in the map between two points of time
