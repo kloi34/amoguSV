@@ -1,4 +1,4 @@
--- amoguSV pre-v2.0 (24 Aug 2021) 
+-- amoguSV pre-v2.0 (25 Aug 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -19,15 +19,14 @@
 
 -- Things that still need working on/fixing:
 --      1. Fix bezier tab and bezier calculation for iceSV method
---      2. Implement different Cubic bezier calculation (right now, uses iceSV method
+--      2. Revamp + upgrade the "Remove" menu
+--      3. Adding tooltips to widgets
+--      4. Implement different Cubic bezier calculation (right now, uses iceSV method
 --         which is slow/laggy when the live sv graphs update every time settings change)
---      3. Make first time useability better, tools easier to understand (adding tooltips to widgets, 
---         and actually finish the goddamn amoguSV wiki)
---      4. Organize code better, create a table of contents listing major sections of code,
---         review + ADD comments, review code, review overall structure of the code
 --      5. Change bezier points to slider instead of input
---      6. Revamp + upgrade the "Remove" menu
-
+--      6. Display linearly changing stutter SV values on right panel
+--      7. Organize code better, create a table of contents listing major sections of code,
+--         review + ADD comments, review code, review overall structure of the code
 -- Optional things that I maybe want to add later
 --      1. Dedicated KeepStill+more SV tool 
 --      2. Dedicated Vibrato+more SV tool 
@@ -563,7 +562,7 @@ function sinusoidalMenu(menuID, toolIndex, betweenOffsetsNotNotes)
         startAmplitude = 2,
         endAmplitude = 2,
         periods = 0.25,
-        shiftPeriods = 0,
+        periodsShift = 0,
         svsPerQuarterPeriod = 8,
         endSVOption = 2,
         addTeleport = false,
@@ -594,12 +593,12 @@ function sinusoidalMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     vars.periods = forceQuarter(vars.periods)
     vars.periods = mathClamp(vars.periods, 0.25, 20)
     updateSVGraph = updateSVGraph or (oldPeriods ~= vars.periods)
-    local oldShiftPeriods = vars.shiftPeriods
-    _, vars.shiftPeriods = imgui.InputFloat("Phase Shift", vars.shiftPeriods, 0.25, 0.25,
+    local oldPeriodsShift = vars.periodsShift
+    _, vars.periodsShift = imgui.InputFloat("Phase Shift", vars.periodsShift, 0.25, 0.25,
                                             "%.2f")
-    vars.shiftPeriods = forceQuarter(vars.shiftPeriods)
-    vars.shiftPeriods = mathClamp(vars.shiftPeriods, 0, 0.75)
-    updateSVGraph = updateSVGraph or (oldShiftPeriods ~= vars.shiftPeriods)
+    vars.periodsShift = forceQuarter(vars.periodsShift)
+    vars.periodsShift = mathClamp(vars.periodsShift, 0, 0.75)
+    updateSVGraph = updateSVGraph or (oldPeriodsShift ~= vars.periodsShift)
     spacing()
     imgui.Text("For every 0.25 period/cycle, place...")
     local oldPerQuarterPeriod = vars.svsPerQuarterPeriod
@@ -614,7 +613,7 @@ function sinusoidalMenu(menuID, toolIndex, betweenOffsetsNotNotes)
     imgui.EndChild()
     
     imgui.NextColumn()
-    local svSetInfo = {vars.startAmplitude, vars.endAmplitude, vars.periods, vars.shiftPeriods,
+    local svSetInfo = {vars.startAmplitude, vars.endAmplitude, vars.periods, vars.periodsShift,
                        vars.svsPerQuarterPeriod}
     betweenOffsetsNotNotes = rightPanel(updateSVGraph, vars, menuID, svSetInfo, toolIndex, betweenOffsetsNotNotes)
     saveStateVariables(menuID, vars)
@@ -851,14 +850,18 @@ end
 --    noNormal : whether or not to have the "Normal" end SV option [Boolean]
 function chooseEndSV(vars, noNormal)
     imgui.AlignTextToFramePadding()
-    imgui.Text("End SV:")
+    imgui.Text("Last SV:")
     local oldOption = vars.endSVOption
     local startNum = 1
     if noNormal then
         startNum = 2
     end
     for i = startNum, #END_SV_TYPES do
-        imgui.SameLine(0, 1.5 * SAMELINE_SPACING)
+        local spacing = SAMELINE_SPACING
+        if i ~= startNum then
+            spacing = 1.5 * spacing
+        end
+        imgui.SameLine(0, spacing)
         _, vars.endSVOption = imgui.RadioButton(END_SV_TYPES[i], vars.endSVOption, i)
     end
     separator()
@@ -1002,7 +1005,7 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
         end
         if linearStutter then
             local thisStartSV = startSVList[i]
-            svValues = {thisStartSV, generateStutterValue(thisStartSV, svDurationList[i], avgSVList[i])}
+            svValues = {thisStartSV, calculateSecondStutterValue(thisStartSV, svDurationList[i], avgSVList[i])}
         end
         for j = 1, #svOffsets - 1 do
             if linearStutter then
@@ -1227,41 +1230,46 @@ function generateLinearSet(startVal, endVal, numValues, interlace, interStart, i
     end
     return linearSet
 end
--- Calculates a single set of sinusoidal SVs
--- Returns the set of sinusoidal SVs [Table]
+-- Generates a single set of sinusoidal values
+-- Returns the set of sinusoidal values [Table]
 -- Parameters
---    startOffset         : start time of the sinusoidal SV [Int/Float]
---    timeInterval        : total time the sinusoidal SV will last (milliseconds) [Int/Float]
---    startAmplitude      : starting amplitude of the sinusoidal wave [Int/Float]
---    endAmplitude        : ending amplitude of the sinusoidal wave [Int/Float]
---    periods             : number of periods/cycles the sinusoidal wave lasts [Int/Float]
---    shiftPeriods        : number of periods/cycles to delay the sinusoidal wave [Int/Float]
---    svsPerQuarterPeriod : number of SVs to place every quarter of a cycle [Int/Float]
---    endSVOption         : option number for the last SV (based on constant END_SV_TYPES) [Int]
-function generateSinusoidalSet(startAmplitude, endAmplitude, periods, shiftPeriods, svsPerQuarterPeriod)
+--    startAmplitude         : starting amplitude of the sinusoidal wave [Int/Float]
+--    endAmplitude           : ending amplitude of the sinusoidal wave [Int/Float]
+--    periods                : number of periods/cycles of the sinusoidal wave [Int/Float]
+--    periodsShift           : number of periods/cycles to shift the sinusoidal wave [Int/Float]
+--    valuesPerQuarterPeriod : number of values to calculate per quarter period/cycle [Int/Float]
+function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShift,
+                               valuesPerQuarterPeriod)
     local sinusoidalSet = {}
     local quarterPeriods = 4 * periods
-    local quarterShiftPeriods = 4 * shiftPeriods
-    local totalSVs = svsPerQuarterPeriod * quarterPeriods
+    local quarterPeriodsShift = 4 * periodsShift
+    local totalSVs = valuesPerQuarterPeriod * quarterPeriods
     local amplitudes = generateLinearSet(startAmplitude, endAmplitude, totalSVs + 1, false, 0, 0)
     for i = 0, totalSVs do
-        local angle = (math.pi / 2) * ((i / svsPerQuarterPeriod) + quarterShiftPeriods)
+        local angle = (math.pi / 2) * ((i / valuesPerQuarterPeriod) + quarterPeriodsShift)
         local velocity = amplitudes[i + 1] * math.sin(angle)
         table.insert(sinusoidalSet, velocity)
     end
     return sinusoidalSet
 end
+-- Calculates the second SV value for a stutter SV
+-- Returns the second SV value for the stutter SV [Int/Float]
 -- Parameters
---    startSV      : starting value of the stutter SV [Int/Float]
---    stutterDuration   : duration (percent) of the first SV in the stutter [Float]
---    avgSV        : average SV of the stutter [Int/Float]
-function generateStutterValue(startSV, stutterDuration, avgSV)
+--    startSV         : velocity of first SV in the stutter [Int/Float]
+--    stutterDuration : duration (ratio) of the first SV in the stutter [Float]
+--    avgSV           : average SV of the stutter [Int/Float]
+function calculateSecondStutterValue(startSV, stutterDuration, avgSV)
     return (avgSV - startSV * stutterDuration) / (1 - stutterDuration)
 end
-
+-- Generates a single set of stutter values
+-- Returns the set of stutter values [Table]
+-- Parameters
+--    startSV         : velocity of first SV in the stutter [Int/Float]
+--    stutterDuration : duration (ratio) of the first SV in the stutter [Float]
+--    avgSV           : average SV of the stutter [Int/Float]
 function generateStutterSet(startSV, stutterDuration, avgSV)
     stutterSet = {startSV} 
-    table.insert(stutterSet, (avgSV - startSV * stutterDuration) / (1 - stutterDuration))
+    table.insert(stutterSet, calculateSecondStutterValue(startSV, stutterDuration, avgSV))
     return stutterSet
 end
 -- Calculates the average value of a set of numbers
@@ -1295,7 +1303,6 @@ function mathClamp(x, lowerBound, upperBound)
     end
 end
 ----*** FUNCTION BELOW COPIED FROM iceSV ***
--- @return table of scroll velocities
 function mathCubicBezier(P, t)
     return P[1] + 3*t*(P[2]-P[1]) + 3*t^2*(P[1]+P[3]-2*P[2]) + t^3*(P[4]-P[1]+3*P[2]-3*P[3])
 end
@@ -1310,7 +1317,11 @@ function normalizeValues(values, targetAverage, includeLastValueInAverage)
         values[i] = (values[i] * targetAverage) / valuesAverage
     end
 end
-
+-- Rounds a number to a given amount of decimal places
+-- Returns the rounded number [Int/Float]
+-- Parameters
+--    x             : number to round [Table]
+--    decimalPlaces : number of decimal places to round the number to [Int]
 function round(x, decimalPlaces)
     local multiplier = 10 ^ decimalPlaces
     return math.floor(x * multiplier + 0.5) / multiplier
@@ -1322,11 +1333,11 @@ end
 --    includeLastValue : whether or not to include the last value in the sum [Boolean]
 function totalSum(values, includeLastValue)
     local sum = 0
-    local loopEnd = #values
+    local endIndex = #values
     if (not includeLastValue) then
-        loopEnd = loopEnd - 1
+        endIndex = endIndex - 1
     end
-    for i = 1, loopEnd do
+    for i = 1, endIndex do
         sum = sum + values[i]
     end
     return sum
@@ -1338,7 +1349,7 @@ end
 -- Returns the list of distances [Table]
 -- Parameters
 --    svValues        : set of SV values [Table]
---    stutterDuration : duration of stutter [Int/Float]
+--    stutterDuration : duration of stutter SV (if applicable) [Int/Float]
 function calculateDistanceVsTime(svValues, stutterDuration)
     local distance = 0
     local distancesBackwards = {distance}
@@ -1360,7 +1371,7 @@ function calculateDistanceVsTime(svValues, stutterDuration)
     end
     return getReverseTable(distancesBackwards, false)
 end
--- Calculates the minimum and maximum scale of an IMGUI plot
+-- Calculates the minimum and maximum scale of a plot
 -- Returns the minimum scale and maximum scale [Int/Float]
 -- Parameters
 --    values : set of numbers to calculate plot scale for [Table]
@@ -1430,11 +1441,11 @@ function removeDuplicateValues(list)
     end
     return newList
 end
--- Constructs a table with the order reversed
+-- Constructs a new table from an old table with the order reversed
 -- Returns the reversed table [Table]
 -- Parameters
 --    oldTable      : table to be reversed [Table]
---    skipLastValue : whether or not to skip the last value of the original table [Boolean]
+--    skipLastValue : whether or not to leave out the last value of the original table [Boolean]
 function getReverseTable(oldTable, skipLastValue)
     local lastIndex = #oldTable
     if skipLastValue then
