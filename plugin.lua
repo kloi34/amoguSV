@@ -1,4 +1,4 @@
--- amoguSV pre-v2.0 (29 Aug 2021) 
+-- amoguSV pre-v2.0 (4 Sept 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -147,42 +147,32 @@ end
 function createMainMenu()
     imgui.SetNextWindowSize(PLUGIN_WINDOW_SIZE)
     imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
-    local menuID = "main"
-    local vars = {
-        isHovered = {false, false, false},
+    local globalVars = {
         currentMenuNum = 0,
-        placeSVsBetweenOffsets = false,
+        placeSVsBetweenOffsets = false
     }
-    retrieveStateVariables(menuID, vars)
+    retrieveStateVariables("global", globalVars)
     
-    vars.isHovered[1] = imgui.IsWindowHovered()
-    imgui.AlignTextToFramePadding()
-    imgui.Text("Current SV Tool:")
-    imgui.SameLine()
-    imgui.PushItemWidth(2 * DEFAULT_WIDGET_WIDTH)
-    _, vars.currentMenuNum = imgui.Combo("     ", vars.currentMenuNum, TOOL_OPTIONS, #TOOL_OPTIONS)
-    local menuIndex = vars.currentMenuNum + 1
-    imgui.SameLine()
-    imgui.Text(EMOTICONS[menuIndex])
-    padding()
-    
-    imgui.Columns(2, "SV Menus", false)
-    imgui.BeginChild("Left Panel", MENU_SIZE_LEFT, true)
-    vars.isHovered[2] = imgui.IsWindowHovered()
+    local navHovered = imgui.IsWindowHovered()
+    createNavigationDropdown(globalVars)
+    local menuIndex = globalVars.currentMenuNum + 1
+    imgui.Columns(2, "SV Panels", false)
+    imgui.BeginChild("Settings Panel", MENU_SIZE_LEFT, true)
+    local settingsHovered = imgui.IsWindowHovered()
     local center = (MENU_SIZE_LEFT[1] - imgui.CalcTextSize("SETTINGS")[1] - 2 * PADDING_WIDTH) / 2
     imgui.Indent(center)
     imgui.Text("SETTINGS")
     imgui.Unindent(center)
-    separator()
+    addSeparator()
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     -- creates the menu of the currently selected SV tool
-    local menuFunctionName = string.lower(TOOL_OPTIONS[menuIndex]).."Menu"
-    vars.placeSVsBetweenOffsets = _G[menuFunctionName](TOOL_OPTIONS[menuIndex], menuIndex, vars.placeSVsBetweenOffsets)
-    vars.isHovered[3] = imgui.IsWindowHovered()
+    local menuFunctionName = string.lower(TOOL_OPTIONS[menuIndex]).."SettingsMenu"
+    globalVars.placeSVsBetweenOffsets = _G[menuFunctionName](TOOL_OPTIONS[menuIndex], menuIndex, globalVars.placeSVsBetweenOffsets)
+    local rightSideHovered = imgui.IsWindowHovered()
     imgui.EndChild()
     
-    saveStateVariables(menuID, vars)
-    state.IsWindowHovered = vars.isHovered[1] or vars.isHovered[2] or vars.isHovered[3]
+    saveStateVariables("global", globalVars)
+    state.IsWindowHovered = navHovered or settingsHovered or rightSideHovered
     imgui.End()
 end
 function rightPanel(updateSVInfo, vars, menuID, svSetInfo, menuIndex, placeSVsBetweenOffsets)
@@ -195,11 +185,11 @@ function rightPanel(updateSVInfo, vars, menuID, svSetInfo, menuIndex, placeSVsBe
     end
     if (not placeSVsBetweenOffsets) then
         plotNotePath(vars.noteDistanceVsTime)
-        separator()
+        addSeparator()
     end
     plotSVs(vars.svValuesPreview, menuID)
     displaySVStats(vars)
-    separator()
+    addSeparator()
     imgui.AlignTextToFramePadding()
     imgui.Text("Place SVs between:")
     imgui.SameLine(0, RADIO_BUTTON_SPACING)
@@ -211,7 +201,7 @@ function rightPanel(updateSVInfo, vars, menuID, svSetInfo, menuIndex, placeSVsBe
         placeSVsBetweenOffsets = true
         vars.displace = false
     end
-    padding()
+    addPadding()
     if placeSVsBetweenOffsets then
         if imgui.Button("Current", {DEFAULT_WIDGET_WIDTH * 0.4, DEFAULT_WIDGET_HEIGHT}) then
             vars.startOffset = state.SongTime
@@ -229,7 +219,7 @@ function rightPanel(updateSVInfo, vars, menuID, svSetInfo, menuIndex, placeSVsBe
     local svButtonText = "Place SVs "
     if placeSVsBetweenOffsets then
         svButtonText = svButtonText.."Between Start/End Offsets"
-        padding()
+        addPadding()
     else
         svButtonText = svButtonText.."Between Selected Notes"
     end
@@ -254,7 +244,7 @@ end
 -- Creates the Linear SV menu
 -- Parameters
 --    menuID : name of the menu [String]
-function linearMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function linearSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = declareMenuVariables(menuID)
     retrieveStateVariables(menuID, vars)
     
@@ -276,7 +266,7 @@ end
 -- Creates the "Exponential SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function exponentialMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function exponentialSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = declareMenuVariables(menuID)
     retrieveStateVariables(menuID, vars)
     
@@ -301,7 +291,7 @@ end
 -- Creates the "Stutter SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function stutterMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function stutterSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = declareMenuVariables(menuID)
     retrieveStateVariables(menuID, vars)
     
@@ -318,16 +308,16 @@ function stutterMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     updateSVInfo = chooseEndSV(vars, true) or updateSVInfo
     _, vars.linearStutter = imgui.Checkbox("Change stutter linearly over time", vars.linearStutter)
     if vars.linearStutter then
-        padding()
+        addPadding()
         imgui.Text("Linearly end at:")
-        padding()
+        addPadding()
         _, vars.linearEndStutterSV = imgui.InputFloat("Stutter start SV ", vars.linearEndStutterSV,
                                                       0, 0, "%.2fx")
         vars.linearEndStutterSV = clampToInterval(vars.linearEndStutterSV, -MAX_GENERAL_SV,
                                             MAX_GENERAL_SV)
         _, vars.linearEndDuration = imgui.SliderInt("Duration ", vars.linearEndDuration, 1, 99, vars.linearEndDuration.."%%")
         vars.linearEndDuration = clampToInterval(vars.linearEndDuration, 1, 99)
-        padding()
+        addPadding()
         _, vars.linearEndAvgSV = imgui.InputFloat("Average SV ", vars.linearEndAvgSV, 0, 0,
                                                   "%.2fx")
         vars.linearEndAvgSV = clampToInterval(vars.linearEndAvgSV, -MAX_GENERAL_SV, MAX_GENERAL_SV)
@@ -343,7 +333,7 @@ end
 -- Creates the "Bezier SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function bezierMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function bezierSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = {
         calculationMethodOption = 0,
         x1 = 0,
@@ -384,13 +374,13 @@ function bezierMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     vars.y2 = clampToInterval(vars.y2, -1, 2)
     updateSVInfo = chooseAverageSV(vars) or updateSVInfo
     updateSVInfo = chooseSVPoints(vars) or updateSVInfo
-    padding()
+    addPadding()
     updateSVInfo = chooseEndSV(vars, true) or updateSVInfo
     updateSVInfo = chooseInterlaceMultiplier(vars, menuID) or updateSVInfo
     chooseTeleportSV(vars, menuID, placeSVsBetweenOffsets)
-    separator()
+    addSeparator()
     chooseDisplacement(vars, placeSVsBetweenOffsets)
-    separator()
+    addSeparator()
     imgui.AlignTextToFramePadding()
     imgui.Text("Calculation Style:")
     local oldMethodOption = vars.calculationMethodOption
@@ -414,9 +404,9 @@ function bezierMenu(menuID, menuIndex, placeSVsBetweenOffsets)
         end
     end
     plotNotePath(vars.noteDistanceVsTime)
-    separator()
+    addSeparator()
     --plotSVs(vars.bezierSVValues, menuID)
-    separator()
+    addSeparator()
     if imgui.Button("Place SVs Between Selected Notes", ACTION_BUTTON_SIZE) then
         local SVs = calculateBezierSV(vars.x1, vars.y1, vars.x2, vars.y2, vars.svPoints,
                                       vars.avgSV, vars.endSVOption, vars.interlace,
@@ -433,14 +423,14 @@ end
 -- Creates the "Sinusoidal SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function sinusoidalMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function sinusoidalSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = declareMenuVariables(menuID)
     retrieveStateVariables(menuID, vars)
     local updateSVInfo = #vars.svValues == 0
     
     imgui.Text("Amplitude:")
     updateSVInfo = chooseStartEndSVs(vars) or updateSVInfo
-    separator()
+    addSeparator()
     local oldPeriods = vars.periods
     _, vars.periods = imgui.InputFloat("Periods/Cycles", vars.periods, 0.25, 0.25, "%.2f")
     vars.periods = forceQuarter(vars.periods)
@@ -452,16 +442,16 @@ function sinusoidalMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     vars.periodsShift = forceQuarter(vars.periodsShift)
     vars.periodsShift = clampToInterval(vars.periodsShift, 0, 0.75)
     updateSVInfo = updateSVInfo or (oldPeriodsShift ~= vars.periodsShift)
-    padding()
+    addPadding()
     imgui.Text("For every 0.25 period/cycle, place...")
     local oldPerQuarterPeriod = vars.svsPerQuarterPeriod
     _, vars.svsPerQuarterPeriod = imgui.InputInt("SV points", vars.svsPerQuarterPeriod)
     vars.svsPerQuarterPeriod = clampToInterval(vars.svsPerQuarterPeriod, 1, 50)
     updateSVInfo = updateSVInfo or (oldPerQuarterPeriod ~= vars.svsPerQuarterPeriod)
-    padding()
+    addPadding()
     updateSVInfo = chooseEndSV(vars, true) or updateSVInfo
     chooseTeleportSV(vars, menuID, placeSVsBetweenOffsets)
-    separator()
+    addSeparator()
     chooseDisplacement(vars, placeSVsBetweenOffsets)
     imgui.EndChild()
     
@@ -475,7 +465,7 @@ end
 -- Creates the "Single SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function singleMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function singleSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = {
         skipSVAtNote = false,
         svBefore = false,
@@ -512,7 +502,7 @@ function singleMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     end
     if (not vars.skipSVAtNote) then
         if vars.svBefore then
-            padding()
+            addPadding()
         end
         imgui.Text("At note:")
         if vars.scaleSVLinearly then
@@ -527,7 +517,7 @@ function singleMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     end
     if vars.svAfter then
         if vars.svBefore or (not vars.skipSVAtNote) then
-            padding()
+            addPadding()
         end
         imgui.Text("After note:")
         if vars.scaleSVLinearly then
@@ -546,7 +536,7 @@ function singleMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     end
     local inputExists = vars.svBefore or (not vars.skipSVAtNote) or vars.svAfter
     if inputExists then
-        separator()
+        addSeparator()
     end
     _, vars.svBefore = imgui.Checkbox("Add SV before note", vars.svBefore)
     _, vars.svAfter = imgui.Checkbox("Add SV after note", vars.svAfter)
@@ -574,7 +564,7 @@ end
 -- Creates the "Remove SV" menu
 -- Parameters
 --    menuID : name of the menu [String]
-function removeMenu(menuID, menuIndex, placeSVsBetweenOffsets)
+function removeSettingsMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local vars = {
         startOffset = 0,
         endOffset = 0,
@@ -585,7 +575,7 @@ function removeMenu(menuID, menuIndex, placeSVsBetweenOffsets)
     local currentButtonSize = {0.6 * DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}
     local halfWidgetWidth = 100
     imgui.Text("Remove SVs...")
-    padding()
+    addPadding()
     imgui.AlignTextToFramePadding()
     imgui.Text("From")
     imgui.SameLine(0, 2 * SAMELINE_SPACING)
@@ -619,7 +609,7 @@ function removeMenu(menuID, menuIndex, placeSVsBetweenOffsets)
         vars.endOffset = math.floor(state.SongTime)
     end
     vars.endOffset = clampToInterval(vars.endOffset, 0, MAX_MS_TIME)
-    padding()
+    addPadding()
     _, vars.inputTime = imgui.Checkbox("Manually input time", vars.inputTime)
     imgui.EndChild()
     
@@ -659,15 +649,15 @@ end
 
 ----------------------------------------------------------------------------------------- IMGUI GUI
 
--- Adds vertical blank space on the GUI
-function padding()
+-- Adds vertical blank space/padding on the GUI
+function addPadding()
     imgui.Dummy({0, 0})
 end
 -- Draws a horizontal line separator on the GUI
-function separator()
-    padding()
+function addSeparator()
+    addPadding()
     imgui.Separator()
-    padding()
+    addPadding()
 end
 
 ------------------------------------------------------------------------------------- IMGUI Widgets
@@ -687,7 +677,7 @@ end
 --    vars : reference to the list of variables for a menu [Table]
 --    placeSVsBetweenOffsets
 function chooseDisplacement(vars, placeSVsBetweenOffsets)
-    separator()
+    addSeparator()
     if (not placeSVsBetweenOffsets) then
         _, vars.displace = imgui.Checkbox("Displace end notes' hit receptor/position", vars.displace)
         if vars.displace then
@@ -707,7 +697,7 @@ function chooseEndSV(vars, noNormal)
     if noNormal then
         startIndex = 2
     end
-    padding()
+    addPadding()
     imgui.AlignTextToFramePadding()
     imgui.Text("Final SV:")
     imgui.SameLine(0, SAMELINE_SPACING)
@@ -725,7 +715,7 @@ end
 --    vars   : reference to the list of variables for a menu [Table]
 --    menuID : name of the menu of the variables [String]
 function chooseInterlaceMultiplier(vars, menuID)
-    separator()
+    addSeparator()
     local oldInterlace = vars.interlace
     local oldMultiplier = vars.interlaceMultiplier
     _, vars.interlace = imgui.Checkbox("Interlace another "..string.lower(menuID), vars.interlace)
@@ -753,7 +743,7 @@ end
 --    menuID : name of the menu of the variables [String]
 --    placeSVsBetweenOffsets
 function chooseTeleportSV(vars, menuID, placeSVsBetweenOffsets)
-    separator()
+    addSeparator()
     _, vars.addTeleport = imgui.Checkbox("Add teleport SV at beginning", vars.addTeleport)
     if vars.addTeleport then
         _, vars.teleportValue = imgui.InputFloat("Teleport SV", vars.teleportValue, 0, 0, "%.2fx")
@@ -763,7 +753,7 @@ function chooseTeleportSV(vars, menuID, placeSVsBetweenOffsets)
         vars.teleportDuration = clampToInterval(vars.teleportDuration, MIN_DURATION,
                                           MAX_TELEPORT_DURATION)
         if (not placeSVsBetweenOffsets) then
-            padding()
+            addPadding()
             if imgui.RadioButton("Very start", vars.veryStartTeleport) then
                 vars.veryStartTeleport = true
             end
@@ -837,7 +827,7 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
                                               i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
         if (not placeSVsBetweenOffsets) and displace then
-            if i ~= 1 and ((not addTeleport) or (addTeleport and veryStartTeleport)) then
+            if i ~= 1 and ((not addTeleport) or (addTeleport and veryStartTeleport)) and (i ~= #offsets - 1 or endSVOption ~= 2) then
                 table.insert(SVs, utils.CreateScrollVelocity(startOffset, - displacement * 64))
                 startOffset = startOffset + MIN_DURATION
             end
@@ -849,7 +839,7 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
         else
             local offsetInterval = endOffset - startOffset
             if linearStutter then
-                svOffsets = {startOffset, startOffset + offsetInterval * svDurationList[i], endOffset}
+                svOffsets = {startOffset, startOffset + offsetInterval * svDurationList[i] / 100, endOffset}
             else
                 svOffsets = {startOffset, startOffset + offsetInterval * stutterDuration / 100, endOffset}
             end
@@ -1428,7 +1418,7 @@ function declareMenuVariables(menuID)
 end
 
 function chooseLinearInterlace(vars)
-    separator()
+    addSeparator()
     local oldInterlace = vars.interlace
     local oldInterlaceValues = {vars.interlaceStartSV, vars.interlaceEndSV}
     _, vars.interlace = imgui.Checkbox("Interlace another linear", vars.interlace)
@@ -1464,4 +1454,19 @@ function chooseIntensity(vars)
     _, vars.intensity = imgui.SliderInt("Intensity", vars.intensity, 1, 100, vars.intensity.."%%")
     vars.intensity = clampToInterval(vars.intensity, 1, 100)
     return oldIntensity ~= vars.intensity
+end
+
+-- Creates the top navigation bar with the dropdown menu to select an SV tool
+-- Parameters
+--    globalVars : global variables for the plugin that are used across all SV tool menus
+function createNavigationDropdown(globalVars)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Current SV Tool:")
+    imgui.SameLine()
+    imgui.PushItemWidth(2 * DEFAULT_WIDGET_WIDTH)
+    _, globalVars.currentMenuNum = imgui.Combo("     ", globalVars.currentMenuNum, TOOL_OPTIONS, #TOOL_OPTIONS)
+    imgui.SameLine()
+    local menuIndex = globalVars.currentMenuNum + 1
+    imgui.Text(EMOTICONS[menuIndex])
+    addPadding()
 end
