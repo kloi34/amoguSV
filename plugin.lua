@@ -1,4 +1,4 @@
--- amoguSV pre-v2.0 (7 Sept 2021) 
+-- amoguSV pre-v2.0 (8 Sept 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -18,16 +18,11 @@
 -- added (stolen) from Illuminati-CRAZ's plugins in the future as well.
 
 -- Things that still need working on/fixing:
---      1. Redesign bezier tab
---      2. Fix sinusoidal, single, and remove menus to be accessible work again.
-
---      1. Fix bezier tab and bezier calculation for iceSV method
---      2. Revamp + upgrade the "Remove" menu
---      3. Adding tooltips to widgets
---      4. Implement different Cubic bezier calculation (right now, uses iceSV method
---         which is slow/laggy when the live sv graphs update every time settings change)
---      5. Change bezier points to slider instead of input
---      6. ADD comments, review code, review overall structure of the code,
+--      1. Change Cubic bezier point inputs to drag
+--      2. Fix sinusoidal, single, and remove menus to be accessible work again
+--      3. Revamp + upgrade the "Remove" menu
+--      4. Adding tooltips to widgets
+--      5. ADD comments, review code, review overall structure of the code,
 --         refactoring code
 
 -- Optional things that I maybe want to add later
@@ -49,6 +44,8 @@
 --      15. add a curve sharpness to sinusoidal
 --      16. add a duration slider for determining % duration of SVs when placing SVs between notes
 --          and have a toggle to determine from the start or from the end
+--      17. make bezier curve display in-game?
+--      18. add another bezier calculation method
 
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
@@ -165,7 +162,7 @@ function createMainMenu()
     local leftPanelHovered, svUpdateNeeded = createSettingsPanel(globalVars, menuVars, menuName)
     if svUpdateNeeded then
         --!! REMOVE WHEN DONE !! --
-        imgui.Text("Debug: Variables changing")
+        --imgui.Text("Debug: Variables changing")
         --!! REMOVE WHEN DONE !! --
         updateMenuSVs(globalVars, menuVars, menuName)
     end
@@ -176,6 +173,30 @@ function createMainMenu()
     saveStateVariables("Global", globalVars)
     state.IsWindowHovered = navHovered or leftPanelHovered or rightPanelHovered
     imgui.End()
+end
+-- Creates the left side settings panel to adjust SV tool settings
+-- Returns 2 values
+--    1. whether or not this left panel is hovered over [Boolean]
+--    2. whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all tools/menus [Table]
+--    menuVars   : list of variables used for this linear menu [Table]
+--    menuName   : name of this menu [String]
+function createSettingsPanel(globalVars, menuVars, menuName)
+  imgui.BeginChild("Settings Panel", MENU_SIZE_LEFT, true)
+  local isPanelHovered = imgui.IsWindowHovered()
+  --[[ leaving this out for now since plugin widgets take up too much space to fit in plugin
+  local centering = (MENU_SIZE_LEFT[1] - imgui.CalcTextSize("SETTINGS")[1] - 2 * PADDING_WIDTH) / 2
+  imgui.Indent(centering)
+  imgui.Text("SETTINGS")
+  imgui.Unindent(centering)
+  addSeparator()
+  --]]
+  imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+  local menuFunctionName = string.lower(menuName).."SettingsMenu"
+  local svUpdateNeeded = _G[menuFunctionName](globalVars, menuVars, menuName)
+  imgui.EndChild()
+  return isPanelHovered, svUpdateNeeded
 end
 -- Creates the settings menu for linear SV
 -- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
@@ -235,11 +256,10 @@ end
 --    menuName   : name of this menu [String]
 function bezierSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
-    svUpdateNeeded = chooseBezierCalculationMethod(menuVars) or svUpdateNeeded
+    provideLinkToBezierWebsite()
     svUpdateNeeded = chooseBezierPoints(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
     svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
-    -- maybe replace line below with "svUpdateNeeded = chooseEndSV(menuVars, false) or svUpdateNeeded" instead
     svUpdateNeeded = chooseEndSV(menuVars, true) or svUpdateNeeded
     svUpdateNeeded = chooseInterlace(menuVars, menuName, false) or svUpdateNeeded
     chooseTeleportSV(globalVars, menuVars, menuName)
@@ -775,17 +795,6 @@ function calculateSingleSV(skipSVAtNote, svBefore, svValueBefore, incrementBefor
     end
     return SVs
 end
-
--- Calculates all bezier SVs to place
--- Returns a list of all calculated bezier SVs [Table]
--- Parameters
-function calculateBezierSV(x1, y1, x2, y2, svPoints, avgSV, endSVOption, interlace,
-                           interlaceMultiplier, addTeleport, veryStartTeleport, teleportValue,
-                           teleportDuration, displace, displacement)
-    local bezierSVValues = generateBezierSetIceSV(x1, y1, x2, y2, avgSV, svPoints + 2, interlace, interlaceMultiplier)
-    return generateSVs(uniqueSelectedNoteOffsets(), bezierSVValues, addTeleport, veryStartTeleport, teleportValue,
-                       teleportDuration, endSVOption, displace, displacement)
-end
 -- Removes SVs in the map between two points of time
 -- Parameters
 --    startOffset : starting time (milliseconds) to begin removing SVs at [Int/Float]
@@ -858,42 +867,6 @@ end
 --    x : number to force to be a multiple of one quarter [Int/Float]
 function forceQuarter(x)
     return (math.floor(x * 4 + 0.5)) / 4
-end
-----*** FUNCTION BELOW COPIED FROM iceSV ***
-function generateBezierSetIceSV(P1_x, P1_y, P2_x, P2_y, averageSV, intermediatePoints, interlace, interlaceMultiplier)
-    local stepInterval = 1/intermediatePoints
-
-    -- the larger this number, the more accurate the final sv is
-    -- ... and the longer it's going to take
-    local totalSampleSize = 2500
-    local allBezierSamples = {}
-    
-    for t=0, 1, 1/totalSampleSize do
-        local x = mathCubicBezier({0, P1_x, P2_x, 1}, t)
-        local y = mathCubicBezier({0, P1_y, P2_y, 1}, t)
-        table.insert(allBezierSamples, {x=x,y=y})
-    end
-
-    local positions = {}
-
-    local currentPoint = 0
-    for sampleCounter = 1, totalSampleSize, 1 do
-        if allBezierSamples[sampleCounter].x > currentPoint then
-            table.insert(positions, allBezierSamples[sampleCounter].y)
-            currentPoint = currentPoint + stepInterval
-        end
-    end
-
-    local bezierSet = {}
-    for i = 2, intermediatePoints do
-        local velocity = (positions[i] - (positions[i-1] or 0)) * averageSV * intermediatePoints
-        velocity = math.floor(velocity * 100 + 0.5) / 100
-        table.insert(bezierSet, velocity)
-        if interlace and (i ~= intermediatePoints) then
-            table.insert(bezierSet, velocity * interlaceMultiplier)
-        end
-    end
-    return bezierSet
 end
 -- Calculates a single set of exponential values
 -- Returns the set of exponential values [Table]
@@ -1185,24 +1158,22 @@ end
 -- Parameters
 -- 
 function updateMenuSVs(globalVars, menuVars, menuName)
-    menuVars.svValues = {}
+    local svSetInfo = {}
     if menuName == "Linear" then
-        menuVars.svValues = generateLinearSet(menuVars.startSV, menuVars.endSV,
-                                              menuVars.svPoints + 1, menuVars.interlace,
-                                              menuVars.secondStartSV, menuVars.secondEndSV)
+        svSetInfo = {menuVars.startSV, menuVars.endSV, menuVars.svPoints + 1, menuVars.interlace,
+                     menuVars.secondStartSV, menuVars.secondEndSV}
     elseif menuName == "Exponential" then
-        menuVars.svValues = generateExponentialSet(menuVars.exponentialIncrease,
-                                                   menuVars.svPoints + 1, menuVars.avgSV,
-                                                   menuVars.intensity, menuVars.interlace,
-                                                   menuVars.interlaceMultiplier)
+        svSetInfo = {menuVars.exponentialIncrease, menuVars.svPoints + 1, menuVars.avgSV,
+                     menuVars.intensity, menuVars.interlace, menuVars.interlaceMultiplier}
     elseif menuName == "Stutter" then
-        menuVars.svValues = generateStutterSet(menuVars.startSV, menuVars.stutterDuration,
-                                               menuVars.avgSV)
+        svSetInfo = {menuVars.startSV, menuVars.stutterDuration, menuVars.avgSV}
     elseif menuName == "Bezier" then
-        menuVars.svValues = generateBezierSetIceSV(menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2,
-                                                   menuVars.avgSV, menuVars.svPoints + 2, menuVars.interlace,
-                                                   menuVars.interlaceMultiplier)
+        svSetInfo = {menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2,
+                     menuVars.avgSV, menuVars.svPoints, menuVars.interlace,
+                     menuVars.interlaceMultiplier}
     end
+    local setGeneratorFunctionName = "generate"..menuName.."Set"
+    menuVars.svValues = _G[setGeneratorFunctionName](table.unpack(svSetInfo))
     menuVars.noteDistanceVsTime = calculateDistanceVsTime(menuVars.svValues, menuVars.stutterDuration)
     menuVars.svValuesPreview = {}
     for i = 1, #menuVars.svValues do
@@ -1321,7 +1292,6 @@ function declareMenuVariables(menuName)
         y1 = 0,
         x2 = 0,
         y2 = 1,
-        calcMethodNum = 1,
         addTeleport = false,
         veryStartTeleport = false,
         teleportValue = 10000,
@@ -1386,25 +1356,6 @@ function createNavigationDropdown(globalVars)
     imgui.Text(EMOTICONS[globalVars.currentMenuNum])
     addPadding()
     return imgui.IsWindowHovered()
-end
-
-function createSettingsPanel(globalVars, menuVars, menuName)
-  imgui.BeginChild("Settings Panel", MENU_SIZE_LEFT, true)
-  local isPanelHovered = imgui.IsWindowHovered()
-  --[[
-  local centering = (MENU_SIZE_LEFT[1] - imgui.CalcTextSize("SETTINGS")[1] - 2 * PADDING_WIDTH) / 2
-  imgui.Indent(centering)
-  imgui.Text("SETTINGS")
-  imgui.Unindent(centering)
-  addSeparator()
-  --]]
-  imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-  
-  -- creates the menu of the currently selected SV tool
-  local menuFunctionName = string.lower(menuName).."SettingsMenu"
-  local svUpdateNeeded = _G[menuFunctionName](globalVars, menuVars, menuName)
-  imgui.EndChild()
-  return isPanelHovered, svUpdateNeeded
 end
 
 function chooseSVPlacementType(globalVars, menuVars)
@@ -1480,8 +1431,10 @@ end
 function chooseBezierPoints(menuVars)
     local oldFirstPoint = {menuVars.x1, menuVars.y1}
     local oldSecondPoint = {menuVars.x2, menuVars.y2}
-    local _, newFirstPoint = imgui.InputFloat2("(x1, y1)", oldFirstPoint, "%.2f")
-    local _, newSecondPoint = imgui.InputFloat2("(x2, y2)", oldSecondPoint, "%.2f")
+    --local _, newFirstPoint = imgui.InputFloat2("(x1, y1)", oldFirstPoint, "%.2f")
+    --local _, newSecondPoint = imgui.InputFloat2("(x2, y2)", oldSecondPoint, "%.2f")
+    local _, newFirstPoint = imgui.DragFloat2("(x1, y1)", oldFirstPoint, 0.01, -2, 2, "%.2f")
+    local _, newSecondPoint = imgui.DragFloat2("(x2, y2)", oldSecondPoint, 0.01, -2, 2, "%.2f")
     menuVars.x1, menuVars.y1 = table.unpack(newFirstPoint)
     menuVars.x2, menuVars.y2 = table.unpack(newSecondPoint)
     menuVars.x1 = clampToInterval(menuVars.x1, 0, 1)
@@ -1493,15 +1446,48 @@ function chooseBezierPoints(menuVars)
     return firstPointDifferent or secondPointDifferent
 end
 
-function chooseBezierCalculationMethod(menuVars)
-    imgui.AlignTextToFramePadding()
-    imgui.Text("Calc. method:")
-    local oldMethodNum = menuVars.calcMethodNum
-    imgui.SameLine()
-    _, menuVars.calcMethodNum = imgui.RadioButton("1", menuVars.calcMethodNum, 1) --root finding
-    imgui.SameLine()
-    _, menuVars.calcMethodNum = imgui.RadioButton("2", menuVars.calcMethodNum, 2) --iceSV
-    imgui.SameLine()
-    _, menuVars.calcMethodNum = imgui.RadioButton("3", menuVars.calcMethodNum, 3) --iceSV
-    return oldMethodNum ~= menuVars.calcMethodNum
+function simplifiedOneDimensionalBezier(v1, v2, t)
+    return 3*t*(1-t)^2*v1 + 3*t^2*(1-t)*v2+ t^3
+end
+
+function generateBezierSet(x1, y1, x2, y2, avgSV, svPoints, interlace, interlaceMultiplier)
+    local startingTime = 0.5
+    local times = {}
+    local goalXPositions = {}
+    local numTimePositions = svPoints
+    local iterations = 20
+    for i = 1, numTimePositions do
+        table.insert(times, startingTime)
+        table.insert(goalXPositions, i / svPoints)
+    end
+    for i = 1, iterations do
+        local increment = 0.5 ^ (i + 1)
+        for j = 1, numTimePositions do
+            local xPosition = simplifiedOneDimensionalBezier(x1, x2, times[j])
+            if xPosition < goalXPositions[j] then
+                times[j] = times[j] + increment
+            elseif xPosition > goalXPositions[j] then
+                times[j] = times[j] - increment
+            end
+        end
+    end
+    local yPositions = {}
+    for i = 1, #times do
+        table.insert(yPositions, simplifiedOneDimensionalBezier(y1, y2, times[i]))
+    end
+    table.insert(yPositions, 1, 0)
+    table.insert(yPositions, 1)
+    local bezierSet = {}
+    for i = 1, #yPositions - 1 do
+        table.insert(bezierSet, (yPositions[i + 1] - yPositions[i]) * avgSV * svPoints)
+        if interlace then
+            table.insert(bezierSet, (yPositions[i + 1] - yPositions[i]) * avgSV * interlaceMultiplier * svPoints)
+        end
+    end
+    return bezierSet
+end
+
+function provideLinkToBezierWebsite()
+    local url = "https://cubic-bezier.com/"
+    imgui.InputText("Bezier Site", url, #url, imgui_input_text_flags.AutoSelectAll)
 end
