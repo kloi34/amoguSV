@@ -17,14 +17,13 @@
 -- It's most similar to (i.e. 50% of SV features/ideas stolen from) iceSV. More features will be
 -- added (stolen) from Illuminati-CRAZ's plugins in the future as well.
 
--- Things that still need working on/fixing:
---      1. Change Cubic bezier point inputs to drag
---      2. Fix sinusoidal, single, and remove menus to be accessible work again
---      3. Revamp + upgrade the "Remove" menu
---      4. Adding tooltips to widgets
---      5. ADD comments, review code, review overall structure of the code,
---         refactoring code
-
+-- Priority to-do list:
+--      1. Add sinusoidal curve sharpness
+--      2. Fiix Single, and remove menus to be accessible work again
+--      2. Revamp + upgrade the "Remove" menu
+--      4. Adding tooltips to widgets (e.g. bezier calulation method radio buttons)
+--      5. ADD COMMENTS, review code, review overall structure of the code,
+--         refactor code
 -- Optional things that I maybe want to add later
 --      1. Dedicated KeepStill+more SV tool 
 --      2. Dedicated Vibrato+more SV tool 
@@ -36,16 +35,13 @@
 --      7. hyperbolic sv 5head, or some common function
 --      8. dampened harmonic motion svs 5head
 --      9. steal iceSV sv multiplier tool? and also steal svs range tool to copy paste svs?
---      10. steal iceSV bezier parse
---      11. edit sv values option (sv multiplier over range)
---      12. expand bezier to orders other than cubic?
---      13. add point weights to bezier points
---      14. interpolation tab? quadratic or cubic interpolation of distance vs time points?
---      15. add a curve sharpness to sinusoidal
---      16. add a duration slider for determining % duration of SVs when placing SVs between notes
+--      10. edit sv values option (sv multiplier over range)
+--      11. expand bezier to orders other than cubic?
+--      12. add point weights to bezier points
+--      13. interpolation tab? quadratic or cubic interpolation of distance vs time points?
+--      15. add a duration slider for determining % duration of SVs when placing SVs between notes
 --          and have a toggle to determine from the start or from the end
---      17. make bezier curve display in-game?
---      18. add another bezier calculation method
+--      17. add another bezier calculation method
 
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
@@ -162,7 +158,7 @@ function createMainMenu()
     local leftPanelHovered, svUpdateNeeded = createSettingsPanel(globalVars, menuVars, menuName)
     if svUpdateNeeded then
         --!! REMOVE WHEN DONE !! --
-        --imgui.Text("Debug: Variables changing")
+        imgui.Text("Debug: Variables changing")
         --!! REMOVE WHEN DONE !! --
         updateMenuSVs(globalVars, menuVars, menuName)
     end
@@ -185,7 +181,7 @@ end
 function createSettingsPanel(globalVars, menuVars, menuName)
   imgui.BeginChild("Settings Panel", MENU_SIZE_LEFT, true)
   local isPanelHovered = imgui.IsWindowHovered()
-  --[[ leaving this out for now since plugin widgets take up too much space to fit in plugin
+  --[[ leaving this out for now since plugin widgets take up too much space already
   local centering = (MENU_SIZE_LEFT[1] - imgui.CalcTextSize("SETTINGS")[1] - 2 * PADDING_WIDTH) / 2
   imgui.Indent(centering)
   imgui.Text("SETTINGS")
@@ -248,7 +244,7 @@ function stutterSettingsMenu(globalVars, menuVars, menuName)
     svUpdateNeeded = chooseLinearStutter(menuVars) or svUpdateNeeded
     return svUpdateNeeded
 end
--- Creates the settings menu for bezier SV
+-- Creates the settings menu for cubic bezier SV
 -- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
@@ -266,47 +262,24 @@ function bezierSettingsMenu(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars)
     return svUpdateNeeded
 end
--- Creates the "Sinusoidal SV" menu
+-- Creates the settings menu for sinusoidal SV
+-- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
 -- Parameters
---    menuName : name of the menu [String]
-function sinusoidalSettingsMenu(menuName, menuIndex, placeSVsBetweenOffsets)
-    local menuVars = declareMenuVariables(menuName)
-    retrieveStateVariables(menuName, menuVars)
+--    globalVars : list of global variables used across all tools/menus [Table]
+--    menuVars   : list of variables used for this sinusoidal menu [Table]
+--    menuName   : name of this menu [String]
+function sinusoidalSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
-    
     imgui.Text("Amplitude:")
     svUpdateNeeded = chooseStartEndSVs(menuVars, true) or svUpdateNeeded
-    addSeparator()
-    local oldPeriods = menuVars.periods
-    _, menuVars.periods = imgui.InputFloat("Periods/Cycles", menuVars.periods, 0.25, 0.25, "%.2f")
-    menuVars.periods = forceQuarter(menuVars.periods)
-    menuVars.periods = clampToInterval(menuVars.periods, 0.25, 20)
-    svUpdateNeeded = svUpdateNeeded or (oldPeriods ~= menuVars.periods)
-    local oldPeriodsShift = menuVars.periodsShift
-    _, menuVars.periodsShift = imgui.InputFloat("Phase Shift", menuVars.periodsShift, 0.25, 0.25,
-                                            "%.2f")
-    menuVars.periodsShift = forceQuarter(menuVars.periodsShift)
-    menuVars.periodsShift = clampToInterval(menuVars.periodsShift, 0, 0.75)
-    svUpdateNeeded = svUpdateNeeded or (oldPeriodsShift ~= menuVars.periodsShift)
-    addPadding()
-    imgui.Text("For every 0.25 period/cycle, place...")
-    local oldPerQuarterPeriod = menuVars.svsPerQuarterPeriod
-    _, menuVars.svsPerQuarterPeriod = imgui.InputInt("SV points", menuVars.svsPerQuarterPeriod)
-    menuVars.svsPerQuarterPeriod = clampToInterval(menuVars.svsPerQuarterPeriod, 1, 50)
-    svUpdateNeeded = svUpdateNeeded or (oldPerQuarterPeriod ~= menuVars.svsPerQuarterPeriod)
-    addPadding()
+    svUpdateNeeded = chooseConstantShift(menuVars) or svUpdateNeeded
+    svUpdateNeeded = chooseNumPeriods(menuVars) or svUpdateNeeded
+    svUpdateNeeded = choosePeriodShift(menuVars) or svUpdateNeeded
+    svUpdateNeeded = chooseSVPerQuarterPeriod(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseEndSV(menuVars, true) or svUpdateNeeded
-    chooseTeleportSV(menuVars, menuName, placeSVsBetweenOffsets)
-    addSeparator()
-    chooseDisplacement(menuVars, placeSVsBetweenOffsets)
-    imgui.EndChild()
-    
-    imgui.NextColumn()
-    local svSetInfo = {menuVars.startSV, menuVars.endSV, menuVars.periods, menuVars.periodsShift,
-                       menuVars.svsPerQuarterPeriod}
-    placeSVsBetweenOffsets = rightPanel(svUpdateNeeded, menuVars, menuName, svSetInfo, menuIndex, placeSVsBetweenOffsets)
-    saveStateVariables(menuName, menuVars)
-    return placeSVsBetweenOffsets
+    chooseTeleportSV(globalVars, menuVars, menuName)
+    chooseDisplacement(globalVars, menuVars)
+    return svUpdateNeeded
 end
 -- Creates the "Single SV" menu
 -- Parameters
@@ -934,7 +907,7 @@ end
 --    periodsShift           : number of periods/cycles to shift the sinusoidal wave [Int/Float]
 --    valuesPerQuarterPeriod : number of values to calculate per quarter period/cycle [Int/Float]
 function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShift,
-                               valuesPerQuarterPeriod)
+                               valuesPerQuarterPeriod, shiftByConstant)
     local sinusoidalSet = {}
     local quarterPeriods = 4 * periods
     local quarterPeriodsShift = 4 * periodsShift
@@ -942,7 +915,7 @@ function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShi
     local amplitudes = generateLinearSet(startAmplitude, endAmplitude, totalSVs + 1, false, 0, 0)
     for i = 0, totalSVs do
         local angle = (math.pi / 2) * ((i / valuesPerQuarterPeriod) + quarterPeriodsShift)
-        local velocity = amplitudes[i + 1] * math.sin(angle)
+        local velocity = amplitudes[i + 1] * math.sin(angle) + shiftByConstant
         table.insert(sinusoidalSet, velocity)
     end
     return sinusoidalSet
@@ -1171,6 +1144,9 @@ function updateMenuSVs(globalVars, menuVars, menuName)
         svSetInfo = {menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2,
                      menuVars.avgSV, menuVars.svPoints, menuVars.interlace,
                      menuVars.interlaceMultiplier}
+    elseif menuName == "Sinusoidal" then
+        svSetInfo = {menuVars.startSV, menuVars.endSV, menuVars.periods, menuVars.periodsShift,
+                     menuVars.svsPerQuarterPeriod, menuVars.shiftByConstant}
     end
     local setGeneratorFunctionName = "generate"..menuName.."Set"
     menuVars.svValues = _G[setGeneratorFunctionName](table.unpack(svSetInfo))
@@ -1273,6 +1249,7 @@ function declareMenuVariables(menuName)
     local menuVars = {
         startSV = 2,
         endSV = 0,
+        shiftByConstant = 0,
         stutterDuration = nil,
         exponentialIncrease = false,
         intensity = 30,
@@ -1431,8 +1408,6 @@ end
 function chooseBezierPoints(menuVars)
     local oldFirstPoint = {menuVars.x1, menuVars.y1}
     local oldSecondPoint = {menuVars.x2, menuVars.y2}
-    --local _, newFirstPoint = imgui.InputFloat2("(x1, y1)", oldFirstPoint, "%.2f")
-    --local _, newSecondPoint = imgui.InputFloat2("(x2, y2)", oldSecondPoint, "%.2f")
     local _, newFirstPoint = imgui.DragFloat2("(x1, y1)", oldFirstPoint, 0.01, -2, 2, "%.2f")
     local _, newSecondPoint = imgui.DragFloat2("(x2, y2)", oldSecondPoint, 0.01, -2, 2, "%.2f")
     menuVars.x1, menuVars.y1 = table.unpack(newFirstPoint)
@@ -1486,8 +1461,50 @@ function generateBezierSet(x1, y1, x2, y2, avgSV, svPoints, interlace, interlace
     end
     return bezierSet
 end
-
+-- Provides a copy-pastable link to a website that lets you play around with a cubic bezier curve
 function provideLinkToBezierWebsite()
     local url = "https://cubic-bezier.com/"
-    imgui.InputText("Bezier Site", url, #url, imgui_input_text_flags.AutoSelectAll)
+    imgui.InputText("Helpful site", url, #url, imgui_input_text_flags.AutoSelectAll)
+    addSeparator()
+end
+
+function chooseNumPeriods(menuVars)
+    addSeparator()
+    local oldPeriods = menuVars.periods
+    _, menuVars.periods = imgui.InputFloat("Periods/Cycles", menuVars.periods, 0.25, 0.25, "%.2f")
+    menuVars.periods = forceQuarter(menuVars.periods)
+    menuVars.periods = clampToInterval(menuVars.periods, 0.25, 20)
+    return oldPeriods ~= menuVars.periods
+end
+
+function choosePeriodShift(menuVars)
+    local oldPeriodsShift = menuVars.periodsShift
+    _, menuVars.periodsShift = imgui.InputFloat("Phase Shift", menuVars.periodsShift, 0.25, 0.25,
+                                            "%.2f")
+    menuVars.periodsShift = forceQuarter(menuVars.periodsShift)
+    menuVars.periodsShift = clampToInterval(menuVars.periodsShift, 0, 0.75)
+    return oldPeriodsShift ~= menuVars.periodsShift
+end
+
+function chooseSVPerQuarterPeriod(menuVars)
+    addPadding()
+    imgui.Text("For every 0.25 period/cycle, place...")
+    local oldPerQuarterPeriod = menuVars.svsPerQuarterPeriod
+    _, menuVars.svsPerQuarterPeriod = imgui.InputInt("SV points", menuVars.svsPerQuarterPeriod)
+    menuVars.svsPerQuarterPeriod = clampToInterval(menuVars.svsPerQuarterPeriod, 1, 50)
+    return oldPerQuarterPeriod ~= menuVars.svsPerQuarterPeriod
+end
+
+function chooseConstantShift(menuVars)
+    addPadding()
+    local oldShift = menuVars.shiftByConstant
+    if imgui.Button("Reset", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT}) then
+        menuVars.shiftByConstant = 0
+    end
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
+    _, menuVars.shiftByConstant = imgui.InputFloat("Vertical Shift", menuVars.shiftByConstant, 0, 0, "%.2fx")
+    menuVars.shiftByConstant = clampToInterval(menuVars.shiftByConstant, -10, 10)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    return oldShift ~= menuVars.shiftByConstant
 end
