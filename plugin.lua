@@ -1,4 +1,4 @@
--- amoguSV pre-v2.0 (8 Sept 2021) 
+-- amoguSV pre-v2.0 (9 Sept 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -18,10 +18,8 @@
 -- added (stolen) from Illuminati-CRAZ's plugins in the future as well.
 
 -- Priority to-do list:
---      1. Add sinusoidal curve sharpness
---      2. Fiix Single, and remove menus to be accessible work again
+--      1. Fix remove menu to be accessible work again
 --      2. Revamp + upgrade the "Remove" menu
---      4. Adding tooltips to widgets (e.g. bezier calulation method radio buttons)
 --      5. ADD COMMENTS, review code, review overall structure of the code,
 --         refactor code
 -- Optional things that I maybe want to add later
@@ -41,7 +39,8 @@
 --      13. interpolation tab? quadratic or cubic interpolation of distance vs time points?
 --      15. add a duration slider for determining % duration of SVs when placing SVs between notes
 --          and have a toggle to determine from the start or from the end
---      17. add another bezier calculation method
+--      16. add another bezier calculation method
+--      17. refactor/rename single sv menu code? maybe it is fine as is even though it is kinda cluttered
 
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
@@ -163,7 +162,7 @@ function createMainMenu()
         updateMenuSVs(globalVars, menuVars, menuName)
     end
     imgui.NextColumn()
-    local rightPanelHovered = createRightPanel(globalVars, menuVars, menuName)
+    local rightPanelHovered = createPlaceSVPanel(globalVars, menuVars, menuName)
 
     saveStateVariables(menuName, menuVars)
     saveStateVariables("Global", globalVars)
@@ -272,6 +271,7 @@ function sinusoidalSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
     imgui.Text("Amplitude:")
     svUpdateNeeded = chooseStartEndSVs(menuVars, true) or svUpdateNeeded
+    svUpdateNeeded = chooseCurveSharpness(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseConstantShift(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseNumPeriods(menuVars) or svUpdateNeeded
     svUpdateNeeded = choosePeriodShift(menuVars) or svUpdateNeeded
@@ -281,9 +281,26 @@ function sinusoidalSettingsMenu(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars)
     return svUpdateNeeded
 end
--- Creates the "Single SV" menu
+-- Creates the settings menu for single SV
+-- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
 -- Parameters
---    menuName : name of the menu [String]
+--    globalVars : list of global variables used across all tools/menus [Table]
+--    menuVars   : list of variables used for this single SV menu [Table]
+--    menuName   : name of this menu [String]
+function singleSettingsMenu(globalVars, menuVars, menuName)
+    if menuVars.svBefore then
+        chooseSVBeforeNote(menuVars)
+    end
+    if (not menuVars.skipSVAtNote) then
+        chooseSVAtNote(menuVars)
+    end
+    if menuVars.svAfter then
+        chooseSVAfterNote(menuVars)
+    end
+    chooseSingleInputs(menuVars)
+    return false
+end
+--[[
 function singleSettingsMenu(menuName, menuIndex, placeSVsBetweenOffsets)
     local menuVars = {
         skipSVAtNote = false,
@@ -380,6 +397,7 @@ function singleSettingsMenu(menuName, menuIndex, placeSVsBetweenOffsets)
     saveStateVariables(menuName, menuVars)
     return placeSVsBetweenOffsets
 end
+--]]
 -- Creates the "Remove SV" menu
 -- Parameters
 --    menuName : name of the menu [String]
@@ -446,11 +464,16 @@ end
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this stutter menu [Table]
 --    menuName   : name of this menu [String]
-function createRightPanel(globalVars, menuVars, menuName)
+function createPlaceSVPanel(globalVars, menuVars, menuName)
     imgui.BeginChild("Right Panel", MENU_SIZE_RIGHT)
     local isPanelHovered = imgui.IsWindowHovered()
-    if not (globalVars.placeSVsBetweenOffsets or menuVars.linearStutter) then
-        plotNotePath(menuVars.noteDistanceVsTime)
+    if menuName == "Single" then
+        createSingleSVRightPanel(menuVars)
+        imgui.EndChild()
+        return isPanelHovered
+    end
+    if not (menuVars.linearStutter) then
+        plotSVMotion(menuVars.noteDistanceVsTime, not globalVars.placeSVsBetweenOffsets)
         addSeparator()
     end
     if menuVars.linearStutter then
@@ -463,7 +486,7 @@ function createRightPanel(globalVars, menuVars, menuName)
     displaySVStats(menuVars)
     addSeparator()
     chooseSVPlacementType(globalVars, menuVars)
-    createPlaceSVButton(globalVars, menuVars)
+    createPlaceSVButton(globalVars, menuVars, menuName)
     imgui.EndChild()
     return isPanelHovered
 end
@@ -534,7 +557,8 @@ end
 function chooseDisplacement(globalVars, menuVars)
     addSeparator()
     if (not globalVars.placeSVsBetweenOffsets) then
-        _, menuVars.displace = imgui.Checkbox("Displace end notes' hit receptor/position", menuVars.displace)
+        _, menuVars.displace = imgui.Checkbox("Displace end notes", menuVars.displace)
+        createHelpMarker("Shifts the note/hit-object receptor up or down, changing how high notes are hit on the screen")
         if menuVars.displace then
             _, menuVars.displacement = imgui.InputFloat("Height", menuVars.displacement, 0, 0, "%.2f msx")
             menuVars.displacement = clampToInterval(menuVars.displacement, -MAX_GENERAL_SV, MAX_GENERAL_SV)
@@ -555,6 +579,7 @@ function chooseEndSV(menuVars, noNormal)
     addPadding()
     imgui.AlignTextToFramePadding()
     imgui.Text("Final SV:")
+    createToolTip("This is the very last SV placed at the end of all SVs")
     imgui.SameLine(0, SAMELINE_SPACING)
     for i = startIndex, #END_SV_TYPES do
         if i ~= startNum then
@@ -576,6 +601,7 @@ function chooseInterlace(menuVars, menuName, isLinear)
     local oldMultiplier = menuVars.interlaceMultiplier
     local oldInterlaceValues = {menuVars.secondStartSV, menuVars.secondEndSV}
     _, menuVars.interlace = imgui.Checkbox("Interlace another "..string.lower(menuName), menuVars.interlace)
+    createHelpMarker("Add another set of "..string.lower(menuName).." SVs in-between the regular SVs")
     if menuVars.interlace then
         if isLinear then
             local _, newInterlaceValues = imgui.InputFloat2("Start/End SV ", oldInterlaceValues, "%.2fx")
@@ -627,6 +653,7 @@ end
 function chooseTeleportSV(globalVars, menuVars, menuName)
     addSeparator()
     _, menuVars.addTeleport = imgui.Checkbox("Add teleport SV at beginning", menuVars.addTeleport)
+    createHelpMarker("Adds a big (or small) SV at the beginning of the SV set that lasts for a short time (< 10 ms)")
     if menuVars.addTeleport then
         _, menuVars.teleportValue = imgui.InputFloat("Teleport SV", menuVars.teleportValue, 0, 0, "%.2fx")
         menuVars.teleportValue = clampToInterval(menuVars.teleportValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
@@ -733,10 +760,7 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
     addEndSV(SVs, offsets[#offsets], svValues[#svValues], endSVOption, displace, displacement)
     return SVs
 end
--- Calculates all single SVs to place
--- Returns a list of all calculated siingle SVs [Table]
--- Parameters
-function calculateSingleSV(skipSVAtNote, svBefore, svValueBefore, incrementBefore, svAfter,
+function generateSingleSVs(skipSVAtNote, svBefore, svValueBefore, incrementBefore, svAfter,
                            svValueAfter, incrementAfter, svValue, scaleSVLinearly,
                            svValueBeforeEnd, svValueEnd, svValueAfterEnd)
     local offsets = uniqueSelectedNoteOffsets()
@@ -768,6 +792,7 @@ function calculateSingleSV(skipSVAtNote, svBefore, svValueBefore, incrementBefor
     end
     return SVs
 end
+
 -- Removes SVs in the map between two points of time
 -- Parameters
 --    startOffset : starting time (milliseconds) to begin removing SVs at [Int/Float]
@@ -907,15 +932,21 @@ end
 --    periodsShift           : number of periods/cycles to shift the sinusoidal wave [Int/Float]
 --    valuesPerQuarterPeriod : number of values to calculate per quarter period/cycle [Int/Float]
 function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShift,
-                               valuesPerQuarterPeriod, shiftByConstant)
+                               valuesPerQuarterPeriod, verticalShift, curveSharpness)
     local sinusoidalSet = {}
     local quarterPeriods = 4 * periods
     local quarterPeriodsShift = 4 * periodsShift
     local totalSVs = valuesPerQuarterPeriod * quarterPeriods
     local amplitudes = generateLinearSet(startAmplitude, endAmplitude, totalSVs + 1, false, 0, 0)
+    local normalizedSharpness
+    if curveSharpness > 50 then
+        normalizedSharpness = math.sqrt((curveSharpness - 50) * 2)
+    else
+        normalizedSharpness = (curveSharpness / 50) ^ 2
+    end
     for i = 0, totalSVs do
         local angle = (math.pi / 2) * ((i / valuesPerQuarterPeriod) + quarterPeriodsShift)
-        local velocity = amplitudes[i + 1] * math.sin(angle) + shiftByConstant
+        local velocity = amplitudes[i + 1] * mathSign(math.sin(angle)) * (math.abs(math.sin(angle))^(normalizedSharpness)) + verticalShift
         table.insert(sinusoidalSet, velocity)
     end
     return sinusoidalSet
@@ -1060,11 +1091,16 @@ function calculatePlotScale(values)
     end
     return minScale, maxScale
 end
--- Creates a distance vs time graph/plot of note motion
+-- Creates a distance vs time graph/plot of SV motion
 -- Parameters
 --    noteDistances : list of note distances [Table]
-function plotNotePath(noteDistances)
-    imgui.Text("Projected Note Motion (Distance vs Time):")
+--    forNotes      : whether or SV motion is describing notes [Boolean]
+function plotSVMotion(noteDistances, forNotes)
+    if forNotes then
+        imgui.Text("Projected Note Motion (Distance vs Time):")
+    else
+        imgui.Text("Projected Motion (Distance vs Time):")
+    end
     minScale, maxScale = calculatePlotScale(noteDistances)
     imgui.PlotLines("     ", noteDistances, #noteDistances, 0, "", minScale, maxScale,
                     {ACTION_BUTTON_SIZE[1], 100})
@@ -1146,7 +1182,7 @@ function updateMenuSVs(globalVars, menuVars, menuName)
                      menuVars.interlaceMultiplier}
     elseif menuName == "Sinusoidal" then
         svSetInfo = {menuVars.startSV, menuVars.endSV, menuVars.periods, menuVars.periodsShift,
-                     menuVars.svsPerQuarterPeriod, menuVars.shiftByConstant}
+                     menuVars.svsPerQuarterPeriod, menuVars.verticalShift, menuVars.curveSharpness}
     end
     local setGeneratorFunctionName = "generate"..menuName.."Set"
     menuVars.svValues = _G[setGeneratorFunctionName](table.unpack(svSetInfo))
@@ -1198,13 +1234,13 @@ function displaySVStats(menuVars)
             local endSecondSV = round(menuVars.svValuesSecondPreview[2], 2)
             local roundedAvgSV = round(menuVars.avgSV, 2)
             local roundedEndAvgSV = round(menuVars.linearEndAvgSV, 2)
-            imgui.Text("Beginning Stutter SVs:")
-            imgui.Text("Ending Stutter SVs:")
+            imgui.Text("First SVs:")
+            imgui.Text("Second SVs:")
             imgui.Text("Stutter Averages:")
             imgui.NextColumn()
-            imgui.Text(firstSV.."x, "..secondSV.."x")
-            imgui.Text(endFirstSV.."x, "..endSecondSV.."x")
-            imgui.Text(roundedAvgSV.."x --> "..roundedEndAvgSV.."x")
+            imgui.Text(firstSV.."x --> "..endFirstSV.."x")
+            imgui.Text(secondSV.."x --> "..endSecondSV.."x")
+            imgui.Text(roundedAvgSV.."x -->"..roundedEndAvgSV.."x")
         else -- non-linearly varying stutter
             local firstSV = round(menuVars.svValues[1], 2)
             local firstDurationPerc = menuVars.stutterDuration
@@ -1249,12 +1285,13 @@ function declareMenuVariables(menuName)
     local menuVars = {
         startSV = 2,
         endSV = 0,
-        shiftByConstant = 0,
+        curveSharpness = 50,
+        verticalShift = 0,
         stutterDuration = nil,
         exponentialIncrease = false,
         intensity = 30,
-        periods = 0.25,
-        periodsShift = 0,
+        periods = 1,
+        periodsShift = 0.25,
         avgSV = 1,
         svsPerQuarterPeriod = 8,
         svPoints = 16,
@@ -1279,6 +1316,18 @@ function declareMenuVariables(menuName)
         svValuesPreview = {},
         svValuesSecondPreview = {},
         noteDistanceVsTime = {},
+        skipSVAtNote = false,
+        svBefore = false,
+        svValueBefore = 0,
+        incrementBefore = 0.125,
+        svAfter = false,
+        svValueAfter = 0,
+        incrementAfter = 0.125,
+        svValue = 1,
+        scaleSVLinearly = false,
+        svValueBeforeEnd = 0,
+        svValueEnd = 1,
+        svValueAfterEnd = 0,
         startOffset = 0,
         endOffset = 0
     }
@@ -1365,8 +1414,17 @@ function chooseSVPlacementType(globalVars, menuVars)
         addPadding()
     end
 end
-
-function createPlaceSVButton(globalVars, menuVars)
+function createPlaceSingleSVButton(menuVars)
+    if imgui.Button("Place SVs At Selected Notes", ACTION_BUTTON_SIZE) then
+        local SVs = generateSingleSVs(menuVars.skipSVAtNote, menuVars.svBefore, menuVars.svValueBefore, menuVars.incrementBefore, menuVars.svAfter,
+                                      menuVars.svValueAfter, menuVars.incrementAfter, menuVars.svValue, menuVars.scaleSVLinearly,
+                                      menuVars.svValueBeforeEnd, menuVars.svValueEnd, menuVars.svValueAfterEnd)
+        if #SVs > 0 then
+            actions.PlaceScrollVelocityBatch(SVs)
+        end
+    end
+end
+function createPlaceSVButton(globalVars, menuVars, menuName)
     local svButtonText = "Place SVs "
     if globalVars.placeSVsBetweenOffsets then
         svButtonText = svButtonText.."Between Start/End Offsets"
@@ -1401,7 +1459,7 @@ end
 function chooseLinearStutter(menuVars)
     addSeparator()
     local oldLinearStutter = menuVars.linearStutter
-    _, menuVars.linearStutter = imgui.Checkbox("Change stutter linearly over time", menuVars.linearStutter)
+    _, menuVars.linearStutter = imgui.Checkbox("Change stutter values linearly over time", menuVars.linearStutter)
     return oldLinearStutter ~= menuVars.linearStutter
 end
 
@@ -1409,7 +1467,9 @@ function chooseBezierPoints(menuVars)
     local oldFirstPoint = {menuVars.x1, menuVars.y1}
     local oldSecondPoint = {menuVars.x2, menuVars.y2}
     local _, newFirstPoint = imgui.DragFloat2("(x1, y1)", oldFirstPoint, 0.01, -2, 2, "%.2f")
+    createHelpMarker("Coordinates of the first point of the cubic bezier")
     local _, newSecondPoint = imgui.DragFloat2("(x2, y2)", oldSecondPoint, 0.01, -2, 2, "%.2f")
+    createHelpMarker("Coordinates of the second point of the cubic bezier")
     menuVars.x1, menuVars.y1 = table.unpack(newFirstPoint)
     menuVars.x2, menuVars.y2 = table.unpack(newSecondPoint)
     menuVars.x1 = clampToInterval(menuVars.x1, 0, 1)
@@ -1465,6 +1525,7 @@ end
 function provideLinkToBezierWebsite()
     local url = "https://cubic-bezier.com/"
     imgui.InputText("Helpful site", url, #url, imgui_input_text_flags.AutoSelectAll)
+    createHelpMarker("This site lets you play around with a cubic bezier whose graph represents the motion/path of notes. Play around with the points until you find a good shape for note motion and input those coordinates below")
     addSeparator()
 end
 
@@ -1482,7 +1543,7 @@ function choosePeriodShift(menuVars)
     _, menuVars.periodsShift = imgui.InputFloat("Phase Shift", menuVars.periodsShift, 0.25, 0.25,
                                             "%.2f")
     menuVars.periodsShift = forceQuarter(menuVars.periodsShift)
-    menuVars.periodsShift = clampToInterval(menuVars.periodsShift, 0, 0.75)
+    menuVars.periodsShift = clampToInterval(menuVars.periodsShift, -0.75, 0.75)
     return oldPeriodsShift ~= menuVars.periodsShift
 end
 
@@ -1496,15 +1557,128 @@ function chooseSVPerQuarterPeriod(menuVars)
 end
 
 function chooseConstantShift(menuVars)
-    addPadding()
-    local oldShift = menuVars.shiftByConstant
+    local oldShift = menuVars.verticalShift
     if imgui.Button("Reset", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT}) then
-        menuVars.shiftByConstant = 0
+        menuVars.verticalShift = 0
     end
     imgui.SameLine(0, SAMELINE_SPACING)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
-    _, menuVars.shiftByConstant = imgui.InputFloat("Vertical Shift", menuVars.shiftByConstant, 0, 0, "%.2fx")
-    menuVars.shiftByConstant = clampToInterval(menuVars.shiftByConstant, -10, 10)
+    _, menuVars.verticalShift = imgui.InputFloat("Vertical Shift", menuVars.verticalShift, 0, 0, "%.2fx")
+    menuVars.verticalShift = clampToInterval(menuVars.verticalShift, -10, 10)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    return oldShift ~= menuVars.shiftByConstant
+    return oldShift ~= menuVars.verticalShift
+end
+
+function mathSign(x)
+    if x < 0 then
+        return -1
+    end
+    return 1
+end
+
+function chooseCurveSharpness(menuVars)
+    local oldCurveSharpness = menuVars.curveSharpness
+    if imgui.Button("Reset", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT}) then
+        menuVars.curveSharpness = 50
+    end
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
+    _, menuVars.curveSharpness = imgui.DragInt("Curve Sharpness", menuVars.curveSharpness, 1, 1, 100, "%d%%")
+    menuVars.curveSharpness = clampToInterval(menuVars.curveSharpness, 1, 100)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    return oldCurveSharpness ~= menuVars.curveSharpness
+end
+
+function chooseSingleInputs(menuVars)
+    local inputExists = menuVars.svBefore or (not menuVars.skipSVAtNote) or menuVars.svAfter
+    if inputExists then
+        addSeparator()
+    end
+    _, menuVars.svBefore = imgui.Checkbox("Add SV before note", menuVars.svBefore)
+    _, menuVars.svAfter = imgui.Checkbox("Add SV after note", menuVars.svAfter)
+    _, menuVars.skipSVAtNote = imgui.Checkbox("Skip SV at note", menuVars.skipSVAtNote)
+    _, menuVars.scaleSVLinearly = imgui.Checkbox("Scale SV values linearly over time", menuVars.scaleSVLinearly)
+end
+
+function chooseSVBeforeNote(menuVars)
+    imgui.Text("Before note:")
+    if menuVars.scaleSVLinearly then
+        local beforeSVValues = {menuVars.svValueBefore, menuVars.svValueBeforeEnd}
+        _, beforeSVValues = imgui.InputFloat2("Start/End SV", beforeSVValues, "%.2fx")
+        menuVars.svValueBefore, menuVars.svValueBeforeEnd = table.unpack(beforeSVValues)
+        menuVars.svValueBeforeEnd = clampToInterval(menuVars.svValueBeforeEnd, -MAX_TELEPORT_VALUE,
+                                          MAX_TELEPORT_VALUE)
+    else
+        _, menuVars.svValueBefore = imgui.InputFloat("SV value", menuVars.svValueBefore, 0, 0, "%.2fx")
+    end
+    menuVars.svValueBefore = clampToInterval(menuVars.svValueBefore, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
+    _, menuVars.incrementBefore = imgui.InputFloat("Time before", menuVars.incrementBefore, 0, 0,
+                                               "%.3f ms")
+    menuVars.incrementBefore = clampToInterval(menuVars.incrementBefore, MIN_DURATION, MAX_DURATION)
+end
+
+function chooseSVAtNote(menuVars)
+    if menuVars.svBefore then
+        addPadding()
+    end
+    imgui.Text("At note:")
+    if menuVars.scaleSVLinearly then
+        local atNoteSVValues = {menuVars.svValue, menuVars.svValueEnd}
+        _, atNoteSVValues = imgui.InputFloat2("Start/End SV ", atNoteSVValues, "%.2fx")
+        menuVars.svValue, menuVars.svValueEnd = table.unpack(atNoteSVValues)
+        menuVars.svValueEnd = clampToInterval(menuVars.svValueEnd, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
+    else
+        _, menuVars.svValue = imgui.InputFloat("SV value ", menuVars.svValue, 0, 0, "%.2fx")
+    end
+    menuVars.svValue = clampToInterval(menuVars.svValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
+end
+
+function chooseSVAfterNote(menuVars)
+    if menuVars.svBefore or (not menuVars.skipSVAtNote) then
+        addPadding()
+    end
+    imgui.Text("After note:")
+    if menuVars.scaleSVLinearly then
+        local afterSVValues = {menuVars.svValueAfter, menuVars.svValueAfterEnd}
+        _, afterSVValues = imgui.InputFloat2("Start/End SV  ", afterSVValues, "%.2fx")
+        menuVars.svValueAfter, menuVars.svValueAfterEnd = table.unpack(afterSVValues)
+        menuVars.svValueAfterEnd = clampToInterval(menuVars.svValueAfterEnd, -MAX_TELEPORT_VALUE,
+                                         MAX_TELEPORT_VALUE)
+    else
+        _, menuVars.svValueAfter = imgui.InputFloat("SV value  ", menuVars.svValueAfter, 0, 0, "%.2fx")
+    end
+    menuVars.svValueAfter = clampToInterval(menuVars.svValueAfter, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
+    _, menuVars.incrementAfter = imgui.InputFloat("Time After", menuVars.incrementAfter, 0, 0,
+                                               "%.3f ms")
+    menuVars.incrementAfter = clampToInterval(menuVars.incrementAfter, MIN_DURATION, MAX_DURATION)
+end
+
+function createSingleSVRightPanel(menuVars)
+    imgui.Text("Hover over the bullet points to see more info")
+    addSeparator()
+    imgui.Text("Some cool things you can do with single SV:")
+    addPadding()
+    imgui.BulletText("Displace notes, making them hit mid-screen")
+    createToolTip("Add SV before note, set time before to be 0.016 ms, and set SV before note to a value between 0.00x and 24000.00x such as 12000.00x. This will essentially make the note move super-duper fast right before it is supposed to be hit, making the note look like it is hit while in the middle of the screen.")
+    addPadding()
+    imgui.BulletText("Reverse Scroll")
+    createToolTip("1.) Set SV at note be 100000.00x and SV after note to be -1.00x with time after being 1.000 ms. Place it at the note you want reverse scroll to start. 2.) Set SV before note to 24000.00x with 0.016 ms time before, SV at note to -24000.00x and SV after note to -1.00x with 0.016 ms time after. Place these at notes after the first note you started the reverse scroll on.")
+    addSeparator()
+    createPlaceSingleSVButton(menuVars)
+end
+-- copied + renamed function from iceSV
+function createToolTip(text)
+    if imgui.IsItemHovered() then
+        imgui.BeginTooltip()
+        imgui.PushTextWrapPos(imgui.GetFontSize() * 20)
+        imgui.Text(text)
+        imgui.PopTextWrapPos()
+        imgui.EndTooltip()
+    end
+end
+-- copied + renamed function from iceSV
+function createHelpMarker(text)
+    imgui.SameLine()
+    imgui.TextDisabled("(?)")
+    createToolTip(text)
 end
