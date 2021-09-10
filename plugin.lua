@@ -1,46 +1,50 @@
--- amoguSV pre-v2.0 (9 Sept 2021) 
+-- amoguSV pre-v2.0 (10 Sept 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
 -- yet to be implemented, so here is credit to those SV plugins and the creators behind them:
---    iceSV       (by IceDynamix)         @ https://github.com/IceDynamix/iceSV
---    KeepStill   (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/KeepStill
---    Vibrato     (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/Vibrato
---    Displacer   (by Illuminati-CRAZ)    @ https://github.com/Illuminati-CRAZ/Displacer
+---------------------------------------------------------------------------------------------------
+--    Plugin Name   Creator                Download                                                
+---------------------------------------------------------------------------------------------------
+--    iceSV         IceDynamix             @ https://github.com/IceDynamix/iceSV
+--    KeepStill     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/KeepStill
+--    Vibrato       Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Vibrato
+--    Displacer     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Displacer
 
 ---------------------------------------------------------------------------------------------------
--- Plugin Info ------------------------------------------------------------------------------------
+-- amoguSV Plugin Info ----------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 
--- This is an SV plugin for Quaver, the ultimate community-driven and open-source competitive
--- rhythm game. The plugin contains various tools for editing SVs quickly and efficiently.
--- It's most similar to (i.e. 50% of SV features/ideas stolen from) iceSV. More features will be
--- added (stolen) from Illuminati-CRAZ's plugins in the future as well.
+-- This is a plugin for Quaver, the ultimate community-driven and open-source competitive rhythm
+-- game. The plugin focuses on provding various tools to add and edit SVs (Scroll Velocities)
+-- quickly and efficiently when making maps. It's most similar to (i.e. 40% of SV features/ideas
+-- stolen from) iceSV. More ideas for features will be added (stolen) from Illuminati-CRAZ's
+-- plugins in the future as well.
 
--- Priority to-do list:
---      1. Fix remove menu to be accessible work again
---      2. Revamp + upgrade the "Remove" menu
---      5. ADD COMMENTS, review code, review overall structure of the code,
---         refactor code
--- Optional things that I maybe want to add later
---      1. Dedicated KeepStill+more SV tool 
---      2. Dedicated Vibrato+more SV tool 
---      3. Option to skip placing SVs between every other note (or every third note, etc.)
+-- Priority to-do list before publishing amoguSV v2.0:
+--      1. ADD COMMENTS, review code + check that numbers are mathClamped + make lines <= 100 lines long, refactor code
+--      2. Rearrange code --> menus at top, all other functions alphabtically sorted blow
+
+-- To-do list after publishing amoguSV v2.0:
+--      1. Copy paste tool
+--      2. steal iceSV sv multiplier tool?
+--      3. Dedicated KeepStill+more SV tool
+--      4. linearly spaced random svs that normalize to 1.00x?
+--      5. Option to skip placing SVs between every other note (or every third note, etc.)
 --         Place this option as a toggle on the right side
---      4. ?? Note animation by choosing which still frames to telport to ??
---      5. Other tools that can place predetermined sv effects like reverse-scroll, bounce, etc.
---      6. linearly spaced random svs that normalize to 1.00x?
---      7. hyperbolic sv 5head, or some common function
---      8. dampened harmonic motion svs 5head
---      9. steal iceSV sv multiplier tool? and also steal svs range tool to copy paste svs?
---      10. edit sv values option (sv multiplier over range)
---      11. expand bezier to orders other than cubic?
---      12. add point weights to bezier points
---      13. interpolation tab? quadratic or cubic interpolation of distance vs time points?
---      15. add a duration slider for determining % duration of SVs when placing SVs between notes
+-- Optional things that I maybe want to add later
+--      1. Dedicated Vibrato+more SV tool 
+--      2. ?? Note animation by choosing which still frames to telport to ??
+--      3. Other tools that can place predetermined sv effects like reverse-scroll, bounce, etc.
+--      4. hyperbolic sv 5head, or some common function
+--      5. dampened harmonic motion svs 5head
+--      6. expand bezier to orders other than cubic?
+--      7. add point weights to bezier points
+--      8. interpolation tab? quadratic or cubic interpolation of distance vs time points?
+--      9. add a duration slider for determining % duration of SVs when placing SVs between notes
 --          and have a toggle to determine from the start or from the end
---      16. add another bezier calculation method
---      17. refactor/rename single sv menu code? maybe it is fine as is even though it is kinda cluttered
+--      10. add another bezier calculation method
+--      11./12. refactor single sv menu code? and refactor genrateSV function code?
 
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
@@ -80,6 +84,13 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "%( ; _ ; %)"
     --"%(w.w)"
 }
+CONDITIONS = {                     -- conditions/tests for numbers
+    "= (equal to)",
+    "> (greater than)",
+    ">= (greater or equal to)",
+    "< (less than)",
+    "<= (less or equal to)"
+}
 END_SV_TYPES = {                   -- options for the last SV placed at the tail end of all SVs
     "Normal",
     "Skip",
@@ -94,7 +105,6 @@ SV_TOOLS = {                       -- list of the available tools for editing SV
     "Single",
     "Remove"
 }
-
 ---------------------------------------------------------------------------------------------------
 -- Plugin Menus and GUI ---------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -148,13 +158,13 @@ function createMainMenu()
     }
     retrieveStateVariables("Global", globalVars)
     
-    local navHovered = createNavigationDropdown(globalVars)
+    local isNavHovered = createNavigationDropdown(globalVars)
     
     local menuName = SV_TOOLS[globalVars.currentMenuNum]
     local menuVars = declareMenuVariables(menuName)
     retrieveStateVariables(menuName, menuVars)
     imgui.Columns(2, "SV Menu Panels", false)
-    local leftPanelHovered, svUpdateNeeded = createSettingsPanel(globalVars, menuVars, menuName)
+    local isLeftPanelHovered, svUpdateNeeded = createSettingsPanel(globalVars, menuVars, menuName)
     if svUpdateNeeded then
         --!! REMOVE WHEN DONE !! --
         imgui.Text("Debug: Variables changing")
@@ -162,14 +172,14 @@ function createMainMenu()
         updateMenuSVs(globalVars, menuVars, menuName)
     end
     imgui.NextColumn()
-    local rightPanelHovered = createPlaceSVPanel(globalVars, menuVars, menuName)
+    local isRightPanelHovered = createRightPanel(globalVars, menuVars, menuName)
 
     saveStateVariables(menuName, menuVars)
     saveStateVariables("Global", globalVars)
-    state.IsWindowHovered = navHovered or leftPanelHovered or rightPanelHovered
+    state.IsWindowHovered = isNavHovered or isLeftPanelHovered or isRightPanelHovered
     imgui.End()
 end
--- Creates the left side settings panel to adjust SV tool settings
+-- Creates the settings panel to adjust SV tool settings
 -- Returns 2 values
 --    1. whether or not this left panel is hovered over [Boolean]
 --    2. whether or not menu-specific SV information has changed and needs an update [Boolean]
@@ -180,21 +190,15 @@ end
 function createSettingsPanel(globalVars, menuVars, menuName)
   imgui.BeginChild("Settings Panel", MENU_SIZE_LEFT, true)
   local isPanelHovered = imgui.IsWindowHovered()
-  --[[ leaving this out for now since plugin widgets take up too much space already
-  local centering = (MENU_SIZE_LEFT[1] - imgui.CalcTextSize("SETTINGS")[1] - 2 * PADDING_WIDTH) / 2
-  imgui.Indent(centering)
-  imgui.Text("SETTINGS")
-  imgui.Unindent(centering)
-  addSeparator()
-  --]]
   imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
   local menuFunctionName = string.lower(menuName).."SettingsMenu"
+  -- creates the settings menu for the current, specific SV tool
   local svUpdateNeeded = _G[menuFunctionName](globalVars, menuVars, menuName)
   imgui.EndChild()
   return isPanelHovered, svUpdateNeeded
 end
 -- Creates the settings menu for linear SV
--- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this linear menu [Table]
@@ -210,7 +214,7 @@ function linearSettingsMenu(globalVars, menuVars, menuName)
     return svUpdateNeeded
 end
 -- Creates the settings menu for exponential SV
--- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this exponential menu [Table]
@@ -228,7 +232,7 @@ function exponentialSettingsMenu(globalVars, menuVars, menuName)
     return svUpdateNeeded
 end
 -- Creates the settings menu for stutter/bump SV
--- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this stutter menu [Table]
@@ -244,7 +248,7 @@ function stutterSettingsMenu(globalVars, menuVars, menuName)
     return svUpdateNeeded
 end
 -- Creates the settings menu for cubic bezier SV
--- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this bezier menu [Table]
@@ -262,7 +266,7 @@ function bezierSettingsMenu(globalVars, menuVars, menuName)
     return svUpdateNeeded
 end
 -- Creates the settings menu for sinusoidal SV
--- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this sinusoidal menu [Table]
@@ -282,7 +286,7 @@ function sinusoidalSettingsMenu(globalVars, menuVars, menuName)
     return svUpdateNeeded
 end
 -- Creates the settings menu for single SV
--- Returns whether or not menu-specific SV information has changed and needs an update [Boolean]
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this single SV menu [Table]
@@ -297,182 +301,71 @@ function singleSettingsMenu(globalVars, menuVars, menuName)
     if menuVars.svAfter then
         chooseSVAfterNote(menuVars)
     end
-    chooseSingleInputs(menuVars)
+    chooseSingleSVInputs(menuVars)
     return false
 end
---[[
-function singleSettingsMenu(menuName, menuIndex, placeSVsBetweenOffsets)
-    local menuVars = {
-        skipSVAtNote = false,
-        svBefore = false,
-        svValueBefore = 0,
-        incrementBefore = 0.125,
-        svAfter = false,
-        svValueAfter = 0,
-        incrementAfter = 0.125,
-        svValue = 1,
-        scaleSVLinearly = false,
-        svValueBeforeEnd = 0,
-        svValueEnd = 1,
-        svValueAfterEnd = 0,
-        startOffset = 0,
-        endOffset = 0
-    }
-    retrieveStateVariables(menuName, menuVars)
-
-    if menuVars.svBefore then
-        imgui.Text("Before note:")
-        if menuVars.scaleSVLinearly then
-            local beforeSVValues = {menuVars.svValueBefore, menuVars.svValueBeforeEnd}
-            _, beforeSVValues = imgui.InputFloat2("Start/End SV", beforeSVValues, "%.2fx")
-            menuVars.svValueBefore, menuVars.svValueBeforeEnd = table.unpack(beforeSVValues)
-            menuVars.svValueBeforeEnd = clampToInterval(menuVars.svValueBeforeEnd, -MAX_TELEPORT_VALUE,
-                                              MAX_TELEPORT_VALUE)
-        else
-            _, menuVars.svValueBefore = imgui.InputFloat("SV value", menuVars.svValueBefore, 0, 0, "%.2fx")
-        end
-        menuVars.svValueBefore = clampToInterval(menuVars.svValueBefore, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, menuVars.incrementBefore = imgui.InputFloat("Time before", menuVars.incrementBefore, 0, 0,
-                                                   "%.3f ms")
-        menuVars.incrementBefore = clampToInterval(menuVars.incrementBefore, MIN_DURATION, MAX_DURATION)
-    end
-    if (not menuVars.skipSVAtNote) then
-        if menuVars.svBefore then
-            addPadding()
-        end
-        imgui.Text("At note:")
-        if menuVars.scaleSVLinearly then
-            local atNoteSVValues = {menuVars.svValue, menuVars.svValueEnd}
-            _, atNoteSVValues = imgui.InputFloat2("Start/End SV ", atNoteSVValues, "%.2fx")
-            menuVars.svValue, menuVars.svValueEnd = table.unpack(atNoteSVValues)
-            menuVars.svValueEnd = clampToInterval(menuVars.svValueEnd, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        else
-            _, menuVars.svValue = imgui.InputFloat("SV value ", menuVars.svValue, 0, 0, "%.2fx")
-        end
-        menuVars.svValue = clampToInterval(menuVars.svValue, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-    end
-    if menuVars.svAfter then
-        if menuVars.svBefore or (not menuVars.skipSVAtNote) then
-            addPadding()
-        end
-        imgui.Text("After note:")
-        if menuVars.scaleSVLinearly then
-            local afterSVValues = {menuVars.svValueAfter, menuVars.svValueAfterEnd}
-            _, afterSVValues = imgui.InputFloat2("Start/End SV  ", afterSVValues, "%.2fx")
-            menuVars.svValueAfter, menuVars.svValueAfterEnd = table.unpack(afterSVValues)
-            menuVars.svValueAfterEnd = clampToInterval(menuVars.svValueAfterEnd, -MAX_TELEPORT_VALUE,
-                                             MAX_TELEPORT_VALUE)
-        else
-            _, menuVars.svValueAfter = imgui.InputFloat("SV value  ", menuVars.svValueAfter, 0, 0, "%.2fx")
-        end
-        menuVars.svValueAfter = clampToInterval(menuVars.svValueAfter, -MAX_TELEPORT_VALUE, MAX_TELEPORT_VALUE)
-        _, menuVars.incrementAfter = imgui.InputFloat("Time After", menuVars.incrementAfter, 0, 0,
-                                                   "%.3f ms")
-        menuVars.incrementAfter = clampToInterval(menuVars.incrementAfter, MIN_DURATION, MAX_DURATION)
-    end
-    local inputExists = menuVars.svBefore or (not menuVars.skipSVAtNote) or menuVars.svAfter
-    if inputExists then
-        addSeparator()
-    end
-    _, menuVars.svBefore = imgui.Checkbox("Add SV before note", menuVars.svBefore)
-    _, menuVars.svAfter = imgui.Checkbox("Add SV after note", menuVars.svAfter)
-    _, menuVars.skipSVAtNote = imgui.Checkbox("Skip SV at note", menuVars.skipSVAtNote)
-    _, menuVars.scaleSVLinearly = imgui.Checkbox("Scale SV values linearly over time", menuVars.scaleSVLinearly)
-    imgui.EndChild()
-    
-    imgui.NextColumn()
-    imgui.BeginChild("Right Menu", MENU_SIZE_RIGHT)
-    if inputExists then
-        if imgui.Button("Place SVs At All Selected Notes", ACTION_BUTTON_SIZE) then
-            local SVs = calculateSingleSV(menuVars.skipSVAtNote, menuVars.svBefore, menuVars.svValueBefore,
-                                          menuVars.incrementBefore, menuVars.svAfter, menuVars.svValueAfter,
-                                          menuVars.incrementAfter, menuVars.svValue, menuVars.scaleSVLinearly,
-                                          menuVars.svValueBeforeEnd, menuVars.svValueEnd,
-                                          menuVars.svValueAfterEnd)
-            if #SVs > 0 then
-                actions.PlaceScrollVelocityBatch(SVs)
-            end
-        end
-    end
-    saveStateVariables(menuName, menuVars)
-    return placeSVsBetweenOffsets
-end
---]]
--- Creates the "Remove SV" menu
+-- Creates the settings menu for remove SV
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
---    menuName : name of the menu [String]
-function removeSettingsMenu(menuName, menuIndex, placeSVsBetweenOffsets)
-    local menuVars = {
-        startOffset = 0,
-        endOffset = 0,
-        inputTime = false
-    }
-    retrieveStateVariables(menuName, menuVars)
-    
-    local currentButtonSize = {0.6 * DEFAULT_WIDGET_WIDTH, DEFAULT_WIDGET_HEIGHT}
-    local halfWidgetWidth = 100
-    imgui.Text("Remove SVs...")
-    addPadding()
-    imgui.AlignTextToFramePadding()
-    imgui.Text("From")
-    imgui.SameLine(0, 2 * SAMELINE_SPACING)
-    if menuVars.inputTime then
-        imgui.PushItemWidth(halfWidgetWidth)
-        _, menuVars.startOffset = imgui.InputFloat("", menuVars.startOffset, 0, 0, "%.3f ms")
-        imgui.PopItemWidth()
-        imgui.SameLine(0, 2 * SAMELINE_SPACING + 2)
-    else
-        imgui.Text(":  "..convertToTime(menuVars.startOffset).." (Start) ")
-        imgui.SameLine(0, 2 * SAMELINE_SPACING + 3)
+--    globalVars : list of global variables used across all tools/menus [Table]
+--    menuVars   : list of variables used for this single SV menu [Table]
+--    menuName   : name of this menu [String]
+function removeSettingsMenu(globalVars, menuVars, menuName)
+    _, menuVars.addRemovalCondition = imgui.Checkbox("Add SV removal conditions", menuVars.addRemovalCondition)
+    if menuVars.addRemovalCondition then
+        addSeparator()
+        local _, svConditionIndex = imgui.Combo("SV Condition", menuVars.svCondition - 1, CONDITIONS, #CONDITIONS)
+        menuVars.svCondition = svConditionIndex + 1
+        _, menuVars.svConditionValue = imgui.InputFloat("SV value", menuVars.svConditionValue, 0, 0, "%.2fx")
+        menuVars.svConditionValue = clampToInterval(menuVars.svConditionValue, -999999, 999999)
     end
-    if imgui.Button("Set Current", currentButtonSize) then
-        menuVars.startOffset = math.floor(state.SongTime)
-    end
-    menuVars.startOffset = clampToInterval(menuVars.startOffset, 0, MAX_MS_TIME)
-    imgui.AlignTextToFramePadding()
-    imgui.Indent(imgui.CalcTextSize("From")[1] - imgui.CalcTextSize("To")[1])
-    imgui.Text("To")
-    imgui.Unindent(imgui.CalcTextSize("From")[1] - imgui.CalcTextSize("To")[1])
-    imgui.SameLine(0, 2 * SAMELINE_SPACING)
-    if menuVars.inputTime then
-        imgui.PushItemWidth(halfWidgetWidth)
-        _, menuVars.endOffset = imgui.InputFloat(" ", menuVars.endOffset, 0, 0, "%.3f ms")
-        imgui.SameLine(0, SAMELINE_SPACING)
-    else
-        imgui.Text(":  "..convertToTime(menuVars.endOffset).." (End)")
-        imgui.SameLine(0, 4 * SAMELINE_SPACING + 2)
-    end
-    if imgui.Button(" Set Current ", currentButtonSize) then
-        menuVars.endOffset = math.floor(state.SongTime)
-    end
-    menuVars.endOffset = clampToInterval(menuVars.endOffset, 0, MAX_MS_TIME)
-    addPadding()
-    _, menuVars.inputTime = imgui.Checkbox("Manually input time", menuVars.inputTime)
-    imgui.EndChild()
-    
-    imgui.NextColumn()
-    imgui.BeginChild("Right Menu", MENU_SIZE_RIGHT)
-    if imgui.Button("Remove SVs Between Times", ACTION_BUTTON_SIZE) then
-        removeSVs(menuVars.startOffset, menuVars.endOffset)
-    end
-    saveStateVariables(menuName, menuVars)
-    return placeSVsBetweenOffsets
+    return false
 end
--- Creates the right panel menu for seeing SV stats and placing SV
+-- Creates the right-side panel for info and action buttons
+-- Returns whether or not the right panel is hovered over [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all tools/menus [Table]
+--    menuVars   : list of variables used for this single SV menu [Table]
+--    menuName   : name of this menu [String]
+function createRightPanel(globalVars, menuVars, menuName)
+    imgui.BeginChild("Right Panel", MENU_SIZE_RIGHT)
+    local isPanelHovered
+    if menuName == "Remove" then
+        isPanelHovered = createRemoveSVPanel(globalVars, menuVars, menuName)
+    --elseif menuname == "Edit" then
+        --isPanelHovered = createEditSVPanel(globalVars, menuVars, menuName)
+    else
+        isPanelHovered = createPlaceSVPanel(globalVars, menuVars, menuName)
+    end
+    imgui.EndChild()
+    return isPanelHovered
+end
+-- Creates the right panel menu for removing SVs
+-- Returns whether or not this right panel is hovered over [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all tools/menus [Table]
+--    menuVars   : list of variables used for this stutter menu [Table]
+--    menuName   : name of this menu [String]
+function createRemoveSVPanel(globalVars, menuVars, menuName)
+    local isPanelHovered = imgui.IsWindowHovered()
+    chooseSVRangeType(globalVars, menuVars, menuName)
+    createActionSVButton(globalVars, menuVars, menuName)
+    return isPanelHovered
+end
+-- Creates the right panel menu for displaying SV stats and placing SVs
 -- Returns whether or not this right panel is hovered over [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all tools/menus [Table]
 --    menuVars   : list of variables used for this stutter menu [Table]
 --    menuName   : name of this menu [String]
 function createPlaceSVPanel(globalVars, menuVars, menuName)
-    imgui.BeginChild("Right Panel", MENU_SIZE_RIGHT)
     local isPanelHovered = imgui.IsWindowHovered()
     if menuName == "Single" then
         createSingleSVRightPanel(menuVars)
         imgui.EndChild()
         return isPanelHovered
     end
-    if not (menuVars.linearStutter) then
+    if (not menuVars.linearStutter) then
         plotSVMotion(menuVars.noteDistanceVsTime, not globalVars.placeSVsBetweenOffsets)
         addSeparator()
     end
@@ -485,9 +378,8 @@ function createPlaceSVPanel(globalVars, menuVars, menuName)
     end
     displaySVStats(menuVars)
     addSeparator()
-    chooseSVPlacementType(globalVars, menuVars)
-    createPlaceSVButton(globalVars, menuVars, menuName)
-    imgui.EndChild()
+    chooseSVRangeType(globalVars, menuVars, menuName)
+    createActionSVButton(globalVars, menuVars, menuName)
     return isPanelHovered
 end
 
@@ -795,20 +687,54 @@ end
 
 -- Removes SVs in the map between two points of time
 -- Parameters
---    startOffset : starting time (milliseconds) to begin removing SVs at [Int/Float]
---    endOffset   : ending time (milliseconds) to stop removing SVs at [Int/Float]
-function removeSVs(startOffset, endOffset)
-    local svsToRemove = {}
-    for i, sv in pairs(map.ScrollVelocities) do
-        local isInBetween = (sv.StartTime >= startOffset and sv.StartTime <= endOffset) or
-                            (sv.StartTime >= endOffset and sv.StartTime <= startOffset)
-        if isInBetween then
-            table.insert(svsToRemove, sv)
-        end
+function removeSVs(menuVars, globalVars)
+    local offsets = {menuVars.startOffset, menuVars.endOffset}
+    if (not globalVars.placeSVsBetweenOffsets) then
+        local selectedNoteOffsets = uniqueSelectedNoteOffsets()
+        offsets[1] = selectedNoteOffsets[1]
+        offsets[2] = selectedNoteOffsets[#selectedNoteOffsets]
     end
+    local svsToRemove = locateRemovableSVs(offsets, menuVars.addRemovalCondition, menuVars.svCondition, menuVars.svConditionValue)
     if #svsToRemove > 0 then
         actions.RemoveScrollVelocityBatch(svsToRemove)
     end
+end
+
+function locateRemovableSVs(offsets, addRemovalCondition, svCondition, svConditionValue)
+    local startOffset = offsets[1]
+    local endOffset = offsets[2]
+    if startOffset > endOffset then
+        startOffset = offsets[2]
+        endOffset = offsets[1]
+    end
+    local roundedConditionValue = round(svConditionValue, 2)
+    local svsToRemove = {}
+    for i, sv in pairs(map.ScrollVelocities) do
+        local roundedSV = round(sv.Multiplier, 2)
+        local svIsInRange = sv.StartTime >= startOffset and sv.StartTime < endOffset
+        if svIsInRange then
+            if addRemovalCondition then
+                if svCondition == 1 or svCondition == 3 or svCondition == 5 then
+                    if roundedSV == roundedConditionValue then
+                        table.insert(svsToRemove, sv)
+                    end
+                end
+                if svCondition == 2 or svCondition == 3 then
+                    if roundedSV > roundedConditionValue then
+                        table.insert(svsToRemove, sv)
+                    end
+                end
+                if svCondition == 4 or svCondition == 5 then
+                    if roundedSV < roundedConditionValue then
+                        table.insert(svsToRemove, sv)
+                    end
+                end
+            else
+                table.insert(svsToRemove, sv)
+            end
+        end
+    end
+    return svsToRemove
 end
 
 -------------------------------------------------------------------------- Math/Numbers/Calculation
@@ -946,7 +872,7 @@ function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShi
     end
     for i = 0, totalSVs do
         local angle = (math.pi / 2) * ((i / valuesPerQuarterPeriod) + quarterPeriodsShift)
-        local velocity = amplitudes[i + 1] * mathSign(math.sin(angle)) * (math.abs(math.sin(angle))^(normalizedSharpness)) + verticalShift
+        local velocity = amplitudes[i + 1] * mathGetSignOfNum(math.sin(angle)) * (math.abs(math.sin(angle))^(normalizedSharpness)) + verticalShift
         table.insert(sinusoidalSet, velocity)
     end
     return sinusoidalSet
@@ -1328,6 +1254,9 @@ function declareMenuVariables(menuName)
         svValueBeforeEnd = 0,
         svValueEnd = 1,
         svValueAfterEnd = 0,
+        addRemovalCondition = false,
+        svCondition = 1,
+        svConditionValue = 0,
         startOffset = 0,
         endOffset = 0
     }
@@ -1384,9 +1313,13 @@ function createNavigationDropdown(globalVars)
     return imgui.IsWindowHovered()
 end
 
-function chooseSVPlacementType(globalVars, menuVars)
+function chooseSVRangeType(globalVars, menuVars, menuName)
     imgui.AlignTextToFramePadding()
-    imgui.Text("Place SVs between:")
+    if menuName == "Remove" then
+        imgui.Text("Remove SVs between:")
+    else
+        imgui.Text("Place SVs between:")
+    end
     imgui.SameLine(0, RADIO_BUTTON_SPACING)
     if imgui.RadioButton("Notes", not globalVars.placeSVsBetweenOffsets) then
         globalVars.placeSVsBetweenOffsets = false
@@ -1424,26 +1357,23 @@ function createPlaceSingleSVButton(menuVars)
         end
     end
 end
-function createPlaceSVButton(globalVars, menuVars, menuName)
-    local svButtonText = "Place SVs "
+function createActionSVButton(globalVars, menuVars, menuName)
+    local svButtonText = "SVs "
+    if menuName == "Remove" then
+        svButtonText = "Remove ".. svButtonText
+    else
+        svButtonText = "Place ".. svButtonText
+    end
     if globalVars.placeSVsBetweenOffsets then
         svButtonText = svButtonText.."Between Start/End Offsets"
     else
         svButtonText = svButtonText.."Between Selected Notes"
     end
     if imgui.Button(svButtonText, ACTION_BUTTON_SIZE) then
-        local offsets = {menuVars.startOffset, menuVars.endOffset}
-        if (not globalVars.placeSVsBetweenOffsets) then
-            offsets = uniqueSelectedNoteOffsets()
-        end
-        local SVs = generateSVs(offsets, menuVars.svValues, menuVars.addTeleport,
-                                menuVars.veryStartTeleport, menuVars.teleportValue,
-                                menuVars.teleportDuration, menuVars.endSVOption, menuVars.displace,
-                                menuVars.displacement, menuVars.stutterDuration,
-                                menuVars.linearStutter, menuVars.endSV, menuVars.linearEndAvgSV,
-                                menuVars.avgSV, globalVars.placeSVsBetweenOffsets)
-        if #SVs > 0 then
-            actions.PlaceScrollVelocityBatch(SVs)
+        if menuName == "Remove" then
+            removeSVs(menuVars, globalVars)
+        else
+            placeSVs(menuVars, globalVars)
         end
     end
 end
@@ -1569,7 +1499,7 @@ function chooseConstantShift(menuVars)
     return oldShift ~= menuVars.verticalShift
 end
 
-function mathSign(x)
+function mathGetSignOfNum(x)
     if x < 0 then
         return -1
     end
@@ -1589,7 +1519,7 @@ function chooseCurveSharpness(menuVars)
     return oldCurveSharpness ~= menuVars.curveSharpness
 end
 
-function chooseSingleInputs(menuVars)
+function chooseSingleSVInputs(menuVars)
     local inputExists = menuVars.svBefore or (not menuVars.skipSVAtNote) or menuVars.svAfter
     if inputExists then
         addSeparator()
@@ -1654,19 +1584,11 @@ function chooseSVAfterNote(menuVars)
 end
 
 function createSingleSVRightPanel(menuVars)
-    imgui.Text("Hover over the bullet points to see more info")
-    addSeparator()
-    imgui.Text("Some cool things you can do with single SV:")
-    addPadding()
-    imgui.BulletText("Displace notes, making them hit mid-screen")
-    createToolTip("Add SV before note, set time before to be 0.016 ms, and set SV before note to a value between 0.00x and 24000.00x such as 12000.00x. This will essentially make the note move super-duper fast right before it is supposed to be hit, making the note look like it is hit while in the middle of the screen.")
-    addPadding()
-    imgui.BulletText("Reverse Scroll")
-    createToolTip("1.) Set SV at note be 100000.00x and SV after note to be -1.00x with time after being 1.000 ms. Place it at the note you want reverse scroll to start. 2.) Set SV before note to 24000.00x with 0.016 ms time before, SV at note to -24000.00x and SV after note to -1.00x with 0.016 ms time after. Place these at notes after the first note you started the reverse scroll on.")
-    addSeparator()
     createPlaceSingleSVButton(menuVars)
 end
--- copied + renamed function from iceSV
+-- Creates a tooltip box when an IMGUI item is hovered over
+-- Parameters
+--    text : text to appear in the tooltip
 function createToolTip(text)
     if imgui.IsItemHovered() then
         imgui.BeginTooltip()
@@ -1676,9 +1598,27 @@ function createToolTip(text)
         imgui.EndTooltip()
     end
 end
--- copied + renamed function from iceSV
+-- Creates an inline, grayed-out '(?)' symbol that shows a tooltip box when hovered over
+-- Parameters
+--    text : text to appear in the tooltip
 function createHelpMarker(text)
     imgui.SameLine()
     imgui.TextDisabled("(?)")
     createToolTip(text)
+end
+
+function placeSVs(menuVars, globalVars)
+    local offsets = {menuVars.startOffset, menuVars.endOffset}
+    if (not globalVars.placeSVsBetweenOffsets) then
+        offsets = uniqueSelectedNoteOffsets()
+    end
+    local SVs = generateSVs(offsets, menuVars.svValues, menuVars.addTeleport,
+                            menuVars.veryStartTeleport, menuVars.teleportValue,
+                            menuVars.teleportDuration, menuVars.endSVOption, menuVars.displace,
+                            menuVars.displacement, menuVars.stutterDuration,
+                            menuVars.linearStutter, menuVars.endSV, menuVars.linearEndAvgSV,
+                            menuVars.avgSV, globalVars.placeSVsBetweenOffsets)
+    if #SVs > 0 then
+        actions.PlaceScrollVelocityBatch(SVs)
+    end
 end
