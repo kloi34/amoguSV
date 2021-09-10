@@ -70,7 +70,7 @@ MAX_GENERAL_SV = 1000              -- maximum (absolute) value allowed for gener
 MAX_MS_TIME = 7200000              -- maximum song time (milliseconds) allowed ~ 2 hours
 MAX_TELEPORT_DURATION = 10         -- maximum teleport duration allowed (milliseconds)
 MAX_TELEPORT_VALUE = 1000000       -- maximum (absolute) teleport SV value allowed
-MIN_DURATION = 0.016               -- minimum duration allowed in general (milliseconds)
+MIN_DURATION = 0.016 -- ~ 1/64     -- minimum duration allowed in general (milliseconds)
 
 -- Menu-related
 EMOTICONS = {                      -- emoticons to visually clutter the plugin and confuse users
@@ -311,7 +311,7 @@ end
 --    menuVars   : list of variables used for this single SV menu [Table]
 --    menuName   : name of this menu [String]
 function removeSettingsMenu(globalVars, menuVars, menuName)
-    _, menuVars.addRemovalCondition = imgui.Checkbox("Add SV removal conditions", menuVars.addRemovalCondition)
+    _, menuVars.addRemovalCondition = imgui.Checkbox("Add SV removal condition", menuVars.addRemovalCondition)
     if menuVars.addRemovalCondition then
         addSeparator()
         local _, svConditionIndex = imgui.Combo("SV Condition", menuVars.svCondition - 1, CONDITIONS, #CONDITIONS)
@@ -349,6 +349,10 @@ end
 function createRemoveSVPanel(globalVars, menuVars, menuName)
     local isPanelHovered = imgui.IsWindowHovered()
     chooseSVRangeType(globalVars, menuVars, menuName)
+    if globalVars.placeSVsBetweenOffsets then
+        addPadding()
+        imgui.Text("(Removing SVs from "..convertToTime(menuVars.startOffset).." to "..convertToTime(menuVars.endOffset)..")")
+    end
     createActionSVButton(globalVars, menuVars, menuName)
     return isPanelHovered
 end
@@ -1338,12 +1342,14 @@ function chooseSVRangeType(globalVars, menuVars, menuName)
         imgui.SameLine(0, SAMELINE_SPACING)
         imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.75)
         _, menuVars.startOffset = imgui.InputInt("Start Offset", menuVars.startOffset)
+        menuVars.startOffset = clampToInterval(menuVars.startOffset, 0, MAX_MS_TIME)
         
         if imgui.Button(" Current ", currentButtonSize) then
             menuVars.endOffset = state.SongTime
         end
         imgui.SameLine(0, SAMELINE_SPACING)
         _, menuVars.endOffset = imgui.InputInt("End Offset", menuVars.endOffset)
+        menuVars.endOffset = clampToInterval(menuVars.endOffset, 0, MAX_MS_TIME)
         addPadding()
     end
 end
@@ -1396,9 +1402,9 @@ end
 function chooseBezierPoints(menuVars)
     local oldFirstPoint = {menuVars.x1, menuVars.y1}
     local oldSecondPoint = {menuVars.x2, menuVars.y2}
-    local _, newFirstPoint = imgui.DragFloat2("(x1, y1)", oldFirstPoint, 0.01, -2, 2, "%.2f")
+    local _, newFirstPoint = imgui.DragFloat2("(x1, y1)", oldFirstPoint, 0.01, -1, 2, "%.2f")
     createHelpMarker("Coordinates of the first point of the cubic bezier")
-    local _, newSecondPoint = imgui.DragFloat2("(x2, y2)", oldSecondPoint, 0.01, -2, 2, "%.2f")
+    local _, newSecondPoint = imgui.DragFloat2("(x2, y2)", oldSecondPoint, 0.01, -1, 2, "%.2f")
     createHelpMarker("Coordinates of the second point of the cubic bezier")
     menuVars.x1, menuVars.y1 = table.unpack(newFirstPoint)
     menuVars.x2, menuVars.y2 = table.unpack(newSecondPoint)
@@ -1488,7 +1494,7 @@ end
 
 function chooseConstantShift(menuVars)
     local oldShift = menuVars.verticalShift
-    if imgui.Button("Reset", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT}) then
+    if imgui.Button("Reset ", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT}) then
         menuVars.verticalShift = 0
     end
     imgui.SameLine(0, SAMELINE_SPACING)
