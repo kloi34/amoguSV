@@ -17,7 +17,7 @@ Currently, the plugin supports the following SV tools:
 * Remove
 
 I recommend you to just play around with the settings of these SV tools to learn how they work.  
-If something is unclear you could probably get help in the Quaver Discord server
+If something about the plugin is unclear you could probably ask around for help in the Quaver Discord server.
 
 ## Installation
 1. Download the ZIP file by pressing the green download code button on GitHub and clicking "Download ZIP"
