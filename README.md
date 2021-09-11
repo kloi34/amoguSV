@@ -16,7 +16,8 @@ Currently, the plugin supports the following SV tools:
 * Single
 * Remove
 
-I recommend you check out the [wiki page](https://github.com/kloi34/amoguSV/wiki) to learn about these tools.
+I recommend you to just play around with the settings of these SV tools to learn how they work.  
+If something is unclear you could probably get help in the Quaver Discord server
 
 ## Installation
 1. Download the ZIP file by pressing the green download code button on GitHub and clicking "Download ZIP"
