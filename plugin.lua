@@ -1,4 +1,4 @@
--- amoguSV v2.0 (10 Sept 2021) 
+-- amoguSV v2.0 (11 Sept 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
