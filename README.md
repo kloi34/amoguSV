@@ -27,3 +27,4 @@ I recommend you check out the [wiki page](https://github.com/kloi34/amoguSV/wiki
 * [iceSV](https://github.com/IceDynamix/iceSV) by IceDynamix
 * [KeepStill](https://github.com/Illuminati-CRAZ/KeepStill) by Illuminati-CRAZ
 * [Vibrato](https://github.com/Illuminati-CRAZ/Vibrato) by Illuminati-CRAZ
+* [Displacer](https://github.com/Illuminati-CRAZ/Displacer) by Illuminati-CRAZ
