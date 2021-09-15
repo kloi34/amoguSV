@@ -1,4 +1,4 @@
--- amoguSV v2.0 (11 Sept 2021) 
+-- amoguSV v2.0 (14 Sept 2021) 
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -25,11 +25,10 @@
 -- https://github.com/kloi34/amoguSV/issues
 
 -- To-do list for amoguSV v3.0:
---      1. Copy paste tool
---      2. steal iceSV sv multiplier tool?
---      3. Dedicated KeepStill+more SV tool
---      4. linearly spaced random svs that normalize to 1.00x?
---      5. Option to skip placing SVs between every other note (or every third note, etc.)
+--      1. steal iceSV sv multiplier tool + add an sv shift tool
+--      2. Dedicated KeepStill+more SV tool
+--      3. linearly spaced random svs that normalize to 1.00x?
+--      4. Option to skip placing SVs between every other note (or every third note, etc.)
 --         Place this option as a toggle on the right side
 
 -- Optional things that I maybe want to add later
@@ -79,6 +78,7 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "%(*o*%)",
     "%(~_~%)",
     "%(>.<%)",
+    "%( c . p %)",
     "%( ; _ ; %)"
     --"%(^w^%)",
     --"%(w.w)"
@@ -102,6 +102,7 @@ SV_TOOLS = {                       -- list of the available tools for editing SV
     "Bezier",
     "Sinusoidal",
     "Single",
+    "Copy",
     "Remove"
 }
 ---------------------------------------------------------------------------------------------------
@@ -315,6 +316,19 @@ function singleSettingsMenu(globalVars, menuVars, menuName)
     chooseSingleSVInputs(menuVars)
     return false
 end
+-- Creates the settings menu for copy & paste SV
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all menus [Table]
+--    menuVars   : list of variables used for this copy & paste SV menu [Table]
+--    menuName   : name of this menu [String]
+function copySettingsMenu(globalVars, menuVars, menuName)
+    chooseCopySettings(menuVars)
+    createCopyButton(menuVars)
+    addSeparator()
+    imgui.Text("("..#menuVars.svValues.." SVs copied currently)")
+    return false
+end
 -- Creates the settings menu for remove SV
 -- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
@@ -348,8 +362,8 @@ function createRightPanel(globalVars, menuVars, menuName)
         isPanelHovered = createRemoveSVPanel(globalVars, menuVars, menuName)
     --elseif menuName == "Edit" then
         --isPanelHovered = createEditSVPanel(globalVars, menuVars, menuName)
-    --elseif menuName == "CopyPaste" then
-    --isPanelHovered = createCopyPasteSVPanel(globalVars, menuVars, menuName)
+    elseif menuName == "Copy" then
+        isPanelHovered = createPasteSVPanel(globalVars, menuVars, menuName)
     else
         isPanelHovered = createPlaceSVPanel(globalVars, menuVars, menuName)
     end
@@ -363,7 +377,6 @@ end
 --    menuVars   : list of variables used for the remove menu [Table]
 --    menuName   : name of the current SV menu [String]
 function createRemoveSVPanel(globalVars, menuVars, menuName)
-    local isPanelHovered = imgui.IsWindowHovered()
     chooseSVRangeType(globalVars, menuVars, menuName)
     if globalVars.placeSVsBetweenOffsets then
         addPadding()
@@ -372,7 +385,24 @@ function createRemoveSVPanel(globalVars, menuVars, menuName)
         imgui.Text("(from "..startTime.." to "..endTime..")")
     end
     createActionSVButton(globalVars, menuVars, menuName)
-    return isPanelHovered
+    return imgui.IsWindowHovered()
+end
+
+-- Returns whether or not this panel is hovered over [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all menus [Table]
+--    menuVars   : list of variables used for the copy SV menu [Table]
+--    menuName   : name of the current SV menu [String]
+function createPasteSVPanel(globalVars, menuVars, menuName)
+    if imgui.Button("Place SVs at current song time", ACTION_BUTTON_SIZE) then
+        local pasteOffsets = {math.floor(state.SongTime)}
+        pasteSVs(menuVars.svValues, pasteOffsets)
+    end
+     if imgui.Button("Place SVs at selected notes", ACTION_BUTTON_SIZE) then
+        local pasteOffsets = uniqueSelectedNoteOffsets()
+        pasteSVs(menuVars.svValues, pasteOffsets)
+    end
+    return imgui.IsWindowHovered()
 end
 -- Creates the right panel menu for displaying SV stats and placing SVs
 -- Returns whether or not this panel is hovered over [Boolean]
@@ -381,7 +411,6 @@ end
 --    menuVars   : list of variables used for the current SV menu [Table]
 --    menuName   : name of the current SV menu [String]
 function createPlaceSVPanel(globalVars, menuVars, menuName)
-    local isPanelHovered = imgui.IsWindowHovered()
     if menuName == "Single" then
         createPlaceSingleSVButton(menuVars)
         return isPanelHovered
@@ -399,7 +428,7 @@ function createPlaceSVPanel(globalVars, menuVars, menuName)
     addSeparator()
     chooseSVRangeType(globalVars, menuVars, menuName)
     createActionSVButton(globalVars, menuVars, menuName)
-    return isPanelHovered
+    return imgui.IsWindowHovered()
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -650,6 +679,32 @@ function locateRemovableSVs(offsets, addRemovalCondition, svCondition, svConditi
     return svsToRemove
 end
 
+function copySVs(startOffset, endOffset)
+    local SVs = {}
+    for i, sv in pairs(map.ScrollVelocities) do
+        if sv.StartTime >= startOffset and sv.StartTime < endOffset then
+            local relativeTime = sv.StartTime - startOffset 
+            table.insert(SVs, {sv.Multiplier, relativeTime})
+        end
+    end
+    return SVs
+end
+
+function pasteSVs(svValues, pasteOffsets)
+    local svsToPaste = {}
+    for i = 1, #pasteOffsets do
+        local pasteOffset = pasteOffsets[i]
+        for j = 1, #svValues do
+            local svMultiplier = svValues[j][1]
+            local relativeOffset = svValues[j][2]
+            local timeToPasteSV = pasteOffset + relativeOffset
+            table.insert(svsToPaste, utils.CreateScrollVelocity(timeToPasteSV, svMultiplier))
+        end
+    end
+    if #svsToPaste > 0 then
+        actions.PlaceScrollVelocityBatch(svsToPaste)
+    end
+end
 ---------------------------------------------------------------------------------------------------
 -- Numerical Value Generation for SVs -------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -868,6 +923,38 @@ function chooseConstantShift(menuVars)
     menuVars.verticalShift = clampToInterval(menuVars.verticalShift, -10, 10)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     return oldShift ~= menuVars.verticalShift
+end
+
+function chooseCopySettings(menuVars)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Copy SVs Between:")
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Notes", not menuVars.copyBetweenOffsets) then
+        menuVars.copyBetweenOffsets = false
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Offsets", menuVars.copyBetweenOffsets) then
+        menuVars.copyBetweenOffsets = true
+    end
+    addPadding()
+    if menuVars.copyBetweenOffsets then
+        local currentButtonSize = {DEFAULT_WIDGET_WIDTH * 0.4, DEFAULT_WIDGET_HEIGHT}
+        if imgui.Button("Current", currentButtonSize) then
+            menuVars.startOffsetCopy = state.SongTime
+        end
+        imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.75)
+        _, menuVars.startOffsetCopy = imgui.InputInt("Start", menuVars.startOffsetCopy)
+        menuVars.startOffsetCopy = clampToInterval(menuVars.startOffsetCopy, 0, MAX_MS_TIME)
+        
+        if imgui.Button(" Current ", currentButtonSize) then
+            menuVars.endOffsetCopy = state.SongTime
+        end
+        imgui.SameLine(0, SAMELINE_SPACING)
+        _, menuVars.endOffsetCopy = imgui.InputInt("End", menuVars.endOffsetCopy)
+        menuVars.endOffsetCopy = clampToInterval(menuVars.endOffsetCopy, 0, MAX_MS_TIME)
+        addPadding()
+    end
 end
 -- Lets users choose SV curve sharpness
 -- Returns whether or not the curve sharpness changed [Boolean]
@@ -1527,7 +1614,11 @@ function declareMenuVariables(menuName)
         svCondition = 1,
         svConditionValue = 0,
         startOffset = 0,
-        endOffset = 0
+        endOffset = 0,
+        copyBetweenOffsets = false,
+        startOffsetCopy = 0,
+        endOffsetCopy = 0,
+        
     }
     if menuName == "Stutter" then
         menuVars.startSV = 1.5
@@ -1622,6 +1713,27 @@ function createActionSVButton(globalVars, menuVars, menuName)
             removeSVs(menuVars, globalVars)
         else
             placeSVs(menuVars, globalVars)
+        end
+    end
+end
+-- Creates the copy SV button
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function createCopyButton(menuVars)
+    local buttonText = "Copy SVs Between "
+    if menuVars.copyBetweenOffsets then
+        buttonText = buttonText.."Offsets"
+    else
+        buttonText = buttonText.."Notes"
+    end
+    if imgui.Button(buttonText, {240, ACTION_BUTTON_SIZE[2]}) then
+        if (not menuVars.copyBetweenOffsets) then
+            local selectedNoteOffsets = uniqueSelectedNoteOffsets()
+            local startOffset = selectedNoteOffsets[1]
+            local endOffset = selectedNoteOffsets[#selectedNoteOffsets]
+            menuVars.svValues = copySVs(startOffset, endOffset)
+        else
+            menuVars.svValues = copySVs(menuVars.startOffsetCopy, menuVars.endOffsetCopy)
         end
     end
 end
