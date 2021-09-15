@@ -678,7 +678,11 @@ function locateRemovableSVs(offsets, addRemovalCondition, svCondition, svConditi
     end
     return svsToRemove
 end
-
+-- Copies SVs between two times
+-- Returns a list of tables with values: 1. SV multiplier 2. relative offset to copy start [Table]
+-- Parameters
+--    startOffset : starting time to start copying SVs
+--    endOffset   : ending time to stop copying SVs
 function copySVs(startOffset, endOffset)
     local SVs = {}
     for i, sv in pairs(map.ScrollVelocities) do
@@ -689,7 +693,10 @@ function copySVs(startOffset, endOffset)
     end
     return SVs
 end
-
+-- Pastes copied SVs
+-- Parameters
+--    svValues     : variable containing copied SV info (1. multiplier, 2. relative offset) [Table]
+--    pasteOffsets : offsets/times to paste copied SVs
 function pasteSVs(svValues, pasteOffsets)
     local svsToPaste = {}
     for i = 1, #pasteOffsets do
@@ -924,7 +931,9 @@ function chooseConstantShift(menuVars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     return oldShift ~= menuVars.verticalShift
 end
-
+-- Lets users choose how to select SVs to copy (between notes times)
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
 function chooseCopySettings(menuVars)
     imgui.AlignTextToFramePadding()
     imgui.Text("Copy SVs Between:")
