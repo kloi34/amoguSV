@@ -1,4 +1,4 @@
--- amoguSV v2.0 (14 Sept 2021) 
+-- amoguSV v2.0 (18 Sept 2021)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
@@ -16,33 +16,23 @@
 ---------------------------------------------------------------------------------------------------
 
 -- This is a plugin for Quaver, the ultimate community-driven and open-source competitive rhythm
--- game. The plugin focuses on providing various tools to add and edit SVs (Scroll Velocities)
--- quickly and efficiently when making maps. It's most similar to (i.e. 50% of SV features/ideas
--- stolen from) iceSV. More ideas for features will be added (stolen) from Illuminati-CRAZ's
--- plugins in the future as well.
+-- game. The plugin provides various tools to add and edit SVs (Scroll Velocities) quickly and
+-- efficiently when making maps.
 
 -- If you have any feature suggestions or issues with the plugin, please open an issue at 
 -- https://github.com/kloi34/amoguSV/issues
 
 -- To-do list for amoguSV v3.0:
---      1. steal iceSV sv multiplier tool + add an sv shift tool
---      2. Dedicated KeepStill+more SV tool
---      3. linearly spaced random svs that normalize to 1.00x?
---      4. Option to skip placing SVs between every other note (or every third note, etc.)
+--      1. Dedicated KeepStill+more SV tool
+--      2. Option to skip placing SVs between every other note (or every third note, etc.)
 --         Place this option as a toggle on the right side
+--      3. steal iceSV sv multiplier tool + add an sv shift tool
 
 -- Optional things that I maybe want to add later
 --      1. Dedicated Vibrato+more SV tool 
 --      2. ?? Note animation by choosing which still frames to teleport to ??
---      3. Other tools that can place predetermined sv effects like reverse-scroll, bounce, etc.
---      4. hyperbolic sv 5head, or some common function
---      5. damped harmonic motion svs 5head
---      6. expand bezier to orders other than cubic?
---      7. add point weights to bezier points
---      8. interpolation tab? quadratic or cubic interpolation of distance vs time points?
---      9. add a duration slider for determining % duration of SVs when placing SVs between notes
---          and have a toggle to determine from the start or from the end
---      10. add another bezier calculation method
+--      3. Predetermined sv effects tool: reverse-scroll, bounce, etc.
+--      4. interpolation tab? quadratic or cubic interpolation of distance vs time points?
 
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
@@ -71,6 +61,13 @@ MAX_TELEPORT_VALUE = 1000000       -- maximum (absolute) teleport SV value allow
 MIN_DURATION = 0.016 -- ~ 1/64     -- minimum millisecond duration allowed in general
 
 -- Menu-related
+CONDITIONS = {                     -- conditions/tests for numbers
+    "= (equal to)",
+    "> (greater than)",
+    ">= (greater or equal to)",
+    "< (less than)",
+    "<= (less or equal to)"
+}
 EMOTICONS = {                      -- emoticons to visually clutter the plugin and confuse users
     "%( - _ - )",
     "%( e.e %)",
@@ -78,17 +75,11 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "%(*o*%)",
     "%(~_~%)",
     "%(>.<%)",
+    "%(w.w)",
     "%( c . p %)",
     "%( ; _ ; %)"
     --"%(^w^%)",
-    --"%(w.w)"
-}
-CONDITIONS = {                     -- conditions/tests for numbers
-    "= (equal to)",
-    "> (greater than)",
-    ">= (greater or equal to)",
-    "< (less than)",
-    "<= (less or equal to)"
+
 }
 FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail end of all SVs
     "Normal",
@@ -102,6 +93,7 @@ SV_TOOLS = {                       -- list of the available tools for editing SV
     "Bezier",
     "Sinusoidal",
     "Single",
+    "Random",
     "Copy",
     "Remove"
 }
@@ -315,6 +307,29 @@ function singleSettingsMenu(globalVars, menuVars, menuName)
     end
     chooseSingleSVInputs(menuVars)
     return false
+end
+-- Creates the settings menu for random SV
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all menus [Table]
+--    menuVars   : list of variables used for this random SV menu [Table]
+--    menuName   : name of this menu [String]
+function randomSettingsMenu(globalVars, menuVars, menuName)
+    local svUpdateNeeded = #menuVars.svValues == 0
+    svUpdateNeeded = chooseRandomType(menuVars) or svUpdateNeeded
+    svUpdateNeeded = chooseRandomScale(menuVars) or svUpdateNeeded
+    svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
+    svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars, true) or svUpdateNeeded
+    chooseTeleportSV(globalVars, menuVars, menuName)
+    chooseDisplacement(globalVars, menuVars)
+    if (not globalVars.placeSVsBetweenOffsets) then
+        addSeparator()
+    end
+    if imgui.Button("Generate New Random Set") then
+        svUpdateNeeded = true
+    end
+    return svUpdateNeeded
 end
 -- Creates the settings menu for copy & paste SV
 -- Returns whether or not SV information has changed and needs to be updated [Boolean]
@@ -795,32 +810,30 @@ end
 --    interlace           : whether or not to interlace another bezier set in between [Boolean]
 --    interlaceMultiplier : multiplier of interlaced values relative to usual values [Int/Float]
 function generateBezierSet(x1, y1, x2, y2, avgValue, numValues, interlace, interlaceMultiplier)
-    -- see amoguSV GitHub wiki for explanation of method used to get bezier set
-    local startingTime = 0.5
-    local times = {}
-    local goalXPositions = {}
+    local startingTimeGuess = 0.5
+    local timeGuesses = {}
+    local targetXPositions = {}
     local iterations = 20
     for i = 1, numValues do
-        table.insert(times, startingTime)
-        table.insert(goalXPositions, i / numValues)
+        table.insert(timeGuesses, startingTimeGuess)
+        table.insert(targetXPositions, i / numValues)
     end
     for i = 1, iterations do
-        local increment = 0.5 ^ (i + 1)
+        local timeIncrement = 0.5 ^ (i + 1)
         for j = 1, numValues do
-            local xPosition = simplifiedOneDimensionalBezier(x1, x2, times[j])
-            if xPosition < goalXPositions[j] then
-                times[j] = times[j] + increment
-            elseif xPosition > goalXPositions[j] then
-                times[j] = times[j] - increment
+            local xPositionGuess = simplifiedOneDimensionalBezier(x1, x2, timeGuesses[j])
+            if xPositionGuess < targetXPositions[j] then
+                timeGuesses[j] = timeGuesses[j] + timeIncrement
+            elseif xPositionGuess > targetXPositions[j] then
+                timeGuesses[j] = timeGuesses[j] - timeIncrement
             end
         end
     end
     local yPositions = {}
-    for i = 1, #times do
-        table.insert(yPositions, simplifiedOneDimensionalBezier(y1, y2, times[i]))
+    for i = 1, #timeGuesses do
+        table.insert(yPositions, simplifiedOneDimensionalBezier(y1, y2, timeGuesses[i]))
     end
     table.insert(yPositions, 1, 0)
-    table.insert(yPositions, 1)
     local bezierSet = {}
     for i = 1, #yPositions - 1 do
         local velocity = (yPositions[i + 1] - yPositions[i]) * numValues
@@ -862,6 +875,27 @@ function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShi
         table.insert(sinusoidalSet, velocity)
     end
     return sinusoidalSet
+end
+-- Generates a single set of random values
+-- Returns the set of random values [Table]
+-- Parameters
+function generateRandomSet(avgValue, numValues, randomType, randomScale)
+    local randomSet = {}
+    for i = 1, numValues do
+        if randomType == "Uniform" then
+            local randomValue = avgValue + randomScale * 2 * (0.5 - math.random())
+            table.insert(randomSet, randomValue)
+        end
+        if randomType == "Normal" then
+            local u1 = math.random()
+            local u2 = math.random()
+            local randomIncrement = math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
+            local randomValue = avgValue + randomScale * randomIncrement
+            table.insert(randomSet, randomValue)
+        end
+    end
+    normalizeValues(randomSet, avgValue, false)
+    return randomSet
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1125,6 +1159,34 @@ function choosePeriodShift(menuVars)
     menuVars.periodsShift = clampToInterval(menuVars.periodsShift, -0.75, 0.75)
     return oldPeriodsShift ~= menuVars.periodsShift
 end
+-- Lets users choose the variability of randomness
+-- Returns whether or not the variability value changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function chooseRandomScale(menuVars)
+    local oldScale = menuVars.randomScale
+     _, menuVars.randomScale = imgui.InputFloat("Random Range", menuVars.randomScale, 0, 0, "%.2fx")
+     menuVars.randomScale = clampToInterval(menuVars.randomScale, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    return oldScale ~= menuVars.randomScale
+end
+-- Lets users choose the type of random generation
+-- Returns whether or not the type of random generation changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function chooseRandomType(menuVars)
+    local oldRandomType = menuVars.randomType
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Random Distribution Type:")
+    if imgui.RadioButton("Uniform", menuVars.randomType == "Uniform") then
+         menuVars.randomType = "Uniform"
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Normal", menuVars.randomType == "Normal") then
+         menuVars.randomType = "Normal"
+    end
+    addSeparator()
+    return oldRandomType ~= menuVars.randomType
+end
 -- Lets users choose SV input options for the single SV menu
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
@@ -1245,7 +1307,7 @@ function chooseSVPerQuarterPeriod(menuVars)
     imgui.Text("For every 0.25 period/cycle, place...")
     local oldPerQuarterPeriod = menuVars.svsPerQuarterPeriod
     _, menuVars.svsPerQuarterPeriod = imgui.InputInt("SV points", menuVars.svsPerQuarterPeriod)
-    menuVars.svsPerQuarterPeriod = clampToInterval(menuVars.svsPerQuarterPeriod, 1, 50)
+    menuVars.svsPerQuarterPeriod = clampToInterval(menuVars.svsPerQuarterPeriod, 1, 128)
     return oldPerQuarterPeriod ~= menuVars.svsPerQuarterPeriod
 end
 -- Lets users choose the number of SVs points
@@ -1627,7 +1689,8 @@ function declareMenuVariables(menuName)
         copyBetweenOffsets = false,
         startOffsetCopy = 0,
         endOffsetCopy = 0,
-        
+        randomType = "Uniform",
+        randomScale = 1
     }
     if menuName == "Stutter" then
         menuVars.startSV = 1.5
@@ -1638,6 +1701,8 @@ function declareMenuVariables(menuName)
         menuVars.finalSVOption = 2
     elseif menuName == "Sinusoidal" then
         menuVars.endSV = 2
+        menuVars.finalSVOption = 2
+    elseif menuName == "Random" then
         menuVars.finalSVOption = 2
     end
     return menuVars
@@ -1884,13 +1949,16 @@ function updateMenuSVs(menuVars, menuName)
                                                menuVars.avgSV)
     elseif menuName == "Bezier" then
         menuVars.svValues = generateBezierSet(menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2,
-                                              menuVars.avgSV, menuVars.svPoints,
+                                              menuVars.avgSV, menuVars.svPoints + 1,
                                               menuVars.interlace, menuVars.interlaceMultiplier)
     elseif menuName == "Sinusoidal" then
         menuVars.svValues = generateSinusoidalSet(menuVars.startSV, menuVars.endSV,
                                                   menuVars.periods, menuVars.periodsShift,
                                                   menuVars.svsPerQuarterPeriod,
                                                   menuVars.verticalShift, menuVars.curveSharpness)
+    elseif menuName == "Random" then
+        menuVars.svValues = generateRandomSet(menuVars.avgSV, menuVars.svPoints + 1,
+                                              menuVars.randomType, menuVars.randomScale)
     end
     menuVars.noteDistanceVsTime = calculateDistanceVsTime(menuVars.svValues,
                                                           menuVars.stutterDuration)
