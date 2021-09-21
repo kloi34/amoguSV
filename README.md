@@ -28,8 +28,8 @@ Finally, if you want to edit SVs that are already placed, you can use these tool
 * Copy (& Paste)
 * Remove
 
-Each tool has many settings. I recommend you play around with the settings of these SV tools to learn how they work.  
-If something about the plugin is unclear you could probably ask around for help in the [Quaver Discord server](https://discord.gg/quaver)
+Each tool has many settings. I recommend you play around with the settings of these SV tools to learn how they work.
+If something about the plugin is unclear you could probably ask around for help in the [Quaver Discord server](https://discord.gg/quaver).
 
 ## Related Links
 * [Quaver Plugin Guide](https://github.com/IceDynamix/QuaverPluginGuide/blob/master/quaver_plugin_guide.md) by IceDynamix
