@@ -1,8 +1,8 @@
--- amoguSV v2.0 (18 Sept 2021)
+-- amoguSV v3.0 (21 Sept 2021)
 -- by kloi34
 
--- Many SV tool ideas were stolen from other plugins, and I'm also planning to steal more that have
--- yet to be implemented, so here is credit to those SV plugins and the creators behind them:
+-- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
+-- creators behind them:
 ---------------------------------------------------------------------------------------------------
 --    Plugin        Creator                Link                                                
 ---------------------------------------------------------------------------------------------------
@@ -22,18 +22,11 @@
 -- If you have any feature suggestions or issues with the plugin, please open an issue at 
 -- https://github.com/kloi34/amoguSV/issues
 
--- To-do list for amoguSV v3.0:
---      1. Dedicated KeepStill+more SV tool
---      2. Option to skip placing SVs between every other note (or every third note, etc.)
---         Place this option as a toggle on the right side
---      3. steal iceSV sv multiplier tool + add an sv shift tool
-
--- Optional things that I maybe want to add later
+-- Future features I may add in order of priority:
 --      1. Dedicated Vibrato+more SV tool 
---      2. ?? Note animation by choosing which still frames to teleport to ??
---      3. Predetermined sv effects tool: reverse-scroll, bounce, etc.
---      4. interpolation tab? quadratic or cubic interpolation of distance vs time points?
-
+--      2. Predetermined sv effects tool: reverse-scroll, bounce, etc.
+--      3. ?? Note animation by choosing which frames to teleport to ??
+ 
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -76,10 +69,9 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "%(~_~%)",
     "%(>.<%)",
     "%(w.w)",
+    "%(^w^%)",
     "%( c . p %)",
     "%( ; _ ; %)"
-    --"%(^w^%)",
-
 }
 FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail end of all SVs
     "Normal",
@@ -94,6 +86,7 @@ SV_TOOLS = {                       -- list of the available tools for editing SV
     "Sinusoidal",
     "Single",
     "Random",
+    "Still",
     "Copy",
     "Remove"
 }
@@ -331,6 +324,48 @@ function randomSettingsMenu(globalVars, menuVars, menuName)
     end
     return svUpdateNeeded
 end
+-- Creates the settings menu for still SV
+-- Returns whether or not SV information has changed and needs to be updated [Boolean]
+-- Parameters
+--    globalVars : list of global variables used across all menus [Table]
+--    menuVars   : list of variables used for this still SV menu [Table]
+--    menuName   : name of this menu [String]
+function stillSettingsMenu(globalVars, menuVars, menuName)
+    local svUpdateNeeded = #menuVars.svValues == 0
+    svUpdateNeeded = chooseAverageSVStill(menuVars) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars, false) or svUpdateNeeded
+    svUpdateNeeded = chooseStillMotionType(menuVars) or svUpdateNeeded
+    addSeparator()
+    imgui.Text("Intermediate Motion Settings:")
+    addPadding()
+    local motionIsLinear = menuVars.stillIntermediateMotion == "Linear"
+    local motionIsExponential = menuVars.stillIntermediateMotion == "Exponential"
+    local motionIsBezier = menuVars.stillIntermediateMotion == "Bezier"
+    local motionIsSinusoial = menuVars.stillIntermediateMotion == "Sinusoidal"
+    if motionIsLinear then
+        svUpdateNeeded = chooseStartEndSVs(menuVars, true) or svUpdateNeeded
+        svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
+    elseif motionIsExponential then
+        svUpdateNeeded = chooseExponentialBehavior(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseIntensity(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
+    elseif motionIsBezier then
+        svUpdateNeeded = chooseBezierPoints(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
+    elseif motionIsSinusoial then
+        svUpdateNeeded = chooseStartEndSVs(menuVars, true) or svUpdateNeeded
+        svUpdateNeeded = chooseCurveSharpness(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseConstantShift(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseNumPeriods(menuVars) or svUpdateNeeded
+        svUpdateNeeded = choosePeriodShift(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseSVPerQuarterPeriod(menuVars) or svUpdateNeeded
+    end
+    if (not motionIsLinear) and (not motionIsSinusoial) then
+        svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
+    end
+    createHelpMarker("This is the average velocity of the notes following the intermediate motion")
+    return svUpdateNeeded
+end
 -- Creates the settings menu for copy & paste SV
 -- Returns whether or not SV information has changed and needs to be updated [Boolean]
 -- Parameters
@@ -372,21 +407,38 @@ end
 --    menuName   : name of the current SV menu [String]
 function createRightPanel(globalVars, menuVars, menuName)
     imgui.BeginChild("Right Panel", MENU_SIZE_RIGHT)
-    local isPanelHovered
-    if menuName == "Remove" then
-        isPanelHovered = createRemoveSVPanel(globalVars, menuVars, menuName)
-    --elseif menuName == "Edit" then
-        --isPanelHovered = createEditSVPanel(globalVars, menuVars, menuName)
+    local isPanelHovered = imgui.IsWindowHovered()
+    if menuName == "Still" then
+        createStillSVPanel(globalVars, menuVars, menuName)
+    elseif menuName == "Remove" then
+        createRemoveSVPanel(globalVars, menuVars, menuName)
     elseif menuName == "Copy" then
-        isPanelHovered = createPasteSVPanel(globalVars, menuVars, menuName)
+        createPasteSVPanel(globalVars, menuVars, menuName)
     else
-        isPanelHovered = createPlaceSVPanel(globalVars, menuVars, menuName)
+        createPlaceSVPanel(globalVars, menuVars, menuName)
     end
     imgui.EndChild()
     return isPanelHovered
 end
+-- Creates the right panel menu for still SVs
+-- Parameters
+--    globalVars : list of global variables used across all menus [Table]
+--    menuVars   : list of variables used for the still SV menu [Table]
+--    menuName   : name of the current SV menu [String]
+function createStillSVPanel(globalVars, menuVars, menuName)
+    plotSVs(menuVars.svValuesPreview, "Intermediate Motion")
+    displaySVStats(menuVars)
+    addSeparator()
+    imgui.Text("Select 3 or more notes:")
+    addPadding()
+    if imgui.Button("Apply Still SVs On Selected Notes", ACTION_BUTTON_SIZE) then
+        local SVs = generateStillSVs(menuVars)
+        if #SVs > 0 then
+            actions.PlaceScrollVelocityBatch(SVs)
+        end
+    end
+end
 -- Creates the right panel menu for removing SVs
--- Returns whether or not this panel is hovered over [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all menus [Table]
 --    menuVars   : list of variables used for the remove menu [Table]
@@ -400,10 +452,8 @@ function createRemoveSVPanel(globalVars, menuVars, menuName)
         imgui.Text("(from "..startTime.." to "..endTime..")")
     end
     createActionSVButton(globalVars, menuVars, menuName)
-    return imgui.IsWindowHovered()
 end
-
--- Returns whether or not this panel is hovered over [Boolean]
+-- Creates the right panel menu for pasting copied SVs
 -- Parameters
 --    globalVars : list of global variables used across all menus [Table]
 --    menuVars   : list of variables used for the copy SV menu [Table]
@@ -417,10 +467,8 @@ function createPasteSVPanel(globalVars, menuVars, menuName)
         local pasteOffsets = uniqueSelectedNoteOffsets()
         pasteSVs(menuVars.svValues, pasteOffsets)
     end
-    return imgui.IsWindowHovered()
 end
 -- Creates the right panel menu for displaying SV stats and placing SVs
--- Returns whether or not this panel is hovered over [Boolean]
 -- Parameters
 --    globalVars : list of global variables used across all menus [Table]
 --    menuVars   : list of variables used for the current SV menu [Table]
@@ -443,7 +491,6 @@ function createPlaceSVPanel(globalVars, menuVars, menuName)
     addSeparator()
     chooseSVRangeType(globalVars, menuVars, menuName)
     createActionSVButton(globalVars, menuVars, menuName)
-    return imgui.IsWindowHovered()
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -632,6 +679,93 @@ function generateSingleSVs(skipSVAtNote, svBefore, svValueBefore, incrementBefor
     end
     return SVs
 end
+-- Generates Still SVs to place
+-- Returns the generated SVs
+-- Parameters
+--    menuVars : list of variables used for the still SV menu [Table]
+function generateStillSVs(menuVars)
+    local SVs = {}
+    local offsets = uniqueSelectedNoteOffsets()
+    if #offsets < 3 then
+        return SVs
+    end
+    local startOffset = offsets[1]
+    local endOffset = offsets[#offsets]
+    if menuVars.stillIntermediateMotion == "Constant" then
+        table.insert(SVs, utils.CreateScrollVelocity(startOffset, menuVars.avgSV))
+        for i = 2, #offsets do
+            local timeFromStart = offsets[i] - startOffset
+            local stillAverageDifference = menuVars.avgSVStill - menuVars.avgSV
+            local teleportVelocity =  stillAverageDifference * 64 * timeFromStart
+            if i == #offsets then
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - MIN_DURATION,
+                             teleportVelocity + menuVars.avgSV))
+            else
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - MIN_DURATION,
+                             teleportVelocity + menuVars.avgSV))
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i],
+                             -teleportVelocity + menuVars.avgSV))
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] + MIN_DURATION,
+                             menuVars.avgSV))
+            end
+        end
+    else
+        local motionSVOffsets = generateLinearSet(startOffset, endOffset, #menuVars.svValues,
+                                                  false, 0, 0)
+        local svValueIndex = 1
+        local totalDistanceTraveled = 0
+        for i = 2, #offsets do
+            local currentMotionOffset = motionSVOffsets[svValueIndex]
+            local nextMotionOffset = motionSVOffsets[svValueIndex + 1]
+            local noteOffset = offsets[i]
+            while nextMotionOffset < (noteOffset - MIN_DURATION) do
+                lastMotionSVValue = menuVars.svValues[svValueIndex]
+                local lastMotionOffset = currentMotionOffset
+                if math.abs(lastMotionOffset - offsets[i -1]) > MIN_DURATION or svValueIndex == 1 then
+                    table.insert(SVs, utils.CreateScrollVelocity(lastMotionOffset, lastMotionSVValue))
+                end
+                svValueIndex = svValueIndex + 1
+                currentMotionOffset = motionSVOffsets[svValueIndex]
+                nextMotionOffset = motionSVOffsets[svValueIndex + 1]
+                local distanceTraveled = (currentMotionOffset - lastMotionOffset) * lastMotionSVValue
+                totalDistanceTraveled = totalDistanceTraveled + distanceTraveled
+            end
+            if i == #offsets then
+                while currentMotionOffset < noteOffset do
+                    lastMotionSVValue = menuVars.svValues[svValueIndex]
+                    local lastMotionOffset = currentMotionOffset
+                    table.insert(SVs, utils.CreateScrollVelocity(lastMotionOffset, lastMotionSVValue))
+                    svValueIndex = svValueIndex + 1
+                    currentMotionOffset = motionSVOffsets[svValueIndex]
+                    local distanceTraveled = (currentMotionOffset - lastMotionOffset) * lastMotionSVValue
+                    totalDistanceTraveled = totalDistanceTraveled + distanceTraveled
+                end
+            end
+            local thisMotionSVValue = menuVars.svValues[svValueIndex]
+            local regularNoteDistance = (noteOffset - startOffset) * menuVars.avgSVStill
+            local totalDistanceTraveledToNote = totalDistanceTraveled + (noteOffset - currentMotionOffset) * thisMotionSVValue
+            local teleportVelocity = (regularNoteDistance - totalDistanceTraveledToNote) * 64
+            if i == #offsets then
+                table.insert(SVs, utils.CreateScrollVelocity(noteOffset - MIN_DURATION,
+                             teleportVelocity + thisMotionSVValue))
+            else
+                table.insert(SVs, utils.CreateScrollVelocity(noteOffset - MIN_DURATION,
+                             teleportVelocity + thisMotionSVValue))
+                table.insert(SVs, utils.CreateScrollVelocity(noteOffset,
+                             -teleportVelocity + thisMotionSVValue))
+                if math.abs(motionSVOffsets[svValueIndex - 1] - offsets[i -1]) < MIN_DURATION then
+                    table.insert(SVs, utils.CreateScrollVelocity(noteOffset + MIN_DURATION,
+                                menuVars.svValues[svValueIndex + 1]))
+                else
+                    table.insert(SVs, utils.CreateScrollVelocity(noteOffset + MIN_DURATION,
+                                thisMotionSVValue))
+                end
+            end
+        end
+    end
+    addFinalSV(SVs, endOffset, menuVars.avgSVStill, menuVars.finalSVOption, false, nil)
+    return SVs
+end
 -- Removes SVs in the map between two points of time
 -- Parameters
 --    menuVars   : list of variables used for the remove menu [Table]
@@ -730,6 +864,46 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Numerical Value Generation for SVs -------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
+
+-- Generates a single set of values (used for SV multipliers)
+-- Parameters
+--    menuVars   : list of variables used for the current SV menu [Table]
+--    menuName   : name of the current SV menu [String]
+function generateSetOfValues(menuVars, menuName)
+    if menuName == "Linear" then
+        return generateLinearSet(menuVars.startSV, menuVars.endSV, menuVars.svPoints + 1,
+                                 menuVars.interlace, menuVars.secondStartSV, menuVars.secondEndSV)
+    end
+    if menuName == "Exponential" then
+        return generateExponentialSet(menuVars.exponentialIncrease, menuVars.svPoints + 1,
+                                      menuVars.avgSV, menuVars.intensity, menuVars.interlace,
+                                      menuVars.interlaceMultiplier)
+    end
+    if menuName == "Stutter" then
+        return generateStutterSet(menuVars.startSV, menuVars.stutterDuration, menuVars.avgSV)
+    end
+    if menuName == "Bezier" then
+        return generateBezierSet(menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2,
+                                 menuVars.avgSV, menuVars.svPoints + 1, menuVars.interlace,
+                                 menuVars.interlaceMultiplier)
+    end
+    if menuName == "Sinusoidal" then
+        return generateSinusoidalSet(menuVars.startSV, menuVars.endSV, menuVars.periods,
+                                     menuVars.periodsShift, menuVars.svsPerQuarterPeriod,
+                                    menuVars.verticalShift, menuVars.curveSharpness)
+    end
+    if menuName == "Random" then
+        return generateRandomSet(menuVars.avgSV, menuVars.svPoints + 1, menuVars.randomType,
+                                   menuVars.randomScale)
+    end
+    if menuName == "Constant" then
+        return {menuVars.avgSV, menuVars.avgSV}
+    end
+    if menuName == "Still" then
+        return generateSetOfValues(menuVars, menuVars.stillIntermediateMotion)
+    end
+    return nil
+end
 
 -- Generates a single set of linear values
 -- Returns the set of linear values [Table]
@@ -887,6 +1061,7 @@ function generateRandomSet(avgValue, numValues, randomType, randomScale)
             table.insert(randomSet, randomValue)
         end
         if randomType == "Normal" then
+            -- Box-Muller transformation
             local u1 = math.random()
             local u2 = math.random()
             local randomIncrement = math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
@@ -922,6 +1097,16 @@ function chooseAverageSV(menuVars, chooseBothSVs)
     local startValueChanged = oldAvgValues[1] ~= menuVars.avgSV
     local endValueChanged = oldAvgValues[2] ~= menuVars.linearEndAvgSV
     return startValueChanged or endValueChanged
+end
+-- Lets users choose the average SV of a still
+-- Returns whether or not the average SV changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function chooseAverageSVStill(menuVars)
+    local oldAvg = menuVars.avgSVStill
+    _, menuVars.avgSVStill = imgui.InputFloat("Note spacing", menuVars.avgSVStill, 0, 0, "%.2fx")
+    menuVars.avgSVStill = clampToInterval(menuVars.avgSVStill, -MAX_GENERAL_SV, MAX_GENERAL_SV)
+    return oldAvg ~= menuVars.avgSVStill
 end
 -- Lets users choose coordinates for two cubic bezier points
 -- Returns whether or not any coordinates changed [Boolean]
@@ -1220,6 +1405,34 @@ function chooseStartEndSVs(menuVars, chooseBothSVs)
     local startValueChanged = oldStartEndValues[1] ~= menuVars.startSV
     local endValueChanged = oldStartEndValues[2] ~= menuVars.endSV
     return startValueChanged or endValueChanged
+end
+-- Lets users choose the still SV motion type
+-- Returns whether or not the motion type changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function chooseStillMotionType(menuVars)
+    addSeparator()
+    local oldType = menuVars.stillIntermediateMotion
+    imgui.Text("Intermediate Motion:")
+    if imgui.RadioButton("Constant Velocity", menuVars.stillIntermediateMotion == "Constant") then
+        menuVars.stillIntermediateMotion = "Constant"
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Linear", menuVars.stillIntermediateMotion == "Linear") then
+        menuVars.stillIntermediateMotion = "Linear"
+    end
+    if imgui.RadioButton("Exponential", menuVars.stillIntermediateMotion == "Exponential") then
+        menuVars.stillIntermediateMotion = "Exponential"
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Bezier", menuVars.stillIntermediateMotion == "Bezier") then
+        menuVars.stillIntermediateMotion = "Bezier"
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Sinusoidal", menuVars.stillIntermediateMotion == "Sinusoidal") then
+        menuVars.stillIntermediateMotion = "Sinusoidal"
+    end
+    return oldType ~= menuVars.stillIntermediateMotion
 end
 -- Lets users choose the stutter duration
 -- Returns whether or not the stutter duration changed [Boolean]
@@ -1690,7 +1903,9 @@ function declareMenuVariables(menuName)
         startOffsetCopy = 0,
         endOffsetCopy = 0,
         randomType = "Uniform",
-        randomScale = 1
+        randomScale = 1,
+        avgSVStill = 0.5,
+        stillIntermediateMotion = "Constant"
     }
     if menuName == "Stutter" then
         menuVars.startSV = 1.5
@@ -1704,6 +1919,8 @@ function declareMenuVariables(menuName)
         menuVars.finalSVOption = 2
     elseif menuName == "Random" then
         menuVars.finalSVOption = 2
+    elseif menuName == "Still" then
+        menuVars.avgSV = 0
     end
     return menuVars
 end
@@ -1935,31 +2152,7 @@ end
 --    menuVars   : list of variables used for the current SV menu [Table]
 --    menuName   : name of the current SV menu [String]
 function updateMenuSVs(menuVars, menuName)
-    if menuName == "Linear" then
-        menuVars.svValues = generateLinearSet(menuVars.startSV, menuVars.endSV,
-                                              menuVars.svPoints + 1, menuVars.interlace,
-                                              menuVars.secondStartSV, menuVars.secondEndSV)
-    elseif menuName == "Exponential" then
-        menuVars.svValues = generateExponentialSet(menuVars.exponentialIncrease,
-                                                   menuVars.svPoints + 1, menuVars.avgSV,
-                                                   menuVars.intensity, menuVars.interlace, 
-                                                   menuVars.interlaceMultiplier)
-    elseif menuName == "Stutter" then
-        menuVars.svValues = generateStutterSet(menuVars.startSV, menuVars.stutterDuration,
-                                               menuVars.avgSV)
-    elseif menuName == "Bezier" then
-        menuVars.svValues = generateBezierSet(menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2,
-                                              menuVars.avgSV, menuVars.svPoints + 1,
-                                              menuVars.interlace, menuVars.interlaceMultiplier)
-    elseif menuName == "Sinusoidal" then
-        menuVars.svValues = generateSinusoidalSet(menuVars.startSV, menuVars.endSV,
-                                                  menuVars.periods, menuVars.periodsShift,
-                                                  menuVars.svsPerQuarterPeriod,
-                                                  menuVars.verticalShift, menuVars.curveSharpness)
-    elseif menuName == "Random" then
-        menuVars.svValues = generateRandomSet(menuVars.avgSV, menuVars.svPoints + 1,
-                                              menuVars.randomType, menuVars.randomScale)
-    end
+    menuVars.svValues = generateSetOfValues(menuVars, menuName)
     menuVars.noteDistanceVsTime = calculateDistanceVsTime(menuVars.svValues,
                                                           menuVars.stutterDuration)
     menuVars.svValuesPreview = {}
