@@ -3,7 +3,7 @@
 
 > "The ultimate community-driven and open-source competitive SV plugin"
 
-This is an plugin for [Quaver](https://github.com/Quaver), the ultimate community-driven and open-source competitive
+This is a plugin for [Quaver](https://github.com/Quaver), the ultimate community-driven and open-source competitive
 rhythm game. The plugin contains various tools for editing SVs (Scroll Velocities) quickly and efficiently.
 It's most similar to (i.e. 50% of SV features/ideas stolen from) [iceSV](https://github.com/IceDynamix/iceSV).
 
