@@ -1,4 +1,4 @@
- -- amoguSV v3.1 (21 Dec 2021)
+ -- amoguSV v4.0 (5 Feb 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -22,10 +22,6 @@
 -- If you have any feature suggestions or issues with the plugin, please open an issue at 
 -- https://github.com/kloi34/amoguSV/issues
 
--- Last features planned for amoguSV v4.0:
---      1. Make amoguSV UI better and UX better, especially for first time users
---      2. Dedicated Vibrato+more SV tool 
-
 ---------------------------------------------------------------------------------------------------
 -- Global Constants -------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -48,9 +44,11 @@ ACTION_BUTTON_SIZE = {             -- dimensions of the button that places/remov
 MAX_DURATION = 10000               -- maximum millisecond duration allowed in general
 MAX_GENERAL_SV = 1000              -- maximum (absolute) value allowed for general SVs (ex. avg SV)
 MAX_MS_TIME = 7200000 -- ~ 2 hrs   -- maximum song time allowed (milliseconds)
+MAX_SV_POINTS = 1000               -- maximum number of SV points allowed
 MAX_TELEPORT_DURATION = 10         -- maximum millisecond teleport duration allowed
-MAX_TELEPORT_VALUE = 9999999       -- maximum (absolute) teleport SV value allowed
-MIN_DURATION = 0.016 -- ~ 1/64     -- minimum millisecond duration allowed in general
+MAX_TELEPORT_VALUE = 9999999999    -- maximum (absolute) teleport SV value allowed
+MIN_DURATION = 1/64                -- minimum millisecond duration allowed in general
+MIN_DURATION_FAR = 1/8             -- minimum millisecond duration for telports above ~4 minutes
 
 -- Menu-related
 CONDITION_TESTS = {                -- conditions/tests for numbers
@@ -70,12 +68,14 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "%(w.w)",
     "%(^w^%)",
     "%( c . p %)",
-    "%( ; _ ; %)"
+    "%( ; _ ; %)",
+    "[ m w m ]",
+    "[ v . ^ ]"
 }
 FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail end of all SVs
     "Normal",
     "Skip",
-    "1.00x"   
+    "Custom"   
 }
 SV_TOOLS = {                       -- list of the available tools for editing SVs
     "Linear",
@@ -87,7 +87,9 @@ SV_TOOLS = {                       -- list of the available tools for editing SV
     "Random",
     "Still",
     "Copy",
-    "Remove"
+    "Remove",
+    "Merge",
+    "Splitscroll"
 }
 ---------------------------------------------------------------------------------------------------
 -- Plugin Menus (+ other higher level menu-related functions) -------------------------------------
@@ -146,14 +148,22 @@ function createMainMenu()
     local menuName = SV_TOOLS[globalVars.currentMenuNum]
     local menuVars = declareMenuVariables(menuName)
     retrieveStateVariables(menuName, menuVars)
-    imgui.Columns(2, "SV Menu Panels", false)
-    local isLeftPanelHovered, svUpdateNeeded = createSettingsPanel(globalVars, menuVars, menuName)
-    if svUpdateNeeded then
-        updateMenuSVs(menuVars, menuName)
+    local isLeftPanelHovered = false
+    local svUpdateNeeded = false
+    local isRightPanelHovered = false
+    if menuName == "Merge" then
+        createMergeMenu()
+    elseif menuName == "Splitscroll" then
+        createSplitscrollMenu()
+    else
+        imgui.Columns(2, "SV Menu Panels", false)
+        isLeftPanelHovered, svUpdateNeeded = createSettingsPanel(globalVars, menuVars, menuName)
+        if svUpdateNeeded then
+            updateMenuSVs(menuVars, menuName)
+        end
+        imgui.NextColumn()
+        isRightPanelHovered = createRightPanel(globalVars, menuVars, menuName)
     end
-    imgui.NextColumn()
-    local isRightPanelHovered = createRightPanel(globalVars, menuVars, menuName)
-
     saveStateVariables(menuName, menuVars)
     saveStateVariables("Global", globalVars)
     state.IsWindowHovered = isNavHovered or isLeftPanelHovered or isRightPanelHovered
@@ -203,7 +213,7 @@ function linearSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
     svUpdateNeeded = chooseStartEndSVs(menuVars, true) or svUpdateNeeded
     svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, false) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseInterlace(menuVars, menuName, true) or svUpdateNeeded
     chooseTeleportSV(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars, menuName)
@@ -221,7 +231,7 @@ function exponentialSettingsMenu(globalVars, menuVars, menuName)
     svUpdateNeeded = chooseIntensity(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
     svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, false) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseInterlace(menuVars, menuName, false) or svUpdateNeeded
     chooseTeleportSV(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars, menuName)
@@ -239,8 +249,9 @@ function stutterSettingsMenu(globalVars, menuVars, menuName)
     svUpdateNeeded = chooseStartEndSVs(menuVars, menuVars.linearStutter) or svUpdateNeeded
     svUpdateNeeded = chooseStutterDuration(menuVars, menuVars.linearStutter) or svUpdateNeeded
     svUpdateNeeded = chooseAverageSV(menuVars, menuVars.linearStutter) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, true) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseLinearStutter(menuVars) or svUpdateNeeded
+    chooseTotalStutterDuration(menuVars)
     return svUpdateNeeded
 end
 -- Creates the settings menu for cubic bezier SV
@@ -251,11 +262,11 @@ end
 --    menuName   : name of this menu [String]
 function bezierSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
-    provideLinkToBezierWebsite()
+    svUpdateNeeded = provideLinkToBezierWebsite(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseBezierPoints(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
     svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, true) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseInterlace(menuVars, menuName, false) or svUpdateNeeded
     chooseTeleportSV(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars, menuName)
@@ -276,7 +287,7 @@ function sinusoidalSettingsMenu(globalVars, menuVars, menuName)
     svUpdateNeeded = chooseNumPeriods(menuVars) or svUpdateNeeded
     svUpdateNeeded = choosePeriodShift(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseSVPerQuarterPeriod(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, true) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     chooseTeleportSV(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars, menuName)
     return svUpdateNeeded
@@ -312,7 +323,7 @@ function randomSettingsMenu(globalVars, menuVars, menuName)
     svUpdateNeeded = chooseRandomScale(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
     svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, true) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     chooseTeleportSV(globalVars, menuVars, menuName)
     chooseDisplacement(globalVars, menuVars, menuName)
     if (not globalVars.placeSVsBetweenOffsets) then
@@ -332,7 +343,7 @@ end
 function stillSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
     svUpdateNeeded = chooseAverageSVStill(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseFinalSV(menuVars, false) or svUpdateNeeded
+    svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseStillMotionType(menuVars) or svUpdateNeeded
     addSeparator()
     imgui.Text("Intermediate Motion Settings:")
@@ -349,6 +360,7 @@ function stillSettingsMenu(globalVars, menuVars, menuName)
         svUpdateNeeded = chooseIntensity(menuVars) or svUpdateNeeded
         svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
     elseif motionIsBezier then
+        svUpdateNeeded = provideLinkToBezierWebsite(menuVars) or svUpdateNeeded
         svUpdateNeeded = chooseBezierPoints(menuVars) or svUpdateNeeded
         svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
     elseif motionIsSinusoial then
@@ -400,6 +412,121 @@ function removeSettingsMenu(globalVars, menuVars, menuName)
     end
     return false
 end
+-- Creates the jank merge menu
+function createMergeMenu()
+    local vars = {
+        statusMsg = "Select notes, between which overlapping SVs will get merged"
+    }
+    retrieveStateVariables("Merge", vars)
+    imgui.Text("This is a jank menu, but it will function and do what it does lol")
+    imgui.Text("Use this to add/subtract SVs of different types that are overlapping")
+    createHelpMarker("Example: placing SVs between notes, cubic bezier 0.50x avg w/ 16 sv points"..
+                     " + exponential 0.50x avg w/ 16 sv points --> merge the SVs = combined new "..
+                     "1.00x avg SV with unique sv shape/motion. Other examples: 2 beziers, "..
+                     "linear + bezier, etc. You can merge teleport SVs too.")
+    addSeparator()
+    imgui.Text(vars.statusMsg)
+    addSeparator()
+    if imgui.Button("Merge overlapping (at the same offset/time) SVs between selected Notes") then
+        local selectedNotes = uniqueSelectedNoteOffsets()
+        if #selectedNotes > 1 then
+            local firstOffset = selectedNotes[1]
+            local lastOffset = selectedNotes[#selectedNotes]
+            local svsValuesToAdd = {}
+            local svsToAdd = {}
+            local svsToRemove = {}
+            local svStartTimeExists = {}
+            for i, sv in pairs(map.ScrollVelocities) do
+                if sv.StartTime >= firstOffset and sv.StartTime <= lastOffset then
+                    table.insert(svsToRemove, sv)
+                    if svStartTimeExists[sv.StartTime] then
+                        svsValuesToAdd[sv.StartTime] = svsValuesToAdd[sv.StartTime] + sv.Multiplier
+                    else
+                        svStartTimeExists[sv.StartTime] = true
+                        svsValuesToAdd[sv.StartTime] = sv.Multiplier
+                    end
+                end
+            end
+            for svTime, svMultiplier in pairs(svsValuesToAdd) do
+                table.insert(svsToAdd, utils.CreateScrollVelocity(svTime, svMultiplier))
+            end
+            actions.RemoveScrollVelocityBatch(svsToRemove)
+            actions.PlaceScrollVelocityBatch(svsToAdd)
+            vars.statusMsg = "SVs between "..firstOffset.."ms and "..lastOffset.."ms merged"
+        end
+    end
+    saveStateVariables("Merge", vars)
+end
+-- Creates the jank splitscroll menu
+function createSplitscrollMenu()
+    local vars = {
+        firstScrollSpeed = 0.8,
+        secondScrollSpeed = -0.8,
+        firstDisplacement = 0,
+        secondDisplacement = 390,
+        reverseScrollNoteTimes = {},
+        statusMessage = "sv stands for sv veleocity",
+        reverseScrollStartDisplacement = 1000000,
+        fps = 60
+    }
+    retrieveStateVariables("Splitscroll", vars)
+    local selectedNotesTimes = uniqueSelectedNoteOffsets()
+    local noNotesSelected = #state.SelectedHitObjects == 0
+    local reverseNotesAdded = #vars.reverseScrollNoteTimes ~= 0
+    local enoughNotesSelectedToSplit = #selectedNotesTimes > #vars.reverseScrollNoteTimes
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.Text("Another jank menu/UI")
+    addSeparator()
+    imgui.Text("General Settings")
+    _, vars.firstScrollSpeed = imgui.InputFloat("First scroll speed", vars.firstScrollSpeed,
+                                                0, 0, "%.2fx")
+    _, vars.firstDisplacement = imgui.InputFloat("First displacement", vars.firstDisplacement,
+                                                 0, 0, "%.2f msx")
+    _, vars.secondScrollSpeed = imgui.InputFloat("Second scroll speed", vars.secondScrollSpeed,
+                                                 0, 0, "%.2fx")
+    _, vars.secondDisplacement = imgui.InputFloat("Second displacement", vars.secondDisplacement,
+                                                  0, 0, "%.2f msx")
+    _, vars.reverseScrollStartDisplacement = imgui.InputFloat("Start displacement",
+                                                              vars.reverseScrollStartDisplacement,
+                                                              0, 0, "%.2f msx")
+    _, vars.fps = imgui.InputFloat("Splitscroll Frames Per Second", vars.fps, 0, 0, "%.2f fps")
+    imgui.Text("(currently set to jump a frame every "..round((1000/vars.fps), 2).." milliseconds)")
+    addSeparator()
+    imgui.Text("Reverse scroll list: "..#vars.reverseScrollNoteTimes.." note times selected")
+    if reverseNotesAdded and imgui.Button("Clear notes", {ACTION_BUTTON_SIZE[1],
+                                          ACTION_BUTTON_SIZE[2]/1.5}) then
+        vars.reverseScrollNoteTimes = {}
+    end
+    addSeparator()
+    if noNotesSelected then
+        imgui.Text("Select some notes")
+    else
+        imgui.Text(#state.SelectedHitObjects.." notes selected ("..#selectedNotesTimes..
+                   " note times)")
+        if imgui.Button("Set selected notes as planned reverse scroll", ACTION_BUTTON_SIZE) then
+            vars.reverseScrollNoteTimes = selectedNotesTimes
+        end
+        if enoughNotesSelectedToSplit and reverseNotesAdded then
+            addSeparator()
+            if imgui.Button("Split Scroll Selected Section!", ACTION_BUTTON_SIZE) then
+                addSplitScrollSVs(vars.reverseScrollNoteTimes, selectedNotesTimes,
+                                  vars.firstScrollSpeed, vars.secondScrollSpeed,
+                                  vars.firstDisplacement, vars.secondDisplacement,
+                                  vars.reverseScrollStartDisplacement, vars.fps)
+                vars.statusMessage = "Successfully added SVs!"
+                vars.reverseScrollNoteTimes = {}
+            end
+        end
+    end
+    if reverseNotesAdded and (not enoughNotesSelectedToSplit) then
+        addSeparator()
+        imgui.TextWrapped("Now that you've added notes to the reverse scroll list, select a "..
+                          "whole section of notes (including the ones on the reverse scroll "..
+                          "list) to make split scroll")
+    end
+    imgui.Text(vars.statusMessage)
+    saveStateVariables("Splitscroll", vars)
+end
 -- Creates the right-side panel for info and action buttons
 -- Returns whether or not this right panel is hovered over [Boolean]
 -- Parameters
@@ -427,19 +554,22 @@ end
 --    menuVars   : list of variables used for the still SV menu [Table]
 --    menuName   : name of the current SV menu [String]
 function createStillSVPanel(globalVars, menuVars, menuName)
-    plotSVs(menuVars.svValuesPreview, "Intermediate Motion")
+    plotSVs(menuVars.svValuesPreview, "Intermediate Motion", menuVars.minPlotScaleSVs,
+            menuVars.maxPlotScaleSVs)
     displaySVStats(menuVars)
     addSeparator()
     imgui.Text("Select 3 or more notes:")
     addPadding()
     if imgui.Button("Apply Still SVs On Selected Notes", ACTION_BUTTON_SIZE) or 
-            utils.IsKeyPressed(keys.Y) then
+            utils.IsKeyPressed(keys.T) then
         local SVs = generateStillSVs(menuVars)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
     end
-    if utils.IsKeyPressed(keys.T) then
+    createToolTip("Alternatively, press ' T ' on your keyboard to place SVs or ' R ' to "..
+                  "replace (delete old and place new) SVs")
+    if utils.IsKeyPressed(keys.R) then
         local SVs = generateStillSVs(menuVars)
         if #SVs > 0 then
             removeSVs(menuVars, globalVars)
@@ -472,11 +602,12 @@ function createPasteSVPanel(globalVars, menuVars, menuName)
         local pasteOffsets = {math.floor(state.SongTime)}
         pasteSVs(menuVars.svValues, pasteOffsets)
     end
-     if imgui.Button("Place SVs at selected notes", ACTION_BUTTON_SIZE) or 
-            utils.IsKeyPressed(keys.Y) then
+    if imgui.Button("Place SVs at selected notes", ACTION_BUTTON_SIZE) or 
+            utils.IsKeyPressed(keys.T) then
         local pasteOffsets = uniqueSelectedNoteOffsets()
         pasteSVs(menuVars.svValues, pasteOffsets)
     end
+    createToolTip("Alternatively, press ' T ' on your keyboard to place SVs")
 end
 -- Creates the right panel menu for displaying SV stats and placing SVs
 -- Parameters
@@ -489,13 +620,23 @@ function createPlaceSVPanel(globalVars, menuVars, menuName)
         return isPanelHovered
     end
     if menuVars.linearStutter then
-        plotSVs(menuVars.svValuesPreview, "First Stutter")
+        local minScaleSecond, maxScaleSecond = calculatePlotScale(menuVars.svValuesSecondPreview)
+        plotSVs(menuVars.svValuesPreview, "First Stutter", menuVars.minPlotScaleSVs,
+                menuVars.maxPlotScaleSVs)
         addSeparator()
-        plotSVs(menuVars.svValuesSecondPreview, "Last Stutter")
+        plotSVs(menuVars.svValuesSecondPreview, "Last Stutter", minScaleSecond, maxScaleSecond)
     else
-        plotSVMotion(menuVars.noteDistanceVsTime, not globalVars.placeSVsBetweenOffsets)
-        addSeparator()
-        plotSVs(menuVars.svValuesPreview, menuName)
+        if #menuVars.noteDistanceVsTime < 201 then
+            plotSVMotion(menuVars.noteDistanceVsTime, not globalVars.placeSVsBetweenOffsets,
+                         menuVars.minPlotScaleMotion, menuVars.maxPlotScaleMotion)
+            addSeparator()
+            plotSVs(menuVars.svValuesPreview, menuName, menuVars.minPlotScaleSVs, 
+                    menuVars.maxPlotScaleSVs)
+        else
+            imgui.Text("SV graphs hidden")
+            createHelpMarker("SV plots with 200+ SV points not displayed to reduce lag")
+            addSeparator()
+        end
     end
     displaySVStats(menuVars)
     addSeparator()
@@ -521,7 +662,8 @@ function placeSVs(menuVars, globalVars)
                             menuVars.teleportDuration, menuVars.finalSVOption, menuVars.displace,
                             menuVars.displacement, menuVars.stutterDuration,
                             menuVars.linearStutter, menuVars.endSV, menuVars.linearEndAvgSV,
-                            menuVars.avgSV, globalVars.placeSVsBetweenOffsets)
+                            menuVars.avgSV, globalVars.placeSVsBetweenOffsets, menuVars.customSV,
+                            menuVars.totalStutterDuration)
     if #SVs > 0 then
         actions.PlaceScrollVelocityBatch(SVs)
     end
@@ -544,9 +686,12 @@ end
 --    linearEndAvgSV         : ending average SV of linear stutter SV (if applicable) [Int/Float]
 --    stutterAvgSV           : average SV of stutter SV (if applicable) [Int/Float]
 --    placeSVsBetweenOffsets : whether or not SVs are placed between two offsets [Boolean]
+--    customSVValue          : value of the custom last SV [Int/Float]
+--    totalStutterDuration   : total duration % of whole stutter SV (if applicable) [Int/Float]
 function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleportValue,
                      teleportDuration, finalSVOption, displace, displacement, stutterDuration,
-                     linearStutter, endSV, linearEndAvgSV, stutterAvgSV, placeSVsBetweenOffsets)
+                     linearStutter, endSV, linearEndAvgSV, stutterAvgSV, placeSVsBetweenOffsets,
+                     customSVValue, totalStutterDuration)
     local SVs = {}
     local startSVList = {}
     local avgSVList = {}
@@ -559,6 +704,9 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
         local startOffset = determineTeleport(offsets[i], addTeleport, veryStartTeleport,
                                               i == 1, teleportValue, teleportDuration, SVs)
         local endOffset = offsets[i + 1]
+        if isAStutterSV then 
+            endOffset = endOffset - (endOffset - startOffset) * (100 - totalStutterDuration) / 100
+        end
         startOffset = addDisplacementSV(SVs, placeSVsBetweenOffsets, displace, i ~= 1, addTeleport,
                                         veryStartTeleport, displacement, startOffset, endOffset)
         local svOffsets
@@ -575,8 +723,20 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
         for j = 1, #svOffsets - 1 do
             table.insert(SVs, utils.CreateScrollVelocity(svOffsets[j], svValues[j]))
         end
+        if isAStutterSV and totalStutterDuration ~= 100 then
+            if linearStutter then
+                table.insert(SVs, utils.CreateScrollVelocity(endOffset, avgSVList[i]))
+            else
+                table.insert(SVs, utils.CreateScrollVelocity(endOffset, stutterAvgSV))
+            end
+        end
     end
-    addFinalSV(SVs, offsets[#offsets], svValues[#svValues], finalSVOption, displace, displacement)
+    local finalSVValue = svValues[#svValues]
+    if isAStutterSV then
+        finalSVValue = stutterAvgSV
+    end
+    addFinalSV(SVs, offsets[#offsets], finalSVValue, finalSVOption, displace, displacement,
+               customSVValue)
     return SVs
 end
 -- Adds a teleport SV to the list of SVs to place if applicable
@@ -616,10 +776,19 @@ function addDisplacementSV(SVs, placeSVsBetweenOffsets, displace, notFirstSet, a
     if (not placeSVsBetweenOffsets) and displace then
         local middleTelportExists = (not addTeleport) or (addTeleport and veryStartTeleport)
         if notFirstSet and middleTelportExists then
-            table.insert(SVs, utils.CreateScrollVelocity(startOffset, - displacement * 64))
-            startOffset = startOffset + MIN_DURATION
+            if isAboveFourMinutes(startOffset) then
+                table.insert(SVs, utils.CreateScrollVelocity(startOffset, - displacement * 8))
+                startOffset = startOffset + MIN_DURATION_FAR
+            else
+                table.insert(SVs, utils.CreateScrollVelocity(startOffset, - displacement * 64))
+                startOffset = startOffset + MIN_DURATION
+            end
         end
-        table.insert(SVs, utils.CreateScrollVelocity(endOffset - MIN_DURATION, displacement * 64))
+        if isAboveFourMinutes(startOffset) then
+            table.insert(SVs, utils.CreateScrollVelocity(endOffset - MIN_DURATION_FAR, displacement * 8))
+        else
+            table.insert(SVs, utils.CreateScrollVelocity(endOffset - MIN_DURATION, displacement * 64))
+        end
     end
     return startOffset
 end
@@ -631,15 +800,21 @@ end
 --    finalSVOption : option number for the type of SV placed at the very end [Int]
 --    displace      : whether or not to displace notes [Boolean]
 --    displacement  : displacement height of note/hitObject receptors (msx) [Int/Float]
-function addFinalSV(SVs, endOffset, velocity, finalSVOption, displace, displacement)
+--    customSVValue : value of the custom last SV [Int/Float]
+function addFinalSV(SVs, endOffset, velocity, finalSVOption, displace, displacement, customSVValue)
     if displace and finalSVOption ~= 2 then
-        table.insert(SVs, utils.CreateScrollVelocity(endOffset, - displacement * 64))
-        endOffset = endOffset + MIN_DURATION
+        if isAboveFourMinutes(endOffset) then
+            table.insert(SVs, utils.CreateScrollVelocity(endOffset, - displacement * 8))
+            endOffset = endOffset + MIN_DURATION_FAR
+        else
+            table.insert(SVs, utils.CreateScrollVelocity(endOffset, - displacement * 64))
+            endOffset = endOffset + MIN_DURATION
+        end
     end
     if finalSVOption == 1 then -- normal SV option
         table.insert(SVs, utils.CreateScrollVelocity(endOffset, velocity))
-    elseif finalSVOption == 3 then -- 1.00x SV option
-        table.insert(SVs, utils.CreateScrollVelocity(endOffset, 1))
+    elseif finalSVOption == 3 then -- custom SV option
+        table.insert(SVs, utils.CreateScrollVelocity(endOffset, customSVValue))
     end
 end
 -- Generates SVs to place for the single SV tool/menu
@@ -701,26 +876,35 @@ function generateStillSVs(menuVars)
     end
     local startOffset = offsets[1]
     local endOffset = offsets[#offsets]
+    local minDuration = MIN_DURATION
+    local displacementMultiplier = 64
+    if isAboveFourMinutes(endOffset) then
+        minDuration = MIN_DURATION_FAR
+        displacementMultiplier = 8
+    end
     if menuVars.stillIntermediateMotion == "Constant" then
         startOffset = determineTeleport(startOffset, menuVars.displace, true, true, 
-                                        64 * menuVars.displacement, MIN_DURATION, SVs)
+                                        displacementMultiplier * menuVars.displacement,
+                                        minDuration, SVs)
         table.insert(SVs, utils.CreateScrollVelocity(startOffset, menuVars.avgSV))
         for i = 2, #offsets do
             local timeFromStart = offsets[i] - startOffset
             local stillAverageDifference = menuVars.avgSVStill - menuVars.avgSV
-            local teleportVelocity = stillAverageDifference * 64 * timeFromStart
+            local teleportVelocity = stillAverageDifference * displacementMultiplier * 
+                                     timeFromStart
             if menuVars.displace then 
-                teleportVelocity = teleportVelocity + 64 * menuVars.displacement
+                teleportVelocity = teleportVelocity + displacementMultiplier *
+                                   menuVars.displacement
             end
             if i == #offsets then
-                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - MIN_DURATION,
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - minDuration,
                              teleportVelocity + menuVars.avgSV))
             else
-                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - MIN_DURATION,
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - minDuration,
                              teleportVelocity + menuVars.avgSV))
                 table.insert(SVs, utils.CreateScrollVelocity(offsets[i],
                              -teleportVelocity + menuVars.avgSV))
-                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] + MIN_DURATION,
+                table.insert(SVs, utils.CreateScrollVelocity(offsets[i] + minDuration,
                              menuVars.avgSV))
             end
         end
@@ -728,7 +912,8 @@ function generateStillSVs(menuVars)
         local motionSVOffsets = generateLinearSet(startOffset, endOffset, #menuVars.svValues,
                                                   false, 0, 0)
         startOffset = determineTeleport(startOffset, menuVars.displace, true, true,
-                                        64 * menuVars.displacement, MIN_DURATION, SVs)
+                                        displacementMultiplier * menuVars.displacement,
+                                        minDuration, SVs)
         table.insert(SVs, utils.CreateScrollVelocity(startOffset, menuVars.svValues[1]))
         local svValueIndex = 1
         local totalDistanceTraveled
@@ -741,10 +926,10 @@ function generateStillSVs(menuVars)
             local currentMotionOffset = motionSVOffsets[svValueIndex]
             local nextMotionOffset = motionSVOffsets[svValueIndex + 1]
             local noteOffset = offsets[i]
-            while nextMotionOffset < (noteOffset - MIN_DURATION) do
+            while nextMotionOffset < (noteOffset - minDuration) do
                 lastMotionSVValue = menuVars.svValues[svValueIndex]
                 local lastMotionOffset = currentMotionOffset
-                if math.abs(lastMotionOffset - offsets[i - 1]) > MIN_DURATION then
+                if math.abs(lastMotionOffset - offsets[i - 1]) > minDuration then
                     table.insert(SVs, utils.CreateScrollVelocity(lastMotionOffset,
                                  lastMotionSVValue))
                 end
@@ -772,26 +957,28 @@ function generateStillSVs(menuVars)
             local regularNoteDistance = (noteOffset - startOffset) * menuVars.avgSVStill
             local totalDistanceTraveledToNote = totalDistanceTraveled + 
                     (noteOffset - currentMotionOffset) * thisMotionSVValue
-            local teleportVelocity = (regularNoteDistance - totalDistanceTraveledToNote) * 64
+            local teleportVelocity = (regularNoteDistance - totalDistanceTraveledToNote) *
+                                      displacementMultiplier
             if i == #offsets then
-                table.insert(SVs, utils.CreateScrollVelocity(noteOffset - MIN_DURATION,
+                table.insert(SVs, utils.CreateScrollVelocity(noteOffset - minDuration,
                              teleportVelocity + thisMotionSVValue))
             else
-                table.insert(SVs, utils.CreateScrollVelocity(noteOffset - MIN_DURATION,
+                table.insert(SVs, utils.CreateScrollVelocity(noteOffset - minDuration,
                              teleportVelocity + thisMotionSVValue))
                 table.insert(SVs, utils.CreateScrollVelocity(noteOffset,
                              -teleportVelocity + thisMotionSVValue))
-                if math.abs(motionSVOffsets[svValueIndex - 1] - offsets[i -1]) < MIN_DURATION then
-                    table.insert(SVs, utils.CreateScrollVelocity(noteOffset + MIN_DURATION,
+                if math.abs(motionSVOffsets[svValueIndex - 1] - offsets[i -1]) < minDuration then
+                    table.insert(SVs, utils.CreateScrollVelocity(noteOffset + minDuration,
                                 menuVars.svValues[svValueIndex + 1]))
                 else
-                    table.insert(SVs, utils.CreateScrollVelocity(noteOffset + MIN_DURATION,
+                    table.insert(SVs, utils.CreateScrollVelocity(noteOffset + minDuration,
                                 thisMotionSVValue))
                 end
             end
         end
     end
-    addFinalSV(SVs, endOffset, menuVars.avgSVStill, menuVars.finalSVOption, false, nil)
+    addFinalSV(SVs, endOffset, menuVars.avgSVStill, menuVars.finalSVOption, false, nil,
+               menuVars.customSV)
     return SVs
 end
 -- Removes SVs in the map between two points of time
@@ -873,7 +1060,7 @@ end
 -- Pastes copied SVs
 -- Parameters
 --    svValues     : variable containing copied SV info (1. multiplier, 2. relative offset) [Table]
---    pasteOffsets : offsets/times to paste copied SVs
+--    pasteOffsets : offsets/times to paste copied SVs [Table]
 function pasteSVs(svValues, pasteOffsets)
     local svsToPaste = {}
     for i = 1, #pasteOffsets do
@@ -887,6 +1074,122 @@ function pasteSVs(svValues, pasteOffsets)
     end
     if #svsToPaste > 0 then
         actions.PlaceScrollVelocityBatch(svsToPaste)
+    end
+end
+-- Calculates an places splitscroll SVs
+-- Parameters
+--    reverseScrollNoteTimes         : list of note times of which should be second scroll [Table]
+--    allNoteTimes                   : list of note times of splitscroll [Table]
+--    firstScrollSpeed               : first/primary splitscroll velocity [Int/Float]
+--    secondScrollSpeed              : second splitscroll velocity [Int/Float]
+--    firstDisplacementHeight        : first/primary splitscroll note displacement [Int/Float]
+--    secondDisplacementHeight       : second splitscroll note displacement [Int/Float]
+--    reverseScrollStartDisplacement : inital negative displacement for splitscroll [Int/Float]
+--    fps                            : frames per second of splitscroll SVs [Int]
+function addSplitScrollSVs(reverseScrollNoteTimes, allNoteTimes, firstScrollSpeed,
+                           secondScrollSpeed, firstDisplacementHeight, secondDisplacementHeight,
+                           reverseScrollStartDisplacement, fps)
+    local svs = {}
+    local startOffset = allNoteTimes[1]
+    local endOffset = allNoteTimes[#allNoteTimes]
+    local minDuration = MIN_DURATION
+    local displacementMultiplier = 64
+    if isAboveFourMinutes(endOffset) then
+        minDuration = MIN_DURATION_FAR
+        displacementMultiplier = 8
+    end
+    firstDisplacementHeight = firstDisplacementHeight * displacementMultiplier
+    secondDisplacementHeight = secondDisplacementHeight * displacementMultiplier
+    local currentlyFirstScroll = false
+    local isReverseTime = {}
+    for i = 1, #reverseScrollNoteTimes do
+       isReverseTime[reverseScrollNoteTimes[i]] = true
+    end
+    local currentOffset = startOffset
+    local iterations = 0
+    while currentOffset < endOffset do
+        local timeSinceStart = currentOffset - startOffset
+        local currentmsxDisplacement = reverseScrollStartDisplacement + timeSinceStart * 
+                                       (firstScrollSpeed - secondScrollSpeed)
+        local teleportSVValue = currentmsxDisplacement * displacementMultiplier
+        local currentNoteOffset
+        local currentScrollSpeed
+        local nextScrollSpeed
+        local currentDisplacement
+        local nextDisplacement
+        if not currentlyFirstScroll then
+            currentScrollSpeed = secondScrollSpeed
+            currentDisplacement = secondDisplacementHeight
+            nextScrollSpeed = firstScrollSpeed
+            nextDisplacement = firstDisplacementHeight
+        else
+            currentScrollSpeed = firstScrollSpeed
+            currentDisplacement = firstDisplacementHeight
+            nextScrollSpeed = secondScrollSpeed
+            nextDisplacement = secondDisplacementHeight
+            teleportSVValue = teleportSVValue * -1
+        end
+        while allNoteTimes[1] <= currentOffset do
+            currentNoteOffset = table.remove(allNoteTimes, 1)
+            local belongsInOtherScroll = currentlyFirstScroll ==
+                                         (true == isReverseTime[currentNoteOffset])
+            if currentNoteOffset ~= nil then
+                local noteTimeSinceStart = currentNoteOffset - startOffset
+                local notemsxDisplacement = reverseScrollStartDisplacement + noteTimeSinceStart *
+                                            (firstScrollSpeed - secondScrollSpeed)
+                local noteTeleportSVValue = notemsxDisplacement * displacementMultiplier
+                if currentlyFirstScroll then 
+                    noteTeleportSVValue = noteTeleportSVValue * -1
+                end
+                -- too many indentations lmao, the code here should get refactored to keep line
+                -- character length below 100 and make code maintainable/readable, but i give up
+                if currentNoteOffset < currentOffset then
+                    if belongsInOtherScroll then
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset - minDuration, noteTeleportSVValue + nextDisplacement + currentScrollSpeed))
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset, -noteTeleportSVValue - nextDisplacement + currentScrollSpeed))
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset + minDuration, currentScrollSpeed))
+                    else
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset - minDuration, currentDisplacement + currentScrollSpeed))
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset, - currentDisplacement + currentScrollSpeed))
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset + minDuration, currentScrollSpeed))
+                    end
+                else --currentNoteOffset == currentOffset
+                    if iterations ~= 0 then
+                        if belongsInOtherScroll then
+                            table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset - minDuration, teleportSVValue + nextDisplacement + currentScrollSpeed))
+                            table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset, - nextDisplacement + currentScrollSpeed))
+                            table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset + minDuration, nextScrollSpeed))
+                        else
+                            table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset - minDuration, currentDisplacement + currentScrollSpeed))
+                            table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset, teleportSVValue - currentDisplacement + currentScrollSpeed))
+                            table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset + minDuration, nextScrollSpeed))
+                        end
+                    else
+                        table.insert(svs, utils.CreateScrollVelocity(currentNoteOffset, nextScrollSpeed))
+                    end
+                end
+            end
+        end
+        if currentNoteOffset ~= currentOffset or currentNoteOffset < currentOffset then
+            table.insert(svs, utils.CreateScrollVelocity(currentOffset, teleportSVValue + currentScrollSpeed))
+            table.insert(svs, utils.CreateScrollVelocity(currentOffset + minDuration, nextScrollSpeed))
+        end
+        currentlyFirstScroll = not currentlyFirstScroll
+        iterations = iterations + 1
+        currentOffset = startOffset + (1000 * iterations) / fps
+    end
+    local noteTimeSinceStart = endOffset - startOffset
+    local notemsxDisplacement = reverseScrollStartDisplacement + noteTimeSinceStart * (firstScrollSpeed - secondScrollSpeed)
+    local noteTeleportSVValue = notemsxDisplacement * displacementMultiplier
+    if not currentlyFirstScroll then
+        table.insert(svs, utils.CreateScrollVelocity(endOffset - minDuration, secondDisplacementHeight))
+        table.insert(svs, utils.CreateScrollVelocity(endOffset, noteTeleportSVValue - secondDisplacementHeight))
+        table.insert(svs, utils.CreateScrollVelocity(endOffset + minDuration, 1))
+    else
+        table.insert(svs, utils.CreateScrollVelocity(endOffset, 1))
+    end
+    if #svs > 0 then
+        actions.PlaceScrollVelocityBatch(svs)
     end
 end
 ---------------------------------------------------------------------------------------------------
@@ -1241,7 +1544,7 @@ function chooseDisplacement(globalVars, menuVars, menuName)
         _, menuVars.displace = imgui.Checkbox("Add initial displacement to still", 
                                               menuVars.displace)
     else
-        _, menuVars.displace = imgui.Checkbox("Displace ends notes", menuVars.displace)
+        _, menuVars.displace = imgui.Checkbox("Displace end notes", menuVars.displace)
         createHelpMarker("Shifts the note/hit-object receptor up or down, changing how high "..
                          "notes are hit on the screen")
     end
@@ -1272,28 +1575,30 @@ function chooseExponentialBehavior(menuVars)
     return oldBehavior ~= menuVars.exponentialIncrease
 end
 -- Lets users choose the final SV to place at the end
--- Returns whether or not the final SV type changed [Boolean]
+-- Returns whether or not the final SV type/value changed [Boolean]
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
---    noNormal : whether or not to include the "Normal" type option [Boolean]
-function chooseFinalSV(menuVars, noNormal)
+function chooseFinalSV(menuVars)
     local oldOption = menuVars.finalSVOption
-    local startIndex = 1
-    if noNormal then
-        startIndex = 2
+    local oldCustomSV = menuVars.customSV
+    if menuVars.finalSVOption == 3 then
+        imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.35)
+        _, menuVars.customSV = imgui.InputFloat("SV", menuVars.customSV, 0, 0, "%.2fx")
+        menuVars.customSV = clampToInterval(menuVars.customSV, -100, 100)
+        imgui.SameLine(0, SAMELINE_SPACING)
+    else
+        imgui.Indent(DEFAULT_WIDGET_WIDTH * 0.35 + 24)
     end
-    addPadding()
-    imgui.AlignTextToFramePadding()
-    imgui.Text("Final SV:")
-    createToolTip("This is the very last SV placed at the end of all SVs")
-    imgui.SameLine(0, SAMELINE_SPACING)
-    for i = startIndex, #FINAL_SV_TYPES do
-        if i ~= startNum then
-            imgui.SameLine(0, RADIO_BUTTON_SPACING)
-        end
-        _, menuVars.finalSVOption = imgui.RadioButton(FINAL_SV_TYPES[i], menuVars.finalSVOption, i)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.5)
+    local _, finalSVIndex = imgui.Combo("Final SV", menuVars.finalSVOption - 1, FINAL_SV_TYPES,
+                                        #FINAL_SV_TYPES)
+    createHelpMarker("This is the very last SV placed at the end of all SVs")
+    if menuVars.finalSVOption ~= 3 then
+        imgui.Unindent(DEFAULT_WIDGET_WIDTH * 0.35 + 24)
     end
-    return oldOption ~= menuVars.finalSVOption
+    menuVars.finalSVOption = finalSVIndex + 1
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    return (oldOption ~= menuVars.finalSVOption) or (oldCustomSV ~= menuVars.customSV)
 end
 -- Lets users choose the intensity of something (like SV curve)
 -- Returns whether or not the intensity changed [Boolean]
@@ -1555,7 +1860,7 @@ function chooseSVPerQuarterPeriod(menuVars)
     imgui.Text("For every 0.25 period/cycle, place...")
     local oldPerQuarterPeriod = menuVars.svsPerQuarterPeriod
     _, menuVars.svsPerQuarterPeriod = imgui.InputInt("SV points", menuVars.svsPerQuarterPeriod)
-    menuVars.svsPerQuarterPeriod = clampToInterval(menuVars.svsPerQuarterPeriod, 1, 128)
+    menuVars.svsPerQuarterPeriod = clampToInterval(menuVars.svsPerQuarterPeriod, 1, MAX_SV_POINTS)
     return oldPerQuarterPeriod ~= menuVars.svsPerQuarterPeriod
 end
 -- Lets users choose the number of SVs points
@@ -1565,7 +1870,7 @@ end
 function chooseSVPoints(menuVars)
     local oldSVPoints = menuVars.svPoints
     _, menuVars.svPoints = imgui.InputInt("SV points", menuVars.svPoints, 1, 1)
-    menuVars.svPoints = clampToInterval(menuVars.svPoints, 1, 128)
+    menuVars.svPoints = clampToInterval(menuVars.svPoints, 1, MAX_SV_POINTS)
     return oldSVPoints ~= menuVars.svPoints
 end
 -- Lets users choose how to place SVs
@@ -1642,7 +1947,17 @@ function chooseTeleportSV(globalVars, menuVars, menuName)
         end
     end
 end
-
+-- Lets users choose the total stutter duration
+-- Parameters
+--    menuVars   : list of variables used for the current SV menu [Table]
+function chooseTotalStutterDuration(menuVars)
+    addSeparator()
+    imgui.Text("Whole Stutter Duration:")
+    _, menuVars.totalStutterDuration = imgui.SliderInt("Stutter Duration",
+                                                       menuVars.totalStutterDuration, 1, 100,
+                                                       menuVars.totalStutterDuration.."%%")
+    menuVars.totalStutterDuration = clampToInterval(menuVars.totalStutterDuration, 1, 100)
+end
 ---------------------------------------------------------------------------------------------------
 -- Math/Calculation Functions ---------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -1695,17 +2010,31 @@ function calculatePlotScale(values)
     end
     return minScale, maxScale
 end
+-- Calculates the average, min, and max values of a list of SVs (this should be split up into
+-- smaller functions to encapsulate stuff better, but im lazy XD)
+-- Returns the average, min, and max values of the SVs (excluding the last SV) [Int/Float]
+-- Parameters
+--    svValues : list of SV values [Table]
+function calculateSVStats(svValues)
+    local svValuesAverage = round(getAverage(svValues, false), 2)
+    local tempLastValue = table.remove(svValues, #svValues)
+    local maxSV = round(math.max(table.unpack(svValues)), 2)
+    local minSV = round(math.min(table.unpack(svValues)), 2)
+    table.insert(svValues, tempLastValue)
+    return svValuesAverage, minSV, maxSV
+end
 -- Creates a distance vs time graph/plot of SV motion
 -- Parameters
 --    noteDistances : list of note distances [Table]
 --    forNotes      : whether or SV motion is describing notes [Boolean]
-function plotSVMotion(noteDistances, forNotes)
+--    minScale      : minimum scale of the plot [Int/Float]
+--    maxScale      : maximum scale of the plot [Int/Float]
+function plotSVMotion(noteDistances, forNotes, minScale, maxScale)
     if forNotes then
         imgui.Text("Projected Note Motion (Distance vs Time):")
     else
         imgui.Text("Projected Motion (Distance vs Time):")
     end
-    minScale, maxScale = calculatePlotScale(noteDistances)
     imgui.PlotLines("     ", noteDistances, #noteDistances, 0, "", minScale, maxScale,
                     {ACTION_BUTTON_SIZE[1], 100})
 end
@@ -1713,9 +2042,10 @@ end
 -- Parameters
 --    svVals : list of numerical SV values [Table]    
 --    svName : name of the SV type being plotted [String]
-function plotSVs(svVals, svName)
+--    minScale      : minimum scale of the plot [Int/Float]
+--    maxScale      : maximum scale of the plot [Int/Float]
+function plotSVs(svVals, svName, minScale, maxScale)
     imgui.Text("Projected "..svName.." SVs:")
-    minScale, maxScale = calculatePlotScale(svVals)
     imgui.PlotHistogram("   ", svVals, #svVals, 0, "", minScale, maxScale, 
                         {ACTION_BUTTON_SIZE[1], 100})
 end
@@ -1887,7 +2217,7 @@ function declareMenuVariables(menuName)
         startSV = 2,
         endSV = 0,
         curveSharpness = 50,
-        verticalShift = 0,
+        verticalShift = 1,
         stutterDuration = nil,
         exponentialIncrease = false,
         intensity = 30,
@@ -1897,6 +2227,7 @@ function declareMenuVariables(menuName)
         svsPerQuarterPeriod = 8,
         svPoints = 16,
         finalSVOption = 1,
+        customSV = 1,
         linearStutter = false,
         linearEndAvgSV = 1,
         interlace = false,
@@ -1940,7 +2271,15 @@ function declareMenuVariables(menuName)
         randomType = "Uniform",
         randomScale = 1,
         avgSVStill = 0.5,
-        stillIntermediateMotion = "Constant"
+        stillIntermediateMotion = "Constant",
+        calculatedAverageSV = 0,
+        calculatedMinSV = 0,
+        calculatedMaxSV = 0,
+        minPlotScaleSVs = 0,
+        maxPlotScaleSVs = 0,
+        minPlotScaleMotion = 0, 
+        maxPlotScaleMotion = 0,
+        totalStutterDuration = 100
     }
     if menuName == "Stutter" then
         menuVars.startSV = 1.5
@@ -2034,16 +2373,20 @@ function createActionSVButton(globalVars, menuVars, menuName)
     else
         svButtonText = svButtonText.."Between Selected Notes"
     end
-    if imgui.Button(svButtonText, ACTION_BUTTON_SIZE) or utils.IsKeyPressed(keys.Y) then
+    if imgui.Button(svButtonText, ACTION_BUTTON_SIZE) or utils.IsKeyPressed(keys.T) then
         if menuName == "Remove" then
             removeSVs(menuVars, globalVars)
         else
             placeSVs(menuVars, globalVars)
         end
     end
-    createToolTip("Alternatively, press ' Y ' on your keyboard to place SVs and ' T ' to replace"..
-                  " (delete old and place new) SVs")
-    if utils.IsKeyPressed(keys.T) then
+    if menuName == "Remove" then
+        createToolTip("Alternatively, press ' T ' or ' R ' on your keyboard to remove SVs")
+    else
+        createToolTip("Alternatively, press ' T ' on your keyboard to place SVs or ' R ' to "..
+                      "replace (delete old and place new) SVs")
+    end
+    if utils.IsKeyPressed(keys.R) then
         removeSVs(menuVars, globalVars)
         placeSVs(menuVars, globalVars)
     end
@@ -2074,7 +2417,7 @@ end
 --    menuVars : list of variables used for the current SV menu [Table]
 function createPlaceSingleSVButton(menuVars)
     if imgui.Button("Place SVs At Selected Notes", ACTION_BUTTON_SIZE) or 
-            utils.IsKeyPressed(keys.Y) then
+            utils.IsKeyPressed(keys.T) then
         local SVs = generateSingleSVs(menuVars.skipSVAtNote, menuVars.svBefore,
                                       menuVars.svValueBefore, menuVars.incrementBefore,
                                       menuVars.svAfter, menuVars.svValueAfter,
@@ -2085,6 +2428,7 @@ function createPlaceSingleSVButton(menuVars)
             actions.PlaceScrollVelocityBatch(SVs)
         end
     end
+    createToolTip("Alternatively, press ' T ' on your keyboard to place SVs")
 end
 -- Calculates and displays info/stats about the current menu's projected SVs
 -- Parameters
@@ -2092,18 +2436,13 @@ end
 function displaySVStats(menuVars)
     imgui.Columns(2, "SV Stats", false)
     if menuVars.stutterDuration == nil then -- non-stutter SV
-        local svValuesAverage = round(getAverage(menuVars.svValues, false), 2)
-        local tempLastValue = table.remove(menuVars.svValues, #menuVars.svValues)
-        local maxSV = round(math.max(table.unpack(menuVars.svValues)), 2)
-        local minSV = round(math.min(table.unpack(menuVars.svValues)), 2)
-        table.insert(menuVars.svValues, tempLastValue)
         imgui.Text("Max SV:")
         imgui.Text("Min SV:")
         imgui.Text("Average SV:")
         imgui.NextColumn()
-        imgui.Text(maxSV.."x")
-        imgui.Text(minSV.."x")
-        imgui.Text(svValuesAverage.."x")
+        imgui.Text(menuVars.calculatedMaxSV.."x")
+        imgui.Text(menuVars.calculatedMinSV.."x")
+        imgui.Text(menuVars.calculatedAverageSV.."x")
     else -- stutter SV
         if menuVars.linearStutter then  -- linearly varying stutter
             local firstSV = round(menuVars.svValues[1], 2)
@@ -2152,14 +2491,41 @@ function getReverseTable(oldTable, skipLastValue)
     end
     return reverseTable
 end
+-- Returns whether an offset (in milliseconds) is above 4 minutes [Boolean]
+-- Parameters
+--    offset: time in milliseconds [Int]
+function isAboveFourMinutes(offset)
+    return offset > 240000
+end
 -- Provides a copy-pastable link to a website that lets you play around with a cubic bezier curve
-function provideLinkToBezierWebsite()
-    local url = "https://cubic-bezier.com/"
-    imgui.InputText("Helpful site", url, #url, imgui_input_text_flags.AutoSelectAll)
+-- Returns whether new bezier coordinates were parsed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function provideLinkToBezierWebsite(menuVars)
+    local coordinateParsed = false
+    local bezierText = state.GetValue("bezierText") or "https://cubic-bezier.com/"
+    _, bezierText = imgui.InputText("", bezierText, 100, imgui_input_text_flags.AutoSelectAll)
+    imgui.SameLine()
+    -- stolen + modified from iceSV -_-
+    if imgui.Button("Parse", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT}) then
+        local regex = "(-?%d*%.?%d+)"
+        local captures = {}
+        for capture, _ in string.gmatch(bezierText, regex) do
+            table.insert(captures, tonumber(capture))
+        end
+        if #captures >= 4 then
+            menuVars.x1, menuVars.y1, menuVars.x2, menuVars.y2  = table.unpack(captures)
+            coordinateParsed = true
+        end
+        bezierText = "https://cubic-bezier.com/"
+    end
+    state.SetValue("bezierText", bezierText)
     createHelpMarker("This site lets you play around with a cubic bezier whose graph represents "..
-                     "the motion/path of notes. Play around with the points until you find a "..
-                     "good shape for note motion and input those coordinates below")
+                     "the motion/path of notes. After finding a good shape for note motion, "..
+                     "paste the resulting url into the input box and hit the parse button to "..
+                     "import the coordinate values. Alternatively, enter 4 numbers and hit parse.")
     addSeparator()
+    return coordinateParsed
 end
 -- Combs through a list and locates unique values
 -- Returns a list of only unique values (no duplicates) [Table]
@@ -2189,7 +2555,7 @@ function uniqueSelectedNoteOffsets()
     offsets = table.sort(offsets, function(a, b) return a < b end)
     return offsets
 end
--- Updates SVs that are pre-stored in menu variables
+-- Updates SVs and related stats that are pre-stored in menu variables
 -- Parameters
 --    menuVars   : list of variables used for the current SV menu [Table]
 --    menuName   : name of the current SV menu [String]
@@ -2201,19 +2567,31 @@ function updateMenuSVs(menuVars, menuName)
     for i = 1, #menuVars.svValues do
         table.insert(menuVars.svValuesPreview, menuVars.svValues[i])
     end
-    if menuVars.stutterDuration ~=nil then
-       menuVars.svValuesSecondPreview = generateStutterSet(menuVars.endSV,
-                                                           menuVars.stutterDuration,
-                                                           menuVars.linearEndAvgSV)
+    if menuVars.stutterDuration ~= nil then
+        menuVars.svValuesSecondPreview = generateStutterSet(menuVars.endSV,
+                                                            menuVars.stutterDuration,
+                                                            menuVars.linearEndAvgSV)
+        if menuVars.finalSVOption == 1 then
+            if menuVars.linearStutter then
+                table.insert(menuVars.svValuesSecondPreview, menuVars.avgSV)
+            else
+                table.insert(menuVars.svValuesPreview, menuVars.avgSV)
+            end
+        end
     end
     if menuVars.finalSVOption ~= 1 and (menuVars.stutterDuration == nil) then
         table.remove(menuVars.svValuesPreview, #menuVars.svValuesPreview)
     end
     if menuVars.finalSVOption == 3 then
         if menuVars.linearStutter then
-            table.insert(menuVars.svValuesSecondPreview, 1)
+            table.insert(menuVars.svValuesSecondPreview, menuVars.customSV)
         else
-            table.insert(menuVars.svValuesPreview, 1)
+            table.insert(menuVars.svValuesPreview, menuVars.customSV)
         end
     end
+    menuVars.calculatedAverageSV, menuVars.calculatedMinSV, menuVars.calculatedMaxSV
+            = calculateSVStats(menuVars.svValues)
+    menuVars.minPlotScaleSVs, menuVars.maxPlotScaleSVs = calculatePlotScale(menuVars.svValues)
+    menuVars.minPlotScaleMotion, menuVars.maxPlotScaleMotion
+            = calculatePlotScale(menuVars.noteDistanceVsTime)
 end
