@@ -23,10 +23,12 @@ amoguSV can **quickly place sets of SVs between selected notes**. Such tools for
 amoguSV also provides extra tools for placing specific SVs with:
 * Single
 * Still
+* Splitscroll
 
 Finally, if you want to edit SVs that are already placed, you can use these tools:
 * Copy (& Paste)
 * Remove
+* Merge
 
 Each tool has many settings. I recommend you play around with the settings of these SV tools to learn how they work.
 If something about the plugin is unclear you could probably ask around for help in the [Quaver Discord server](https://discord.gg/quaver).
