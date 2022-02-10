@@ -1,4 +1,4 @@
- -- amoguSV v4.1 (9 Feb 2022)
+ -- amoguSV v4.1.727 (10 Feb 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -580,7 +580,7 @@ function createStillSVPanel(globalVars, menuVars, menuName)
     addPadding()
     if imgui.Button("Apply Still SVs On Selected Notes", ACTION_BUTTON_SIZE) or 
             utils.IsKeyPressed(keys.T) then
-        local SVs, temp = generateStillSVs(menuVars)
+        local SVs = generateStillSVs(menuVars)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
@@ -588,7 +588,7 @@ function createStillSVPanel(globalVars, menuVars, menuName)
     createToolTip("Alternatively, press ' T ' on your keyboard to place SVs or ' R ' to "..
                   "replace (delete old and place new) SVs")
     if utils.IsKeyPressed(keys.R) then
-        local SVs, temp = generateStillSVs(menuVars)
+        local SVs = generateStillSVs(menuVars)
         if #SVs > 0 then
             removeSVs(menuVars, globalVars)
             actions.PlaceScrollVelocityBatch(SVs)
@@ -904,12 +904,12 @@ function generateStillSVs(menuVars)
     local autoSVFound = false
     if menuVars.autoDisplace then
         for i, sv in pairs(map.ScrollVelocities) do
-            if (startOffset - sv.StartTime) == MIN_DURATION_FAR then
-                initialDisplacement =  -sv.Multiplier / 8
+            if (startOffset - sv.StartTime) == MIN_DURATION then
+                initialDisplacement =  -sv.Multiplier / 64
                 autoSVFound = true
                 break
-            elseif (startOffset - sv.StartTime) == MIN_DURATION then
-                initialDisplacement =  -sv.Multiplier / 64
+            elseif (startOffset - sv.StartTime) == MIN_DURATION_FAR then
+                initialDisplacement =  -sv.Multiplier / 8
                 autoSVFound = true
                 break
             end
@@ -1940,14 +1940,12 @@ function chooseSVRangeType(globalVars, menuVars, menuName)
         imgui.SameLine(0, SAMELINE_SPACING)
         imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.75)
         _, menuVars.startOffset = imgui.InputInt("Start Offset", menuVars.startOffset)
-        menuVars.startOffset = clampToInterval(menuVars.startOffset, 0, MAX_MS_TIME)
         
         if imgui.Button(" Current ", currentButtonSize) then
             menuVars.endOffset = state.SongTime
         end
         imgui.SameLine(0, SAMELINE_SPACING)
         _, menuVars.endOffset = imgui.InputInt("End Offset", menuVars.endOffset)
-        menuVars.endOffset = clampToInterval(menuVars.endOffset, 0, MAX_MS_TIME)
         addPadding()
     end
 end
