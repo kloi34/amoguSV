@@ -1,4 +1,4 @@
- -- amoguSV v4.0 (5 Feb 2022)
+ -- amoguSV v4.1 (9 Feb 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -352,6 +352,7 @@ function stillSettingsMenu(globalVars, menuVars, menuName)
     local motionIsExponential = menuVars.stillIntermediateMotion == "Exponential"
     local motionIsBezier = menuVars.stillIntermediateMotion == "Bezier"
     local motionIsSinusoial = menuVars.stillIntermediateMotion == "Sinusoidal"
+    local motionIsRandom = menuVars.stillIntermediateMotion == "Random"
     if motionIsLinear then
         svUpdateNeeded = chooseStartEndSVs(menuVars, true) or svUpdateNeeded
         svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
@@ -370,6 +371,14 @@ function stillSettingsMenu(globalVars, menuVars, menuName)
         svUpdateNeeded = chooseNumPeriods(menuVars) or svUpdateNeeded
         svUpdateNeeded = choosePeriodShift(menuVars) or svUpdateNeeded
         svUpdateNeeded = chooseSVPerQuarterPeriod(menuVars) or svUpdateNeeded
+    elseif motionIsRandom then
+        svUpdateNeeded = chooseRandomType(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseRandomScale(menuVars) or svUpdateNeeded
+        svUpdateNeeded = chooseSVPoints(menuVars) or svUpdateNeeded
+        if imgui.Button("Generate New Random Set") then
+            svUpdateNeeded = true
+        end
+        addSeparator()
     end
     if (not motionIsLinear) and (not motionIsSinusoial) then
         svUpdateNeeded = chooseAverageSV(menuVars, false) or svUpdateNeeded
@@ -554,15 +563,24 @@ end
 --    menuVars   : list of variables used for the still SV menu [Table]
 --    menuName   : name of the current SV menu [String]
 function createStillSVPanel(globalVars, menuVars, menuName)
-    plotSVs(menuVars.svValuesPreview, "Intermediate Motion", menuVars.minPlotScaleSVs,
-            menuVars.maxPlotScaleSVs)
+    if #menuVars.noteDistanceVsTime < 201 then
+        plotSVMotion(menuVars.noteDistanceVsTime, false, menuVars.minPlotScaleMotion, 
+                     menuVars.maxPlotScaleMotion)
+        addSeparator()
+        plotSVs(menuVars.svValuesPreview, "Intermediate Motion", menuVars.minPlotScaleSVs, 
+                menuVars.maxPlotScaleSVs)
+    else
+        imgui.Text("SV graphs hidden")
+        createHelpMarker("SV plots with 200+ SV points not displayed to reduce lag")
+        addSeparator()
+    end
     displaySVStats(menuVars)
     addSeparator()
     imgui.Text("Select 3 or more notes:")
     addPadding()
     if imgui.Button("Apply Still SVs On Selected Notes", ACTION_BUTTON_SIZE) or 
             utils.IsKeyPressed(keys.T) then
-        local SVs = generateStillSVs(menuVars)
+        local SVs, temp = generateStillSVs(menuVars)
         if #SVs > 0 then
             actions.PlaceScrollVelocityBatch(SVs)
         end
@@ -570,7 +588,7 @@ function createStillSVPanel(globalVars, menuVars, menuName)
     createToolTip("Alternatively, press ' T ' on your keyboard to place SVs or ' R ' to "..
                   "replace (delete old and place new) SVs")
     if utils.IsKeyPressed(keys.R) then
-        local SVs = generateStillSVs(menuVars)
+        local SVs, temp = generateStillSVs(menuVars)
         if #SVs > 0 then
             removeSVs(menuVars, globalVars)
             actions.PlaceScrollVelocityBatch(SVs)
@@ -882,9 +900,25 @@ function generateStillSVs(menuVars)
         minDuration = MIN_DURATION_FAR
         displacementMultiplier = 8
     end
+    local initialDisplacement = menuVars.displacement
+    local autoSVFound = false
+    if menuVars.autoDisplace then
+        for i, sv in pairs(map.ScrollVelocities) do
+            if (startOffset - sv.StartTime) == MIN_DURATION_FAR then
+                initialDisplacement =  -sv.Multiplier / 8
+                autoSVFound = true
+                break
+            elseif (startOffset - sv.StartTime) == MIN_DURATION then
+                initialDisplacement =  -sv.Multiplier / 64
+                autoSVFound = true
+                break
+            end
+        end
+    end
+    local willDisplace = autoSVFound or (menuVars.displace and (not menuVars.autoDisplace)) 
     if menuVars.stillIntermediateMotion == "Constant" then
-        startOffset = determineTeleport(startOffset, menuVars.displace, true, true, 
-                                        displacementMultiplier * menuVars.displacement,
+        startOffset = determineTeleport(startOffset, willDisplace, true, true, 
+                                        displacementMultiplier * initialDisplacement,
                                         minDuration, SVs)
         table.insert(SVs, utils.CreateScrollVelocity(startOffset, menuVars.avgSV))
         for i = 2, #offsets do
@@ -892,9 +926,9 @@ function generateStillSVs(menuVars)
             local stillAverageDifference = menuVars.avgSVStill - menuVars.avgSV
             local teleportVelocity = stillAverageDifference * displacementMultiplier * 
                                      timeFromStart
-            if menuVars.displace then 
+            if willDisplace then 
                 teleportVelocity = teleportVelocity + displacementMultiplier *
-                                   menuVars.displacement
+                                   initialDisplacement
             end
             if i == #offsets then
                 table.insert(SVs, utils.CreateScrollVelocity(offsets[i] - minDuration,
@@ -911,25 +945,26 @@ function generateStillSVs(menuVars)
     else
         local motionSVOffsets = generateLinearSet(startOffset, endOffset, #menuVars.svValues,
                                                   false, 0, 0)
-        startOffset = determineTeleport(startOffset, menuVars.displace, true, true,
-                                        displacementMultiplier * menuVars.displacement,
+        startOffset = determineTeleport(startOffset, willDisplace, true, true,
+                                        displacementMultiplier * initialDisplacement,
                                         minDuration, SVs)
         table.insert(SVs, utils.CreateScrollVelocity(startOffset, menuVars.svValues[1]))
         local svValueIndex = 1
         local totalDistanceTraveled
-        if menuVars.displace then
-            totalDistanceTraveled = menuVars.displacement
+        if willDisplace then
+            totalDistanceTraveled = initialDisplacement
         else
             totalDistanceTraveled = 0
         end
+        local leewayDuration = 1.1 * minDuration
         for i = 2, #offsets do
             local currentMotionOffset = motionSVOffsets[svValueIndex]
             local nextMotionOffset = motionSVOffsets[svValueIndex + 1]
             local noteOffset = offsets[i]
-            while nextMotionOffset < (noteOffset - minDuration) do
+            while nextMotionOffset < (noteOffset - leewayDuration) do
                 lastMotionSVValue = menuVars.svValues[svValueIndex]
                 local lastMotionOffset = currentMotionOffset
-                if math.abs(lastMotionOffset - offsets[i - 1]) > minDuration then
+                if math.abs(lastMotionOffset - offsets[i - 1]) > leewayDuration then
                     table.insert(SVs, utils.CreateScrollVelocity(lastMotionOffset,
                                  lastMotionSVValue))
                 end
@@ -967,7 +1002,7 @@ function generateStillSVs(menuVars)
                              teleportVelocity + thisMotionSVValue))
                 table.insert(SVs, utils.CreateScrollVelocity(noteOffset,
                              -teleportVelocity + thisMotionSVValue))
-                if math.abs(motionSVOffsets[svValueIndex - 1] - offsets[i -1]) < minDuration then
+                if math.abs(motionSVOffsets[svValueIndex + 1] - offsets[i]) < leewayDuration then
                     table.insert(SVs, utils.CreateScrollVelocity(noteOffset + minDuration,
                                 menuVars.svValues[svValueIndex + 1]))
                 else
@@ -1546,14 +1581,20 @@ function chooseDisplacement(globalVars, menuVars, menuName)
     else
         _, menuVars.displace = imgui.Checkbox("Displace end notes", menuVars.displace)
         createHelpMarker("Shifts the note/hit-object receptor up or down, changing how high "..
-                         "notes are hit on the screen")
+                        "notes are hit on the screen")
     end
     if menuVars.displace then
-        _, menuVars.displacement = imgui.InputFloat("Height", menuVars.displacement, 0, 0,
-                                                    "%.2f msx")
-        menuVars.displacement = clampToInterval(menuVars.displacement, -MAX_GENERAL_SV,
-                                                MAX_GENERAL_SV)
-        createHelpMarker("("..round(64 * menuVars.displacement, 2).."x 1/64 ms SV)")
+        if menuName ~= "Still" or (not menuVars.autoDisplace) then
+            _, menuVars.displacement = imgui.InputFloat("Height", menuVars.displacement, 0, 0,
+                                                        "%.2f msx")
+            menuVars.displacement = clampToInterval(menuVars.displacement, -MAX_GENERAL_SV,
+                                                    MAX_GENERAL_SV)
+            createHelpMarker("("..round(64 * menuVars.displacement, 2).."x 1/64 ms SV)")
+        end
+        if menuName == "Still" then
+            _, menuVars.autoDisplace = imgui.Checkbox("Auto detect + use last displacement",
+                                                      menuVars.autoDisplace)
+        end
     end
 end
 -- Lets users choose the exponential behavior (speed up or slow down)
@@ -1752,26 +1793,21 @@ end
 --    menuVars : list of variables used for the current SV menu [Table]
 function chooseStillMotionType(menuVars)
     addSeparator()
+    local availableMotions = {
+        "Constant",
+        "Linear",
+        "Exponential",
+        "Bezier",
+        "Sinusoidal",
+        "Random"
+    }
     local oldType = menuVars.stillIntermediateMotion
-    imgui.Text("Intermediate Motion:")
-    if imgui.RadioButton("Constant Velocity", menuVars.stillIntermediateMotion == "Constant") then
-        menuVars.stillIntermediateMotion = "Constant"
+    local svIndex = 0
+    while (availableMotions[svIndex + 1] != oldType) do
+        svIndex = svIndex + 1
     end
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    if imgui.RadioButton("Linear", menuVars.stillIntermediateMotion == "Linear") then
-        menuVars.stillIntermediateMotion = "Linear"
-    end
-    if imgui.RadioButton("Exponential", menuVars.stillIntermediateMotion == "Exponential") then
-        menuVars.stillIntermediateMotion = "Exponential"
-    end
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    if imgui.RadioButton("Bezier", menuVars.stillIntermediateMotion == "Bezier") then
-        menuVars.stillIntermediateMotion = "Bezier"
-    end
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    if imgui.RadioButton("Sinusoidal", menuVars.stillIntermediateMotion == "Sinusoidal") then
-        menuVars.stillIntermediateMotion = "Sinusoidal"
-    end
+    _, svIndex = imgui.Combo("Still type", svIndex, availableMotions, #availableMotions)
+    menuVars.stillIntermediateMotion = availableMotions[svIndex + 1]
     return oldType ~= menuVars.stillIntermediateMotion
 end
 -- Lets users choose the stutter duration
@@ -2279,7 +2315,8 @@ function declareMenuVariables(menuName)
         maxPlotScaleSVs = 0,
         minPlotScaleMotion = 0, 
         maxPlotScaleMotion = 0,
-        totalStutterDuration = 100
+        totalStutterDuration = 100,
+        autoDisplace = false
     }
     if menuName == "Stutter" then
         menuVars.startSV = 1.5
