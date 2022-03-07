@@ -1,4 +1,4 @@
- -- amoguSV v4.1.727 (10 Feb 2022)
+ -- amoguSV v4.2 (7 Mar 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
