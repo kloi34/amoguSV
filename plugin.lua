@@ -245,12 +245,20 @@ end
 --    menuName   : name of this menu [String]
 function stutterSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
-    imgui.Text("First SV:")
-    svUpdateNeeded = chooseStartEndSVs(menuVars, menuVars.linearStutter) or svUpdateNeeded
-    svUpdateNeeded = chooseStutterDuration(menuVars, menuVars.linearStutter) or svUpdateNeeded
+    svUpdateNeeded = chooseStutterType(menuVars) or svUpdateNeeded
+    if menuVars.stutterType == "Normal" then
+        imgui.Text("First SV:")
+        svUpdateNeeded = chooseStartEndSVs(menuVars, menuVars.linearStutter) or svUpdateNeeded
+        svUpdateNeeded = chooseStutterDuration(menuVars, menuVars.linearStutter) or svUpdateNeeded
+    else
+        menuVars.linearStutter = false
+        chooseStutterTeleportSVs(menuVars)
+    end
     svUpdateNeeded = chooseAverageSV(menuVars, menuVars.linearStutter) or svUpdateNeeded
     svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseLinearStutter(menuVars) or svUpdateNeeded
+    if menuVars.stutterType == "Normal" then
+        svUpdateNeeded = chooseLinearStutter(menuVars) or svUpdateNeeded
+    end
     chooseTotalStutterDuration(menuVars)
     return svUpdateNeeded
 end
@@ -342,9 +350,9 @@ end
 --    menuName   : name of this menu [String]
 function stillSettingsMenu(globalVars, menuVars, menuName)
     local svUpdateNeeded = #menuVars.svValues == 0
+    svUpdateNeeded = chooseStillMotionType(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseAverageSVStill(menuVars) or svUpdateNeeded
     svUpdateNeeded = chooseFinalSV(menuVars) or svUpdateNeeded
-    svUpdateNeeded = chooseStillMotionType(menuVars) or svUpdateNeeded
     addSeparator()
     imgui.Text("Intermediate Motion Settings:")
     addPadding()
@@ -576,7 +584,7 @@ function createStillSVPanel(globalVars, menuVars, menuName)
     end
     displaySVStats(menuVars)
     addSeparator()
-    imgui.Text("Select 3 or more notes:")
+    imgui.Text("Select 2 or more notes:")
     addPadding()
     if imgui.Button("Apply Still SVs On Selected Notes", ACTION_BUTTON_SIZE) or 
             utils.IsKeyPressed(keys.T) then
@@ -637,26 +645,30 @@ function createPlaceSVPanel(globalVars, menuVars, menuName)
         createPlaceSingleSVButton(menuVars)
         return isPanelHovered
     end
-    if menuVars.linearStutter then
-        local minScaleSecond, maxScaleSecond = calculatePlotScale(menuVars.svValuesSecondPreview)
-        plotSVs(menuVars.svValuesPreview, "First Stutter", menuVars.minPlotScaleSVs,
-                menuVars.maxPlotScaleSVs)
-        addSeparator()
-        plotSVs(menuVars.svValuesSecondPreview, "Last Stutter", minScaleSecond, maxScaleSecond)
+    if menuVars.stutterType == "Teleport" then
+        imgui.Text("No graphs or extra info for teleport stutters")
     else
-        if #menuVars.noteDistanceVsTime < 201 then
-            plotSVMotion(menuVars.noteDistanceVsTime, not globalVars.placeSVsBetweenOffsets,
-                         menuVars.minPlotScaleMotion, menuVars.maxPlotScaleMotion)
-            addSeparator()
-            plotSVs(menuVars.svValuesPreview, menuName, menuVars.minPlotScaleSVs, 
-                    menuVars.maxPlotScaleSVs)
+        if menuVars.linearStutter then
+                local minScale2, maxScale2 = calculatePlotScale(menuVars.svValuesSecondPreview)
+                plotSVs(menuVars.svValuesPreview, "First Stutter", menuVars.minPlotScaleSVs,
+                        menuVars.maxPlotScaleSVs)
+                addSeparator()
+                plotSVs(menuVars.svValuesSecondPreview, "Last Stutter", minScale2, maxScale2)
         else
-            imgui.Text("SV graphs hidden")
-            createHelpMarker("SV plots with 200+ SV points not displayed to reduce lag")
-            addSeparator()
+            if #menuVars.noteDistanceVsTime < 201 then
+                plotSVMotion(menuVars.noteDistanceVsTime, not globalVars.placeSVsBetweenOffsets,
+                             menuVars.minPlotScaleMotion, menuVars.maxPlotScaleMotion)
+                addSeparator()
+                plotSVs(menuVars.svValuesPreview, menuName, menuVars.minPlotScaleSVs, 
+                        menuVars.maxPlotScaleSVs)
+            else
+                imgui.Text("SV graphs hidden")
+                createHelpMarker("SV plots with 200+ SV points not displayed to reduce lag")
+                addSeparator()
+            end
         end
+        displaySVStats(menuVars)
     end
-    displaySVStats(menuVars)
     addSeparator()
     chooseSVRangeType(globalVars, menuVars, menuName)
     createActionSVButton(globalVars, menuVars, menuName)
@@ -681,7 +693,8 @@ function placeSVs(menuVars, globalVars)
                             menuVars.displacement, menuVars.stutterDuration,
                             menuVars.linearStutter, menuVars.endSV, menuVars.linearEndAvgSV,
                             menuVars.avgSV, globalVars.placeSVsBetweenOffsets, menuVars.customSV,
-                            menuVars.totalStutterDuration)
+                            menuVars.totalStutterDuration, menuVars.stutterType,
+                            menuVars.chooseByPercent, menuVars.svValue, menuVars.svValueBefore)
     if #SVs > 0 then
         actions.PlaceScrollVelocityBatch(SVs)
     end
@@ -706,10 +719,15 @@ end
 --    placeSVsBetweenOffsets : whether or not SVs are placed between two offsets [Boolean]
 --    customSVValue          : value of the custom last SV [Int/Float]
 --    totalStutterDuration   : total duration % of whole stutter SV (if applicable) [Int/Float]
+--    stutterType            : type of stutter [String]
+--    chooseByPercent        : whether or not stutter teleport value is percent [Boolean]
+--    svValue                : value of stutter teleport [Int/Float]
+--    svValueBefore          : whether or not it include of stutter teleport at start [Boolean]
 function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleportValue,
                      teleportDuration, finalSVOption, displace, displacement, stutterDuration,
                      linearStutter, endSV, linearEndAvgSV, stutterAvgSV, placeSVsBetweenOffsets,
-                     customSVValue, totalStutterDuration)
+                     customSVValue, totalStutterDuration, stutterType, chooseByPercent, svValue,
+                     svValueBefore)
     local SVs = {}
     local startSVList = {}
     local avgSVList = {}
@@ -730,8 +748,34 @@ function generateSVs(offsets, svValues, addTeleport, veryStartTeleport, teleport
         local svOffsets
         if isAStutterSV then
             local offsetInterval = endOffset - startOffset
-            local stutterSecondOffset = startOffset + offsetInterval * stutterDuration / 100
-            svOffsets = {startOffset, stutterSecondOffset, endOffset}
+            if stutterType == "Teleport" then
+                local minDuration = MIN_DURATION
+                local teleportStutterMultiplier = 64
+                if isAboveFourMinutes(startOffset) then
+                    minDuration = MIN_DURATION_FAR
+                    teleportStutterMultiplier = 8
+                end
+                svOffsets = {startOffset, startOffset + minDuration,
+                             endOffset - minDuration, endOffset}
+                local initial64Distance = svValueBefore
+                local firstSV = initial64Distance
+                local expectedNote64Distance =  64 * (offsetInterval * stutterAvgSV)
+                local traveledNote64Distance = 64 * (offsetInterval * svValue)
+                if chooseByPercent then 
+                    firstSV = svValueBefore / 100 * expectedNote64Distance
+                    initial64Distance = svValueBefore / 100 * expectedNote64Distance
+                end
+                local restore64Distance = expectedNote64Distance - initial64Distance - traveledNote64Distance
+                local tpBack = restore64Distance
+                if isAboveFourMinutes(startOffset) then
+                    firstSV = firstSV / 8
+                    tpBack = tpBack / 8
+                end
+                svValues = {firstSV, svValue, tpBack, stutterAvgSV}
+            else
+                local stutterSecondOffset = startOffset + offsetInterval * stutterDuration / 100
+                svOffsets = {startOffset, stutterSecondOffset, endOffset}
+            end
         else
             svOffsets = generateLinearSet(startOffset, endOffset, #svValues, false, 0, 0)
         end
@@ -889,7 +933,7 @@ end
 function generateStillSVs(menuVars)
     local SVs = {}
     local offsets = uniqueSelectedNoteOffsets()
-    if #offsets < 3 then
+    if #offsets < 2 then
         return SVs
     end
     local startOffset = offsets[1]
@@ -927,7 +971,7 @@ function generateStillSVs(menuVars)
             local teleportVelocity = stillAverageDifference * displacementMultiplier * 
                                      timeFromStart
             if willDisplace then 
-                teleportVelocity = teleportVelocity + displacementMultiplier *
+                teleportVelocity = teleportVelocity - displacementMultiplier *
                                    initialDisplacement
             end
             if i == #offsets then
@@ -1613,6 +1657,7 @@ function chooseExponentialBehavior(menuVars)
     if imgui.RadioButton("Speed up", menuVars.exponentialIncrease) then
         menuVars.exponentialIncrease = true
     end
+    addSeparator()
     return oldBehavior ~= menuVars.exponentialIncrease
 end
 -- Lets users choose the final SV to place at the end
@@ -1792,7 +1837,6 @@ end
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
 function chooseStillMotionType(menuVars)
-    addSeparator()
     local availableMotions = {
         "Constant",
         "Linear",
@@ -1821,6 +1865,46 @@ function chooseStutterDuration(menuVars)
     menuVars.stutterDuration = clampToInterval(menuVars.stutterDuration, 1, 99)
     addSeparator()
     return oldDuration ~= menuVars.stutterDuration
+end
+-- Lets users choose the stutter teleport values
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function chooseStutterTeleportSVs(menuVars)
+    if (not menuVars.svBefore) then
+        if menuVars.chooseByPercent then
+            _, menuVars.svValueBefore = imgui.InputInt("Start SV %", menuVars.svValueBefore)
+            menuVars.svValueBefore = clampToInterval(menuVars.svValueBefore, -500, 500)
+            createHelpMarker("%% distance between notes")
+        else
+            _, menuVars.svValueBefore = imgui.InputFloat("Start SV (1/64)", menuVars.svValueBefore,
+                                                         0, 0, "%.2fx")
+        end
+    end
+    _, menuVars.svValue = imgui.InputFloat("Main SV", menuVars.svValue, 0, 0, "%.2fx")
+    createHelpMarker("This SV will last ~99.99%% of the stutter")
+    addPadding()
+    _, menuVars.svBefore = imgui.Checkbox("Skip SV at start", menuVars.svBefore)
+    _, menuVars.chooseByPercent = imgui.Checkbox("Use percent SV", menuVars.chooseByPercent)
+    addSeparator()
+end
+-- Lets users choose the stutter type
+-- Returns whether or not the stutter type changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function chooseStutterType(menuVars)
+    local oldType = menuVars.stutterType
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Stutter Type:")
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Normal", oldType == "Normal") then
+        menuVars.stutterType = "Normal"
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Teleport", oldType == "Teleport") then
+         menuVars.stutterType = "Teleport"
+    end
+    addSeparator()
+    return oldType == menuVars.stutterType
 end
 -- Lets users choose the single SV to place after a note
 -- Parameters
@@ -2314,13 +2398,16 @@ function declareMenuVariables(menuName)
         minPlotScaleMotion = 0, 
         maxPlotScaleMotion = 0,
         totalStutterDuration = 100,
-        autoDisplace = false
+        autoDisplace = false,
+        stutterType = nil,
+        chooseByPercent = false
     }
     if menuName == "Stutter" then
         menuVars.startSV = 1.5
         menuVars.endSV = 2
         menuVars.stutterDuration = 50
         menuVars.finalSVOption = 2
+        menuVars.stutterType = "Normal"
     elseif menuName == "Bezier" then
         menuVars.finalSVOption = 2
     elseif menuName == "Sinusoidal" then
@@ -2595,6 +2682,8 @@ end
 --    menuVars   : list of variables used for the current SV menu [Table]
 --    menuName   : name of the current SV menu [String]
 function updateMenuSVs(menuVars, menuName)
+    if menuVars.stutterType == "Teleport" then return end
+    
     menuVars.svValues = generateSetOfValues(menuVars, menuName)
     menuVars.noteDistanceVsTime = calculateDistanceVsTime(menuVars.svValues,
                                                           menuVars.stutterDuration)
