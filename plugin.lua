@@ -49,13 +49,17 @@ FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail
     "Skip",
     "Custom"   
 }
-TAB_MENUS = {
+TAB_MENUS = {                      -- tabs of different SV menus
     "Info",
     "Place SVs",
     "Edit SVs",
     "Delete SVs"
 }
-SV_SHAPES = {                      -- list of the available tools for editing SVs
+PLACE_TYPE = {                     -- general categories of SVs to place
+    "Standard",
+    "Special",
+}
+SV_SHAPES = {                      -- tools/shapes for placing SVs
     "Linear",
     "Exponential",
     "Stutter",
@@ -64,13 +68,13 @@ SV_SHAPES = {                      -- list of the available tools for editing SV
     "Random",
     "Custom",
 }
-GIMMICK_SV = {                     -- list of gimmick SV types
+SPECIAL_SV = {                     -- special/gimmick SV types to place
     "Single",
     "Upscroll",
     "Splitscroll",
     "Animate"
 }
-EDIT_SV_TOOLS = {                  -- list of tools for editing SVs
+EDIT_SV_TOOLS = {                  -- tools for editing SVs
     "Copy & Paste",
     "Displace Note",
     "Displace View",
@@ -79,16 +83,16 @@ EDIT_SV_TOOLS = {                  -- list of tools for editing SVs
     "Scale"
 --    "Vibe"
 }
-SCALE_TYPES = {                    -- list of ways to scale SV multipliers
+SCALE_TYPES = {                    -- ways to scale SV multipliers
     "Average SV",
     "Absolute Distance",
     "Relative Ratio"
 }
-DISPLACE_TYPES = {                 -- list of ways of how to scale/calculate distances
+DISPLACE_TYPES = {                 -- ways to scale/calculate distances
     "Absolute Distance",
     "Relative Distance"
 }
-SECTIONS = {                       -- list of ways to apply actions on sections
+SECTIONS = {                       -- ways to apply SV actions on sections
     "Per note section",
     "Whole section"
 }
@@ -288,6 +292,7 @@ function draw()
         green = 1,
         blue = 1,
         editToolIndex = 1,
+        placeTypeIndex = 1,
         debugText = "debuggy"
     }
     getVariables("globalVars", globalVars)
@@ -539,6 +544,15 @@ function getSelectedOffsets(globalVars)
     if globalVars.useManualOffsets then return {globalVars.startOffset, globalVars.endOffset} end
     return uniqueSelectedNoteOffsets()
 end
+-- Gets the SV multiplier at a specified offset in the map
+-- Returns the SV multiplier at the offset [Int/Float]
+-- Parameters
+--    offset : millisecond time [Int/Float]
+function getSVMultiplierAt(offset)
+    local sv = map.GetScrollVelocityAt(offset) 
+    if sv then return sv.Multiplier end
+    return 1
+end
 
 ---------------------------------------------------------------------------------------------- Math
 
@@ -554,23 +568,23 @@ end
 -- Calculates the average SV over time for a given set of SVs
 -- Returns the average SV [Int/Float]
 -- Parameters
---    svs        : list of ordered svs to calculate average SV with [Table]
---    lastOffset : final time (milliseconds) to stop calculating at [Int]
-function calculateAvgSV(svs, lastOffset)
-    local totalDisplacement = calculateDispacementFromSVs(svs, lastOffset)
-    local firstOffset = svs[1].StartTime
-    local timeInterval = lastOffset - firstOffset
+--    svs       : list of ordered svs to calculate average SV with [Table]
+--    endOffset : final time (milliseconds) to stop calculating at [Int]
+function calculateAvgSV(svs, endOffset)
+    local totalDisplacement = calculateDispacementFromSVs(svs, endOffset)
+    local startOffset = svs[1].StartTime
+    local timeInterval = endOffset - startOffset
     local avgSV = totalDisplacement / timeInterval
     return avgSV
 end
 -- Calculates the total msx displacement over time for a given set of SVs
 -- Returns the total displacement [Int/Float]
 -- Parameters
---    svs        : list of ordered svs to calculate displacement with [Table]
---    lastOffset : final time (milliseconds) to stop calculating at [Int]
-function calculateDispacementFromSVs(svs, lastOffset)
+--    svs       : list of ordered svs to calculate displacement with [Table]
+--    endOffset : final time (milliseconds) to stop calculating at [Int]
+function calculateDispacementFromSVs(svs, endOffset)
     local totalDisplacement = 0
-    table.insert(svs, utils.CreateScrollVelocity(lastOffset, 0))
+    table.insert(svs, utils.CreateScrollVelocity(endOffset, 0))
     for i = 1, (#svs - 1) do
         local lastSV = svs[i]
         local nextSV = svs[i + 1]
@@ -588,6 +602,15 @@ end
 --    offset: time in milliseconds [Int]
 function isAboveFourMinutes(offset)
     return offset > 240000
+end
+-- Ternary operator: if a then b else c
+-- Parameters
+--    a : boolean [Boolean]
+--    b : thing 1 [Any]
+--    c : thing 2 [Any]
+function abc(a, b, c)
+    if a then return b end
+    return c
 end
 
 -------------------------------------------------------------------------------------- Abstractions
@@ -631,8 +654,10 @@ function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
         actionThing = "for"
     end
     chooseStartEndOffsets(globalVars)
-    local needToSelectNotes = (not globalVars.useManualOffsets) and #state.SelectedHitObjects < minimumNotes
+    local enoughSelectedNotes = #state.SelectedHitObjects < minimumNotes
+    local needToSelectNotes = (not globalVars.useManualOffsets) and enoughSelectedNotes
     if needToSelectNotes then imgui.Text("Select "..minimumNotes.." or more notes") return end
+    
     local text = actionName.." SVs "..actionThing.." selected notes"
     if globalVars.useManualOffsets then text = actionName.." SVs between offsets" end
     button(text, ACTION_BUTTON_SIZE, actionfunc, globalVars, menuVars)
@@ -663,7 +688,8 @@ function editSVs(globalVars, menuVars, func, needOffsets)
         if #svsBetweenOffsets > 0 then
             if menuVars then
                 if needOffsets then
-                    newSVsToRemove, newSVsToAdd = func(menuVars, svsBetweenOffsets, startOffset, endOffset)
+                    newSVsToRemove, newSVsToAdd = func(menuVars, svsBetweenOffsets, startOffset,
+                                                       endOffset)
                 else
                     newSVsToRemove, newSVsToAdd = func(menuVars, svsBetweenOffsets)
                 end
@@ -691,10 +717,6 @@ function editSVs(globalVars, menuVars, func, needOffsets)
     end
 end
 
-function abc(a, b, c)
-    if a then return b end
-    return c
-end
 ---------------------------------------------------------------------------------------------------
 -- Choose Functions (Sorted Alphabetically) -------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -708,8 +730,12 @@ function chooseAverageSV(menuVars)
     _, menuVars.avgSV = imgui.InputFloat("Average SV ", menuVars.avgSV, 0, 0, "%.2fx")
     return oldAvg == menuVars.avgSV
 end
+-- Lets you choose the displace type
+-- Returns whether or not the displace type changed [Boolean]
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function chooseDisplaceType(globalVars, menuVars)
-    --if globalVars.useManualOffsets then menuVars.displaceTypeIndex = 1 return end
     local comboIndex = menuVars.displaceTypeIndex - 1
     _, comboIndex = imgui.Combo("Displace Type", comboIndex, DISPLACE_TYPES, #DISPLACE_TYPES)
     menuVars.displaceTypeIndex = comboIndex + 1
@@ -834,15 +860,23 @@ function deleteSVs(globalVars)
     local svsToRemove = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
     if #svsToRemove > 0 then actions.RemoveScrollVelocityBatch(svsToRemove) end
 end
-
+-- Copies SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function copySVs(globalVars, menuVars)
     editSVs(globalVars, menuVars, getSVsToCopy, false)
 end
-
+-- Merges SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
 function mergeSVs(globalVars)
     editSVs(globalVars, nil, getSVsToMerge, false)
 end
-
+-- Measures SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function measureSVs(globalVars, menuVars)
     local startOffset
     local endOffset
@@ -863,11 +897,17 @@ function measureSVs(globalVars, menuVars)
     menuVars.measuredDistance =  round(calculateDispacementFromSVs(svs, endOffset), 5)
     menuVars.measuredNSVDistance = endOffset - startOffset
 end
-
+-- Scales SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function scaleSVs(globalVars, menuVars)
     editSVs(globalVars, menuVars, getSVsToScale, true)
 end
-
+-- Adds SVs that displace how high the notes are hit on the screen
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function displaceNoteSVs(globalVars, menuVars)
     local svsToAdd = {}
     local svsToRemove = {}
@@ -921,6 +961,10 @@ function displaceNoteSVs(globalVars, menuVars)
         actions.PerformBatch(editorActions)
     end
 end
+-- Adds SVs that temporarily displace the playfield view
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function displaceViewSVs(globalVars, menuVars)
     local svsToAdd = {}
     local svsToRemove = {}
@@ -929,8 +973,8 @@ function displaceViewSVs(globalVars, menuVars)
     if globalVars.useManualOffsets then
         offsets = {globalVars.startOffset, globalVars.endOffset}
     else
-        local selectedNoteOffsets = uniqueSelectedNoteOffsets()
-        offsets = uniqueNoteOffsets(selectedNoteOffsets[1], selectedNoteOffsets[#selectedNoteOffsets])
+        local selectedOffsets = uniqueSelectedNoteOffsets()
+        offsets = uniqueNoteOffsets(selectedOffsets[1], selectedOffsets[#selectedOffsets])
     end
     local startOffset = offsets[1]
     local endOffset = offsets[#offsets]
@@ -1000,7 +1044,10 @@ function pasteSVs(svValues, pasteOffsets)
         actions.PlaceScrollVelocityBatch(svsToPaste)
     end
 end
-
+-- Gets SVs to merge
+-- Returns SVs to remove and add for merging SVs [Table]
+-- Parameters
+--    svs : SVs to merge [Table]
 function getSVsToMerge(svs)
     local merged = false
     local svsToAdd = {}
@@ -1021,8 +1068,14 @@ function getSVsToMerge(svs)
     end
     return svs, svsToAdd
 end
-
-function getSVsToScale(menuVars, svs, firstOffset, lastOffset)
+-- Gets SVs multiplier at a specified offset in the map
+-- Returns SVs to remove and add for scaling SVs [Table]
+-- Parameters
+--    menuVars    : list of variables used for the current menu [Table]
+--    svs         : SVs to scale [Table]
+--    startOffset : time to start scaling SVs from [Int]
+--    endOffset   : time to stop scaling SVs at [Int]
+function getSVsToScale(menuVars, svs, startOffset, endOffset)
     local svsToAdd = {}
     local svsToRemove = {}
     local scaleType = SCALE_TYPES[menuVars.scaleTypeIndex]
@@ -1030,16 +1083,16 @@ function getSVsToScale(menuVars, svs, firstOffset, lastOffset)
     for i, sv in pairs(svs) do
         table.insert(svsToRemove, sv)
     end
-    if svs[1].StartTime ~= firstOffset then
-        local svMultiplierAtFirstOffset = getSVMultiplierAt(firstOffset)
-        table.insert(svs, 1, utils.CreateScrollVelocity(firstOffset, svMultiplierAtFirstOffset))
+    if svs[1].StartTime ~= startOffset then
+        local multiplierAtStartOffset = getSVMultiplierAt(startOffset)
+        table.insert(svs, 1, utils.CreateScrollVelocity(startOffset, multiplierAtStartOffset))
     end
     if scaleType == "Average SV" then
-        local svAverage = calculateAvgSV(svs, lastOffset)
+        local svAverage = calculateAvgSV(svs, endOffset)
         scalingFactor = menuVars.avgSV / svAverage
     end
     if scaleType == "Absolute Distance" then
-        local distanceTraveled = calculateDispacementFromSVs(svs, lastOffset)
+        local distanceTraveled = calculateDispacementFromSVs(svs, endOffset)
         scalingFactor = menuVars.distance / distanceTraveled
     end
     if scaleType == "Relative Ratio" then
@@ -1051,7 +1104,11 @@ function getSVsToScale(menuVars, svs, firstOffset, lastOffset)
     end
     return svsToRemove, svsToAdd
 end
-
+-- Gets SVs to copy and copies them
+-- Returns SVs to remove and add (none for copying) [Table]
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+--    svs      : SVs to copy [Table]
 function getSVsToCopy(menuVars, svs)
     menuVars.copiedSVs = {}
     local startOffset = svs[1].StartTime
@@ -1060,13 +1117,4 @@ function getSVsToCopy(menuVars, svs)
         table.insert(menuVars.copiedSVs, {sv.Multiplier, relativeTime})
     end
     return {}, {}
-end
--- Gets the SV multiplier at a specified offset in the map
--- Returns the SV multiplier at the offset [Int/Float]
--- Parameters
---    offset : millisecond time [Int/Float]
-function getSVMultiplierAt(offset)
-    local sv = map.GetScrollVelocityAt(offset) 
-    if sv then return sv.Multiplier end
-    return 1
 end
