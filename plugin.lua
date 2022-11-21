@@ -1,4 +1,4 @@
--- amoguSV v5.0 (21 Nov 2022)
+-- amoguSV v5.0 beta (21 Nov 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -1061,7 +1061,10 @@ function getSVsToCopy(menuVars, svs)
     end
     return {}, {}
 end
-
+-- Gets the SV multiplier at a specified offset in the map
+-- Returns the SV multiplier at the offset [Int/Float]
+-- Parameters
+--    offset : millisecond time [Int/Float]
 function getSVMultiplierAt(offset)
     local sv = map.GetScrollVelocityAt(offset) 
     if sv then return sv.Multiplier end
