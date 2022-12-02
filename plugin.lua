@@ -336,7 +336,7 @@ function draw()
     }
     getVariables("globalVars", globalVars)
     setPluginAppearance(globalVars)
-    imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
+    imgui.Begin("amoguSV (v5.0 beta)", imgui_window_flags.AlwaysAutoResize)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     imgui.BeginTabBar("SV tabs")
     for i = 1, #TAB_MENUS do
