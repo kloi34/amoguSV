@@ -1,4 +1,4 @@
--- amoguSV v5.0 beta (30 Nov 2022)
+-- amoguSV v5.0 beta (2 Dec 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -44,18 +44,26 @@ MIN_DURATION = 1/64                -- minimum millisecond duration allowed in ge
 MIN_DURATION_FAR = 1/8             -- minimum millisecond duration for teleports above 4 minutes
 
 -- Menu-related
+PLUGIN_COLOR_SCHEMES = {
+    "Default",
+    "RGB Gamer Mode"
+}
+PLUGIN_STYLE_SCHEMES = {
+    "Rounded",
+    "Boxed"
+}
 EMOTICONS = {                      -- emoticons to visually clutter the plugin and confuse users
     "( - _ - )",
     "( e . e )",
-    "( o _ 0 )",
     "( * o * )",
     "( ~ _ ~ )",
     "( w . w )",
     "( ^ w ^ )",
+    "( o _ 0 )",
     "( > . < )",
     "( c . p )",
     "( ; _ ; )",
-    "[ m w m ]",
+    "[mwm]",
     "[ v . ^ ]"
 }
 FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail end of all SVs
@@ -71,9 +79,9 @@ TAB_MENUS = {                      -- tabs of different SV menus
 }
 PLACE_TYPE = {                     -- general categories of SVs to place
     "Standard",
-    "Special",
+    "Special"
 }
-STANDARD_SV = {                      -- tools/shapes for placing SVs
+STANDARD_SVS = {                      -- tools/shapes for placing SVs
     "Linear",
     "Exponential",
     "Bezier",
@@ -81,7 +89,7 @@ STANDARD_SV = {                      -- tools/shapes for placing SVs
     "Random",
     "Custom"
 }
-SPECIAL_SV = {                     -- special/gimmick SV types to place
+SPECIAL_SVS = {                     -- special/gimmick SV types to place
     "Stutter",
     "Single",
 --    "Combo",
@@ -115,7 +123,7 @@ BEHAVIORS = {                      --
     "Slow down",
     "Speed up"
 }
-RANDOM_DISTRIBUTION_TYPE = {
+RANDOM_DISTRIBUTION_TYPES = {
     "Normal",
     "Uniform"
 }
@@ -127,81 +135,88 @@ RANDOM_DISTRIBUTION_TYPE = {
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function setPluginAppearance(globalVars)
-    if globalVars.rgb then
-        activateRGBColors(globalVars)
+    local colorScheme = PLUGIN_COLOR_SCHEMES[globalVars.colorSchemeIndex]
+    local styleScheme = PLUGIN_STYLE_SCHEMES[globalVars.styleSchemeIndex]
+    setPluginAppearanceStyles(styleScheme)
+    setPluginAppearanceColors(globalVars, colorScheme)
+    if colorScheme == "RGB Gamer Mode" then
         updateRGBColors(globalVars)
-        state.SetValue("initialized", false)
-    elseif not (state.GetValue("initialized") or false) then
-        setDefaultPluginAppearance()
-        state.SetValue("initialized", true)
     end
 end
--- Configures the plugin GUI to have the default appearance (colors and styles)
-function setDefaultPluginAppearance()
-    -- Plugin Styles
+-- Configures the plugin GUI styles
+function setPluginAppearanceStyles(styleScheme)
     local rounding = 5 -- determines how rounded corners are
+    if styleScheme == "Boxed" then rounding = 0 end
     imgui.PushStyleVar( imgui_style_var.WindowPadding,      { PADDING_WIDTH, 8 } )
     imgui.PushStyleVar( imgui_style_var.FramePadding,       { PADDING_WIDTH, 5 } )
     imgui.PushStyleVar( imgui_style_var.ItemSpacing,        { DEFAULT_WIDGET_HEIGHT / 2 - 1, 4 } )
     imgui.PushStyleVar( imgui_style_var.ItemInnerSpacing,   { SAMELINE_SPACING, 6 } )
-    imgui.PushStyleVar( imgui_style_var.WindowBorderSize,   0        )
+    --imgui.PushStyleVar( imgui_style_var.WindowBorderSize,   0        )
     imgui.PushStyleVar( imgui_style_var.WindowRounding,     rounding )
     imgui.PushStyleVar( imgui_style_var.ChildRounding,      rounding )
     imgui.PushStyleVar( imgui_style_var.FrameRounding,      rounding )
     imgui.PushStyleVar( imgui_style_var.GrabRounding,       rounding )
-    
-    -- Plugin Colors
-    imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
-    imgui.PushStyleColor( imgui_col.FrameBg,                { 0.14, 0.24, 0.28, 1.00 } )
-    imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.24, 0.34, 0.38, 1.00 } )
-    imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.29, 0.39, 0.43, 1.00 } )
-    imgui.PushStyleColor( imgui_col.TitleBg,                { 0.41, 0.48, 0.65, 1.00 } )
-    imgui.PushStyleColor( imgui_col.TitleBgActive,          { 0.51, 0.58, 0.75, 1.00 } )
-    imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       { 0.51, 0.58, 0.75, 0.50 } )
-    imgui.PushStyleColor( imgui_col.CheckMark,              { 0.81, 0.88, 1.00, 1.00 } )
-    imgui.PushStyleColor( imgui_col.SliderGrab,             { 0.56, 0.63, 0.75, 1.00 } )
-    imgui.PushStyleColor( imgui_col.SliderGrabActive,       { 0.61, 0.68, 0.80, 1.00 } )
-    imgui.PushStyleColor( imgui_col.Button,                 { 0.31, 0.38, 0.50, 1.00 } )
-    imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.41, 0.48, 0.60, 1.00 } )
-    imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.51, 0.58, 0.70, 1.00 } )
-    imgui.PushStyleColor( imgui_col.Tab,                    { 0.31, 0.38, 0.50, 1.00 } )
-    imgui.PushStyleColor( imgui_col.TabHovered,             { 0.51, 0.58, 0.75, 1.00 } )
-    imgui.PushStyleColor( imgui_col.TabActive,              { 0.51, 0.58, 0.75, 1.00 } )
-    imgui.PushStyleColor( imgui_col.Header,                 { 0.81, 0.88, 1.00, 0.40 } )
-    imgui.PushStyleColor( imgui_col.HeaderHovered,          { 0.81, 0.88, 1.00, 0.50 } )
-    imgui.PushStyleColor( imgui_col.HeaderActive,           { 0.81, 0.88, 1.00, 0.54 } )
-    imgui.PushStyleColor( imgui_col.Separator,              { 0.81, 0.88, 1.00, 0.30 } )
-    imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 0.81, 0.88, 1.00, 0.40 } )
+    imgui.PushStyleVar( imgui_style_var.ScrollbarRounding,  rounding )
+    imgui.PushStyleVar( imgui_style_var.TabRounding,        rounding )
 end
--- Changes plugin colors to RGB colors
--- Parameters
---    globalVars : list of variables used globally across all menus [Table]
-function activateRGBColors(globalVars)
-    local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
-    local inactiveColor = {globalVars.red, globalVars.green, globalVars.blue, 0.5}
-    local white = {1.00, 1.00, 1.00, 1.00}
-    local clearWhite = {1.00, 1.00, 1.00, 0.40}
-    
-    imgui.PushStyleColor( imgui_col.FrameBg,                inactiveColor )
-    imgui.PushStyleColor( imgui_col.FrameBgHovered,         activeColor   )
-    imgui.PushStyleColor( imgui_col.FrameBgActive,          activeColor   )
-    imgui.PushStyleColor( imgui_col.TitleBg,                inactiveColor )
-    imgui.PushStyleColor( imgui_col.TitleBgActive,          activeColor   )
-    imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       inactiveColor )
-    imgui.PushStyleColor( imgui_col.CheckMark,              white         )
-    imgui.PushStyleColor( imgui_col.SliderGrab,             white         )
-    imgui.PushStyleColor( imgui_col.SliderGrabActive,       white         )
-    imgui.PushStyleColor( imgui_col.Button,                 inactiveColor )
-    imgui.PushStyleColor( imgui_col.ButtonHovered,          activeColor   )
-    imgui.PushStyleColor( imgui_col.ButtonActive,           activeColor   )
-    imgui.PushStyleColor( imgui_col.Tab,                    inactiveColor )
-    imgui.PushStyleColor( imgui_col.TabHovered,             activeColor   )
-    imgui.PushStyleColor( imgui_col.TabActive,              activeColor   )
-    imgui.PushStyleColor( imgui_col.Header,                 inactiveColor )
-    imgui.PushStyleColor( imgui_col.HeaderHovered,          inactiveColor )
-    imgui.PushStyleColor( imgui_col.HeaderActive,           activeColor   )
-    imgui.PushStyleColor( imgui_col.Separator,              activeColor   )
-    imgui.PushStyleColor( imgui_col.TextSelectedBg,         clearWhite    )
+-- Configures the plugin GUI colors
+function setPluginAppearanceColors(globalVars, colorScheme)
+    if colorScheme == "Default" then
+        imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBg,                { 0.14, 0.24, 0.28, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.24, 0.34, 0.38, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.29, 0.39, 0.43, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBg,                { 0.41, 0.48, 0.65, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          { 0.51, 0.58, 0.75, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       { 0.51, 0.58, 0.75, 0.50 } )
+        imgui.PushStyleColor( imgui_col.CheckMark,              { 0.81, 0.88, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             { 0.56, 0.63, 0.75, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       { 0.61, 0.68, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Button,                 { 0.31, 0.38, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.41, 0.48, 0.60, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.51, 0.58, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Tab,                    { 0.31, 0.38, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabHovered,             { 0.51, 0.58, 0.75, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabActive,              { 0.51, 0.58, 0.75, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Header,                 { 0.81, 0.88, 1.00, 0.40 } )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          { 0.81, 0.88, 1.00, 0.50 } )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           { 0.81, 0.88, 1.00, 0.54 } )
+        imgui.PushStyleColor( imgui_col.Separator,              { 0.81, 0.88, 1.00, 0.30 } )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 0.81, 0.88, 1.00, 0.40 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.31, 0.38, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.41, 0.48, 0.60, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.51, 0.58, 0.70, 1.00 } )
+    end
+    if colorScheme == "RGB Gamer Mode" then
+        local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
+        local inactiveColor = {globalVars.red, globalVars.green, globalVars.blue, 0.5}
+        local white = {1.00, 1.00, 1.00, 1.00}
+        local clearWhite = {1.00, 1.00, 1.00, 0.40}
+        
+        imgui.PushStyleColor( imgui_col.FrameBg,                inactiveColor )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         activeColor   )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          activeColor   )
+        imgui.PushStyleColor( imgui_col.TitleBg,                inactiveColor )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          activeColor   )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       inactiveColor )
+        imgui.PushStyleColor( imgui_col.CheckMark,              white         )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             white         )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       white         )
+        imgui.PushStyleColor( imgui_col.Button,                 inactiveColor )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          activeColor   )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           activeColor   )
+        imgui.PushStyleColor( imgui_col.Tab,                    inactiveColor )
+        imgui.PushStyleColor( imgui_col.TabHovered,             activeColor   )
+        imgui.PushStyleColor( imgui_col.TabActive,              activeColor   )
+        imgui.PushStyleColor( imgui_col.Header,                 inactiveColor )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          inactiveColor )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           activeColor   )
+        imgui.PushStyleColor( imgui_col.Separator,              activeColor   )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         clearWhite    )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          inactiveColor )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor   )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    activeColor   )
+    end
 end
 -- Updates global RGB color values, cycling through high-saturation colors
 -- Parameters
@@ -310,7 +325,8 @@ function draw()
         startOffset = 0,
         endOffset = 0,
         teleportDistance = 10000,
-        rgb = false,
+        colorSchemeIndex = 1,
+        styleSchemeIndex = 1,
         red = 0,
         green = 1,
         blue = 1,
@@ -320,7 +336,6 @@ function draw()
     }
     getVariables("globalVars", globalVars)
     setPluginAppearance(globalVars)
-
     imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     imgui.BeginTabBar("SV tabs")
@@ -366,14 +381,25 @@ function choosePluginSettings(globalVars)
     addPadding()
     chooseSVSelection(globalVars)
     addSeparator()
-    chooseRGBMode(globalVars)
+    chooseStyleScheme(globalVars)
+    chooseColorScheme(globalVars)
+end
+
+function chooseStyleScheme(globalVars)
+    local comboIndex =  globalVars.styleSchemeIndex - 1
+    _, comboIndex = imgui.Combo("Style Scheme", comboIndex, PLUGIN_STYLE_SCHEMES, #PLUGIN_STYLE_SCHEMES)
+    globalVars.styleSchemeIndex = comboIndex + 1
+end
+function chooseColorScheme(globalVars)
+    local comboIndex =  globalVars.colorSchemeIndex - 1
+    _, comboIndex = imgui.Combo("Color Scheme", comboIndex, PLUGIN_COLOR_SCHEMES, #PLUGIN_COLOR_SCHEMES)
+    globalVars.colorSchemeIndex = comboIndex + 1
 end
 -- Creates the "Place SVs" tab
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeSVTab(globalVars)
     choosePlaceSVType(globalVars)
-    --addSeparator()
     local placeType = PLACE_TYPE[globalVars.placeTypeIndex]
     if placeType == "Standard" then placeStandardSVMenu(globalVars) end
     if placeType == "Special"  then placeSpecialSVMenu(globalVars) end
@@ -423,7 +449,7 @@ function placeStandardSVMenu(globalVars)
     getVariables("placeStandardMenu", menuVars)
     local needSVUpdate =  #menuVars.svMultipliers == 0
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
-    local currentSVType = STANDARD_SV[menuVars.svTypeIndex]
+    local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
     local menuFunctionName = string.lower(currentSVType).."SettingsMenu"
     local settingVars = getSettingVars(currentSVType)
     needSVUpdate = _G[menuFunctionName](settingVars) or needSVUpdate
@@ -457,8 +483,6 @@ function makeSVInfoWindow(menuVars)
     imgui.Text("Projected SVs:")
     plotSVs(menuVars.svMultipliers, menuVars.svStats.minScale, menuVars.svStats.maxScale)
     displaySVStats(menuVars.svStats)
-    imgui.Text(#menuVars.svDistances)
-    imgui.Text(#menuVars.svMultipliers)
     imgui.End()
 end
 function displaySVStats(svStats)
@@ -565,7 +589,6 @@ end
 --    settingVars : list of setting variables for this menu [Table]
 function exponentialSettingsMenu(settingVars)
     local settingsChanged = false
-    imgui.PushStyleVar( imgui_style_var.GrabRounding, 5) -- uuuh
     settingsChanged = chooseExponentialBehavior(settingVars) or settingsChanged
     settingsChanged = chooseIntensity(settingVars) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
@@ -672,7 +695,9 @@ function adjustNumberOfMultipliers(settingVars)
         end
     end
     if settingVars.svPoints < #settingVars.svMultipliers then
-        settingVars.selectedMultiplierIndex = settingVars.svPoints
+        if settingVars.selectedMultiplierIndex > settingVars.svPoints then
+            settingVars.selectedMultiplierIndex = settingVars.svPoints
+        end
         local difference = #settingVars.svMultipliers - settingVars.svPoints
         for i = 1, difference do
             table.remove(settingVars.svMultipliers, #settingVars.svMultipliers)
@@ -683,14 +708,14 @@ end
 function chooseCustomMultipliers(settingVars)
     imgui.BeginChild("Custom Multipliers", {imgui.GetContentRegionAvailWidth(), 100}, true)
     for i = 1, #settingVars.svMultipliers do
-        if imgui.Selectable("SV # "..i.." : "..settingVars.svMultipliers[i], settingVars.selectedMultiplierIndex == i) then
+        if imgui.Selectable(i.." )   "..settingVars.svMultipliers[i], settingVars.selectedMultiplierIndex == i) then
             settingVars.selectedMultiplierIndex = i
         end
     end
     imgui.EndChild()
     local index = settingVars.selectedMultiplierIndex
     local oldMultiplier = settingVars.svMultipliers[index]
-    _, settingVars.svMultipliers[index] = imgui.InputFloat("SV multiplier", oldMultiplier, 0, 0, "%.2fx")
+    _, settingVars.svMultipliers[index] = imgui.InputFloat("SV Multiplier", oldMultiplier, 0, 0, "%.2fx")
     addSeparator()
     return oldMultiplier ~= settingVars.svMultipliers[index]
 end
@@ -774,20 +799,20 @@ end
 function measureSVMenu(globalVars)
     local menuVars = {
         measuredNSVDistance = 0,
-        measuredDistance = 0
+        measuredDistance = 0,
+        avgSV = 0,
     }
     getVariables("measureMenu", menuVars)
-    local text1 = "NSV Distance: "
-    local text2 = "SV Distance: "
-    if menuVars.measuredNSVDistance and menuVars.measuredDistance then
-        text1 = text1..menuVars.measuredNSVDistance
-        text2 = text2..menuVars.measuredDistance
-    end
-    imgui.Text(text1.." msx")
+    local text1 = "NSV Distance: "..menuVars.measuredNSVDistance.." msx"
+    local text2 = "SV Distance: "..menuVars.measuredDistance.." msx"
+    local text3 = "Average SV: "..menuVars.avgSV.."x"
+    imgui.Text(text1)
     helpMarker("This is the normal distance between the start and the end, ignoring SVs")
-    imgui.Text(text2.." msx")
+    imgui.Text(text2)
     helpMarker("This is the actual distance between the start and the end (rounded to 5 decimal "..
                "places), calculated with SVs")
+    imgui.Text(text3)
+    helpMarker("(rounded to 5 decimal places)")
     addSeparator()
     simpleActionMenu("Measure", measureSVs, globalVars, menuVars)
     saveVariables("measureMenu", menuVars)
@@ -921,7 +946,7 @@ end
 --    svs       : list of ordered svs to calculate average SV with [Table]
 --    endOffset : final time (milliseconds) to stop calculating at [Int]
 function calculateAvgSV(svs, endOffset)
-    local totalDisplacement = calculateDispacementFromSVs(svs, endOffset)
+    local totalDisplacement = calculateDisplacementFromSVs(svs, endOffset)
     local startOffset = svs[1].StartTime
     local timeInterval = endOffset - startOffset
     local avgSV = totalDisplacement / timeInterval
@@ -932,7 +957,7 @@ end
 -- Parameters
 --    svs       : list of ordered svs to calculate displacement with [Table]
 --    endOffset : final time (milliseconds) to stop calculating at [Int]
-function calculateDispacementFromSVs(svs, endOffset)
+function calculateDisplacementFromSVs(svs, endOffset)
     local totalDisplacement = 0
     table.insert(svs, utils.CreateScrollVelocity(endOffset, 0))
     for i = 1, (#svs - 1) do
@@ -1349,7 +1374,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function choosePlaceSVType(globalVars)
     imgui.AlignTextToFramePadding()
-    imgui.Text("Type:")
+    imgui.Text("  Type : ")
     imgui.SameLine(0, SAMELINE_SPACING)
     local comboIndex = globalVars.placeTypeIndex - 1
     _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPE, #PLACE_TYPE)
@@ -1372,7 +1397,7 @@ end
 function chooseRandomType(settingVars)
     local oldIndex = settingVars.randomTypeIndex
     local comboIndex = oldIndex - 1
-    _, comboIndex = imgui.Combo("Distribution Type", comboIndex, RANDOM_DISTRIBUTION_TYPE, #RANDOM_DISTRIBUTION_TYPE)
+    _, comboIndex = imgui.Combo("Distribution", comboIndex, RANDOM_DISTRIBUTION_TYPES, #RANDOM_DISTRIBUTION_TYPES)
     settingVars.randomTypeIndex = comboIndex + 1
     return oldIndex ~= settingVars.randomTypeIndex
 end
@@ -1384,13 +1409,6 @@ function chooseRatio(menuVars)
     local oldRatio = menuVars.ratio 
     _, menuVars.ratio = imgui.InputFloat("Ratio", menuVars.ratio, 0, 0, "%.2f")
     return oldRatio == menuVars.ratio 
-end
--- Lets you choose whether or not go RGB gamer mode (i.e. make plugin constantly rainbow colored)
--- Parameters
---    globalVars : list of variables used globally across all menus [Table]
-function chooseRGBMode(globalVars)
-    _, globalVars.rgb = imgui.Checkbox("RGB gamer mode", globalVars.rgb)
-    toolTip("Make the plugin dynamically colorful and cool")
 end
 -- Lets you choose which section(s) to target SV actions at
 -- Parameters
@@ -1407,11 +1425,12 @@ end
 --    menuVars : list of variables used for the current menu [Table]
 function chooseSpecialSVType(menuVars)
     local comboIndex = menuVars.svTypeIndex - 1
-    local emoticonIndex = menuVars.svTypeIndex + #STANDARD_SV
+    local emoticonIndex = menuVars.svTypeIndex + #STANDARD_SVS
     local emoticon = EMOTICONS[emoticonIndex]
-    imgui.Indent(34)
-    _, comboIndex = imgui.Combo("  "..emoticon.." ", comboIndex, SPECIAL_SV, #SPECIAL_SV)
-    imgui.Unindent(34)
+    local indentAmount = 45
+    imgui.Indent(indentAmount)
+    _, comboIndex = imgui.Combo("  "..emoticon, comboIndex, SPECIAL_SVS, #SPECIAL_SVS)
+    imgui.Unindent(indentAmount)
     menuVars.svTypeIndex = comboIndex + 1
     addSeparator()
 end
@@ -1424,9 +1443,10 @@ function chooseStandardSVType(menuVars)
     local newComboIndex = oldcomboIndex
     local emoticonIndex = menuVars.svTypeIndex
     local emoticon = EMOTICONS[emoticonIndex]
-    imgui.Indent(34)
-    _, newComboIndex = imgui.Combo("  "..emoticon, newComboIndex, STANDARD_SV, #STANDARD_SV)
-    imgui.Unindent(34)
+    local indentAmount = 45
+    imgui.Indent(indentAmount)
+    _, newComboIndex = imgui.Combo(" "..emoticon, newComboIndex, STANDARD_SVS, #STANDARD_SVS)
+    imgui.Unindent(indentAmount)
     menuVars.svTypeIndex = newComboIndex + 1
     addSeparator()
     return oldcomboIndex ~= newComboIndex
@@ -1478,7 +1498,7 @@ function chooseSVPerQuarterPeriod(settingVars)
 end
 function chooseSVPoints(settingVars)
     local oldSVPoints = settingVars.svPoints
-    _, settingVars.svPoints = imgui.InputInt("SV points", oldSVPoints, 1, 1)
+    _, settingVars.svPoints = imgui.InputInt("SV Points", oldSVPoints, 1, 1)
     settingVars.svPoints = clampToInterval(settingVars.svPoints, 1, MAX_SV_POINTS)
     return oldSVPoints ~= settingVars.svPoints
 end
@@ -1541,7 +1561,7 @@ function generateSVMultipliers(svType, settingVars)
          multipliers = generateSinusoidalSet(settingVars.startSV, settingVars.endSV, settingVars.periods, settingVars.periodsShift, settingVars.svsPerQuarterPeriod, settingVars.verticalShift, settingVars.curveSharpness)
     end
     if svType == "Random" then
-        local randomType = RANDOM_DISTRIBUTION_TYPE[settingVars.randomTypeIndex]
+        local randomType = RANDOM_DISTRIBUTION_TYPES[settingVars.randomTypeIndex]
         multipliers = generateRandomSet(settingVars.avgSV, settingVars.svPoints + 1, randomType, settingVars.randomScale)
     end
     if svType == "Custom" then
@@ -1789,8 +1809,13 @@ function measureSVs(globalVars, menuVars)
         local svMultiplierAtStartOffset = getSVMultiplierAt(startOffset)
         table.insert(svs, 1, utils.CreateScrollVelocity(startOffset, svMultiplierAtStartOffset))
     end
-    menuVars.measuredDistance =  round(calculateDispacementFromSVs(svs, endOffset), 5)
+    local displacement = calculateDisplacementFromSVs(svs, endOffset)
+    menuVars.measuredDistance = round(displacement, 5)
     menuVars.measuredNSVDistance = endOffset - startOffset
+    menuVars.avgSV = 0
+    if menuVars.measuredNSVDistance ~= 0 then
+        menuVars.avgSV = round(displacement / menuVars.measuredNSVDistance, 5)
+    end
 end
 -- Scales SVs
 -- Parameters
@@ -1989,7 +2014,7 @@ function getSVsToScale(menuVars, svs, startOffset, endOffset)
         scalingFactor = menuVars.avgSV / svAverage
     end
     if scaleType == "Absolute Distance" then
-        local distanceTraveled = calculateDispacementFromSVs(svs, endOffset)
+        local distanceTraveled = calculateDisplacementFromSVs(svs, endOffset)
         scalingFactor = menuVars.distance / distanceTraveled
     end
     if scaleType == "Relative Ratio" then
