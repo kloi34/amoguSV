@@ -1,4 +1,4 @@
--- amoguSV v5.0 beta (2 Dec 2022)
+-- amoguSV v5.0 beta (5 Dec 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -26,31 +26,44 @@
 -- Global Constants -------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 
--- IMGUI / GUI
+--------------------------------------------------------------------------------------- IMGUI / GUI
+
 DEFAULT_WIDGET_HEIGHT = 26         -- value determining the height of GUI widgets
 DEFAULT_WIDGET_WIDTH = 160         -- value determining the width of GUI widgets
 PADDING_WIDTH = 8                  -- value determining window and frame padding
-SAMELINE_SPACING = 5               -- value determining spacing between GUI items on the same row
 RADIO_BUTTON_SPACING = 7.5         -- value determining spacing between radio buttons
-ACTION_BUTTON_SIZE = {             -- dimensions of the button that places/removes SVs
+SAMELINE_SPACING = 5               -- value determining spacing between GUI items on the same row
+ACTION_BUTTON_SIZE = {             -- dimensions of the button that does important things
     1.6 * DEFAULT_WIDGET_WIDTH - 1,
     1.6 * DEFAULT_WIDGET_HEIGHT
 }
-SV_INFO_WINDOW_SIZE = {271, 334}
+SV_INFO_WINDOW_SIZE = {271, 334}   -- dimensions of the window displaying SV info/stats
 
--- SV/Time restrictions
+------------------------------------------------------------------------------ SV/Time restrictions
+
 MAX_SV_POINTS = 1000               -- maximum number of SV points allowed
 MIN_DURATION = 1/64                -- minimum millisecond duration allowed in general
 MIN_DURATION_FAR = 1/8             -- minimum millisecond duration for teleports above 4 minutes
+--MIN_DURATION_FAR = 1               -- minimum millisecond duration for teleports above 17? minutes
 
--- Menu-related
-PLUGIN_COLOR_SCHEMES = {
+-------------------------------------------------------------------------------------- Menu related
+
+COLOR_SCHEMES = {                  -- available color themes for the plugin
     "Default",
     "RGB Gamer Mode"
 }
-PLUGIN_STYLE_SCHEMES = {
-    "Rounded",
-    "Boxed"
+DISPLACE_TYPES = {                 -- ways to scale/calculate distances
+    "Relative Distance",
+    "Absolute Distance"
+}
+EDIT_SV_TOOLS = {                  -- tools for editing SVs
+    "Copy & Paste",
+    "Displace Note",
+    "Displace View",
+    "Measure",
+    "Merge",
+    "Scale"
+--    "Vibe"
 }
 EMOTICONS = {                      -- emoticons to visually clutter the plugin and confuse users
     "( - _ - )",
@@ -71,25 +84,28 @@ FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail
     "Skip",
     "Custom"   
 }
-TAB_MENUS = {                      -- tabs of different SV menus
-    "Info",
-    "Place SVs",
-    "Edit SVs",
-    "Delete SVs"
+PLACE_BEHAVIORS = {                -- ways to place SVs
+    "Replace old SVs",
+    "Keep old SVs"
 }
-PLACE_TYPE = {                     -- general categories of SVs to place
+PLACE_TYPES = {                    -- general categories of SVs to place
     "Standard",
     "Special"
 }
-STANDARD_SVS = {                      -- tools/shapes for placing SVs
-    "Linear",
-    "Exponential",
-    "Bezier",
-    "Sinusoidal",
-    "Random",
-    "Custom"
+RANDOM_DISTRIBUTION_TYPES = {      -- distribution types of random SV
+    "Normal",
+    "Uniform"
 }
-SPECIAL_SVS = {                     -- special/gimmick SV types to place
+SCALE_TYPES = {                    -- ways to scale SV multipliers
+    "Average SV",
+    "Absolute Distance",
+    "Relative Ratio"
+}
+SECTIONS = {                       -- ways to apply SV actions on sections
+    "Per note section",
+    "Whole section"
+}
+SPECIAL_SVS = {                    -- tools for placing special SVs
     "Stutter",
     "Single",
 --    "Combo",
@@ -97,36 +113,29 @@ SPECIAL_SVS = {                     -- special/gimmick SV types to place
     "Splitscroll",
     "Animate"
 }
-EDIT_SV_TOOLS = {                  -- tools for editing SVs
-    "Copy & Paste",
-    "Displace Note",
-    "Displace View",
-    "Measure",
-    "Merge",
-    "Scale"
---    "Vibe"
+STANDARD_SVS = {                   -- tools for placing standard SVs
+    "Linear",
+    "Exponential",
+    "Bezier",
+    "Sinusoidal",
+    "Random",
+    "Custom"
 }
-SCALE_TYPES = {                    -- ways to scale SV multipliers
-    "Average SV",
-    "Absolute Distance",
-    "Relative Ratio"
+STYLE_SCHEMES = {                  -- available style/appearance themes for the plugin
+    "Rounded",
+    "Boxed"
 }
-DISPLACE_TYPES = {                 -- ways to scale/calculate distances
-    "Relative Distance",
-    "Absolute Distance"
-}
-SECTIONS = {                       -- ways to apply SV actions on sections
-    "Per note section",
-    "Whole section"
-}
-BEHAVIORS = {                      -- 
+SV_BEHAVIORS = {                   -- behaviors of SVs
     "Slow down",
     "Speed up"
 }
-RANDOM_DISTRIBUTION_TYPES = {
-    "Normal",
-    "Uniform"
+TAB_MENUS = {                      -- tab names for different SV menus
+    "Info",
+    "Place SVs",
+    "Edit SVs",
+    "Delete SVs"
 }
+
 ---------------------------------------------------------------------------------------------------
 -- Plugin Styles and Colors -----------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -135,31 +144,36 @@ RANDOM_DISTRIBUTION_TYPES = {
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function setPluginAppearance(globalVars)
-    local colorScheme = PLUGIN_COLOR_SCHEMES[globalVars.colorSchemeIndex]
-    local styleScheme = PLUGIN_STYLE_SCHEMES[globalVars.styleSchemeIndex]
+    local colorScheme = COLOR_SCHEMES[globalVars.colorSchemeIndex]
+    local styleScheme = STYLE_SCHEMES[globalVars.styleSchemeIndex]
+    
     setPluginAppearanceStyles(styleScheme)
     setPluginAppearanceColors(globalVars, colorScheme)
-    if colorScheme == "RGB Gamer Mode" then
-        updateRGBColors(globalVars)
-    end
+    
+    if colorScheme == "RGB Gamer Mode" then updateRGBColors(globalVars) end
 end
 -- Configures the plugin GUI styles
+-- Parameters
+--    styleScheme : name of the desired style scheme [String]
 function setPluginAppearanceStyles(styleScheme)
-    local rounding = 5 -- determines how rounded corners are
-    if styleScheme == "Boxed" then rounding = 0 end
+    local cornerRoundnessValue = 5 -- up to 12, 14 for WindowRounding and 16 for ChildRounding
+    if styleScheme == "Boxed" then cornerRoundnessValue = 0 end
+    
     imgui.PushStyleVar( imgui_style_var.WindowPadding,      { PADDING_WIDTH, 8 } )
     imgui.PushStyleVar( imgui_style_var.FramePadding,       { PADDING_WIDTH, 5 } )
     imgui.PushStyleVar( imgui_style_var.ItemSpacing,        { DEFAULT_WIDGET_HEIGHT / 2 - 1, 4 } )
     imgui.PushStyleVar( imgui_style_var.ItemInnerSpacing,   { SAMELINE_SPACING, 6 } )
-    --imgui.PushStyleVar( imgui_style_var.WindowBorderSize,   0        )
-    imgui.PushStyleVar( imgui_style_var.WindowRounding,     rounding )
-    imgui.PushStyleVar( imgui_style_var.ChildRounding,      rounding )
-    imgui.PushStyleVar( imgui_style_var.FrameRounding,      rounding )
-    imgui.PushStyleVar( imgui_style_var.GrabRounding,       rounding )
-    imgui.PushStyleVar( imgui_style_var.ScrollbarRounding,  rounding )
-    imgui.PushStyleVar( imgui_style_var.TabRounding,        rounding )
+    imgui.PushStyleVar( imgui_style_var.WindowRounding,     cornerRoundnessValue )
+    imgui.PushStyleVar( imgui_style_var.ChildRounding,      cornerRoundnessValue )
+    imgui.PushStyleVar( imgui_style_var.FrameRounding,      cornerRoundnessValue )
+    imgui.PushStyleVar( imgui_style_var.GrabRounding,       cornerRoundnessValue )
+    imgui.PushStyleVar( imgui_style_var.ScrollbarRounding,  cornerRoundnessValue )
+    imgui.PushStyleVar( imgui_style_var.TabRounding,        cornerRoundnessValue )
 end
 -- Configures the plugin GUI colors
+-- Parameters
+--    globalVars  : list of variables used globally across all menus [Table]
+--    colorScheme : name of the desired color scheme [String]
 function setPluginAppearanceColors(globalVars, colorScheme)
     if colorScheme == "Default" then
         imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
@@ -282,7 +296,7 @@ function addSeparator()
     imgui.Separator()
     addPadding()
 end
--- Creates a tooltip box when the last (most recent) item is hovered over
+-- Creates a tooltip box when the last (most recently created) item is hovered over
 -- Parameters
 --    text : text to appear in the tooltip box [String]
 function toolTip(text)
@@ -324,7 +338,7 @@ function draw()
         useManualOffsets = false,
         startOffset = 0,
         endOffset = 0,
-        teleportDistance = 10000,
+        placeBehaviorIndex = 1,
         colorSchemeIndex = 1,
         styleSchemeIndex = 1,
         red = 0,
@@ -336,11 +350,12 @@ function draw()
     }
     getVariables("globalVars", globalVars)
     setPluginAppearance(globalVars)
+    
     imgui.Begin("amoguSV (v5.0 beta)", imgui_window_flags.AlwaysAutoResize)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     imgui.BeginTabBar("SV tabs")
     for i = 1, #TAB_MENUS do
-        createMenuTab(TAB_MENUS[i], globalVars)
+        createMenuTab(globalVars, TAB_MENUS[i])
     end
     imgui.EndTabBar()
     state.IsWindowHovered = imgui.IsWindowHovered()
@@ -351,7 +366,11 @@ end
 
 ----------------------------------------------------------------------------------------- Tab stuff
 
-function createMenuTab(tabName, globalVars)
+-- Creates a menu tab
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    tabName    : name of the tab currently being created [String]
+function createMenuTab(globalVars, tabName)
     if not imgui.BeginTabItem(tabName) then return end
     addPadding()
     if tabName == "Info"       then infoTab(globalVars) end
@@ -381,26 +400,17 @@ function choosePluginSettings(globalVars)
     addPadding()
     chooseSVSelection(globalVars)
     addSeparator()
+    choosePlaceBehavior(globalVars)
+    addSeparator()
     chooseStyleScheme(globalVars)
     chooseColorScheme(globalVars)
-end
-
-function chooseStyleScheme(globalVars)
-    local comboIndex =  globalVars.styleSchemeIndex - 1
-    _, comboIndex = imgui.Combo("Style Scheme", comboIndex, PLUGIN_STYLE_SCHEMES, #PLUGIN_STYLE_SCHEMES)
-    globalVars.styleSchemeIndex = comboIndex + 1
-end
-function chooseColorScheme(globalVars)
-    local comboIndex =  globalVars.colorSchemeIndex - 1
-    _, comboIndex = imgui.Combo("Color Scheme", comboIndex, PLUGIN_COLOR_SCHEMES, #PLUGIN_COLOR_SCHEMES)
-    globalVars.colorSchemeIndex = comboIndex + 1
 end
 -- Creates the "Place SVs" tab
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeSVTab(globalVars)
     choosePlaceSVType(globalVars)
-    local placeType = PLACE_TYPE[globalVars.placeTypeIndex]
+    local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
     if placeType == "Standard" then placeStandardSVMenu(globalVars) end
     if placeType == "Special"  then placeSpecialSVMenu(globalVars) end
 end
@@ -417,7 +427,6 @@ function editSVTab(globalVars)
     if toolName == "Measure"       then measureSVMenu(globalVars) end
     if toolName == "Merge"         then simpleActionMenu("Merge", mergeSVs, globalVars, nil) end
     if toolName == "Scale"         then scaleSVMenu(globalVars) end
-    --imgui.Text(globalVars.debugText)
 end
 -- Creates the "Delete SVs" tab
 -- Parameters
@@ -426,7 +435,7 @@ function deleteSVTab(globalVars)
     simpleActionMenu("Delete", deleteSVs, globalVars, nil)
 end
 
----------------------------------------------------------------------------------------- Tool Menus
+--------------------------------------------------------------------------------------------- Menus
 
 -- Creates the menu for placing standard SVs
 -- Parameters
@@ -448,130 +457,21 @@ function placeStandardSVMenu(globalVars)
     }
     getVariables("placeStandardMenu", menuVars)
     local needSVUpdate =  #menuVars.svMultipliers == 0
+    
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
+    
     local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
-    local menuFunctionName = string.lower(currentSVType).."SettingsMenu"
     local settingVars = getSettingVars(currentSVType)
+    local menuFunctionName = string.lower(currentSVType).."SettingsMenu"
     needSVUpdate = _G[menuFunctionName](settingVars) or needSVUpdate
-    if needSVUpdate then
-        menuVars.svMultipliers = generateSVMultipliers(currentSVType, settingVars)
-        local svMultipliersNoEndSV = makeDuplicateList(menuVars.svMultipliers)
-        table.remove(svMultipliersNoEndSV, #svMultipliersNoEndSV)
-        local finalSVType = FINAL_SV_TYPES[settingVars.finalSVIndex]
-        if finalSVType == "Skip" then
-            table.remove(menuVars.svMultipliers, #menuVars.svMultipliers)
-        end
-        if finalSVType == "Custom" then
-            table.remove(menuVars.svMultipliers, #menuVars.svMultipliers)
-            table.insert(menuVars.svMultipliers, settingVars.customSV)
-        end
-        menuVars.svDistances = calculateDistanceVsTime(svMultipliersNoEndSV, nil)
-        updateSVStats(currentSVType, menuVars, menuVars.svMultipliers, svMultipliersNoEndSV)
-    end
+    
+    if needSVUpdate then updateMenuSVs(currentSVType, menuVars, settingVars) end
+    
     addSeparator()
     makeSVInfoWindow(menuVars)
     simpleActionMenu("Place", placeSVs, globalVars, menuVars)
     saveVariables(currentSVType.."Settings", settingVars)
     saveVariables("placeStandardMenu", menuVars)
-end
-function makeSVInfoWindow(menuVars)
-    imgui.SetNextWindowSize(SV_INFO_WINDOW_SIZE)
-    imgui.Begin("SV Info", imgui_window_flags.AlwaysAutoResize)
-    imgui.Text("Projected Note Motion:")
-    helpMarker("Distance vs Time graph of notes")
-    plotSVMotion(menuVars.svDistances, menuVars.svStats.distMinScale, menuVars.svStats.distMaxScale)
-    imgui.Text("Projected SVs:")
-    plotSVs(menuVars.svMultipliers, menuVars.svStats.minScale, menuVars.svStats.maxScale)
-    displaySVStats(menuVars.svStats)
-    imgui.End()
-end
-function displaySVStats(svStats)
-    imgui.Columns(2, "SV Stats", false)
-    imgui.Text("Max SV:")
-    imgui.Text("Min SV:")
-    imgui.Text("Average SV:")
-    imgui.NextColumn()
-    imgui.Text(svStats.maxSV.."x")
-    imgui.Text(svStats.minSV.."x")
-    imgui.Text(svStats.avgSV.."x")
-    imgui.Columns(1)
-end
-function updateSVStats(currentSVType, menuVars, svMultipliers, svMultipliersNoEndSV)
-    menuVars.svStats.minScale, menuVars.svStats.maxScale = calculatePlotScale(svMultipliers)
-    menuVars.svStats.distMinScale, menuVars.svStats.distMaxScale = calculatePlotScale(menuVars.svDistances)
-    menuVars.svStats.minSV = round(calculateMinValue(svMultipliersNoEndSV), 2)
-    menuVars.svStats.maxSV = round(calculateMaxValue(svMultipliersNoEndSV), 2)
-    menuVars.svStats.avgSV = round(calculateAverage(svMultipliersNoEndSV, true), 2)
-end
-function getSettingVars(svType)
-    local settingVars
-    if svType == "Linear" then
-        settingVars = {
-            startSV = 1.5,
-            endSV = 0.5,
-            svPoints = 16,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    elseif svType == "Exponential" then
-        settingVars = {
-            behaviorIndex = 1,
-            intensity = 30,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    elseif svType == "Stutter" then
-        settingVars = {
-            svPoints = 16,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    elseif svType == "Bezier" then
-        settingVars = {
-            x1 = 0,
-            y1 = 0,
-            x2 = 0,
-            y2 = 1,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    elseif svType == "Sinusoidal" then
-        settingVars = {
-            startSV = 2,
-            endSV = 2,
-            curveSharpness = 50,
-            verticalShift = 1,
-            periods = 1,
-            periodsShift = 0.25,
-            svsPerQuarterPeriod = 8,
-            svPoints = 16,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    elseif svType == "Random" then
-        settingVars = {
-            randomTypeIndex = 1,
-            randomScale = 2,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    elseif svType == "Custom" then
-        settingVars = {
-            svMultipliers = {1.5, -0.5, 1.5, -0.5, 1.5, -0.5, 1.5, -0.5},
-            selectedMultiplierIndex = 1,
-            svPoints = 8,
-            finalSVIndex = 1,
-            customSV = 1
-        }
-    end
-    getVariables(svType.."Settings", settingVars)
-    return settingVars
 end
 -- Creates the menu for linear SV settings
 -- Returns whether settings have changed or not [Boolean]
@@ -596,21 +496,12 @@ function exponentialSettingsMenu(settingVars)
     settingsChanged = chooseFinalSV(settingVars) or settingsChanged
     return settingsChanged
 end
---[[
--- Creates the menu for stutter SV settings
--- Parameters
---    settingVars : list of setting variables for this menu [Table]
-function stutterSettingsMenu(settingVars)
-    local settingsChanged = false
-    return settingsChanged
-end
---]]
 -- Creates the menu for bezier SV settings
 -- Parameters
 --    settingVars : list of setting variables for this menu [Table]
 function bezierSettingsMenu(settingVars)
     local settingsChanged = false
-    settingsChanged = provideLinkToBezierWebsite(settingVars) or settingsChanged
+    settingsChanged = provideBezierWebsiteLink(settingVars) or settingsChanged
     settingsChanged = chooseBezierPoints(settingVars) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     settingsChanged = chooseSVPoints(settingVars) or settingsChanged
@@ -620,12 +511,12 @@ end
 -- Provides a copy-pastable link to a website that lets you play around with a cubic bezier curve
 -- Returns whether new bezier coordinates were parsed [Boolean]
 -- Parameters
---    menuVars : list of variables used for the current SV menu [Table]
-function provideLinkToBezierWebsite(settingVars)
+--    settingVars : list of variables used for the current SV menu [Table]
+function provideBezierWebsiteLink(settingVars)
     local coordinateParsed = false
     local bezierText = state.GetValue("bezierText") or "https://cubic-bezier.com/"
     _, bezierText = imgui.InputText("##bezierWebsite", bezierText, 100, imgui_input_text_flags.AutoSelectAll)
-    imgui.SameLine()
+    imgui.SameLine(0, SAMELINE_SPACING)
     -- stolen + modified from iceSV -_-
     if imgui.Button("Parse", {DEFAULT_WIDGET_WIDTH * 0.3, DEFAULT_WIDGET_HEIGHT - 2}) then
         local regex = "(-?%d*%.?%d+)"
@@ -683,8 +574,8 @@ function customSettingsMenu(settingVars)
     local settingsChanged = false
     settingsChanged = chooseCustomMultipliers(settingVars) or settingsChanged
     settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    adjustNumberOfMultipliers(settingVars)
     settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    adjustNumberOfMultipliers(settingVars)
     return settingsChanged
 end
 function adjustNumberOfMultipliers(settingVars)
@@ -706,7 +597,7 @@ function adjustNumberOfMultipliers(settingVars)
 end
 
 function chooseCustomMultipliers(settingVars)
-    imgui.BeginChild("Custom Multipliers", {imgui.GetContentRegionAvailWidth(), 100}, true)
+    imgui.BeginChild("Custom Multipliers", {imgui.GetContentRegionAvailWidth(), 90}, true)
     for i = 1, #settingVars.svMultipliers do
         if imgui.Selectable(i.." )   "..settingVars.svMultipliers[i], settingVars.selectedMultiplierIndex == i) then
             settingVars.selectedMultiplierIndex = i
@@ -800,7 +691,7 @@ function measureSVMenu(globalVars)
     local menuVars = {
         measuredNSVDistance = 0,
         measuredDistance = 0,
-        avgSV = 0,
+        avgSV = 0
     }
     getVariables("measureMenu", menuVars)
     local text1 = "NSV Distance: "..menuVars.measuredNSVDistance.." msx"
@@ -836,6 +727,123 @@ function scaleSVMenu(globalVars)
     saveVariables("scaleMenu", menuVars)
 end
 
+-------------------------------------------------------------------------------------- Menu related
+
+-- Updates SVs and SV info stored in the menu
+-- Parameters
+--    currentSVType : current type of SV selected [String]
+--    menuVars      : list of variables used for the place SV menu [Table]
+--    settingVars   : list of variables used for the current SV menu [Table]
+function updateMenuSVs(currentSVType, menuVars, settingVars)
+    menuVars.svMultipliers = generateSVMultipliers(currentSVType, settingVars)
+    local svMultipliersNoEndSV = makeDuplicateList(menuVars.svMultipliers)
+    table.remove(svMultipliersNoEndSV, #svMultipliersNoEndSV)
+    local finalSVType = FINAL_SV_TYPES[settingVars.finalSVIndex]
+    if finalSVType == "Skip" then
+        table.remove(menuVars.svMultipliers, #menuVars.svMultipliers)
+    end
+    if finalSVType == "Custom" then
+        table.remove(menuVars.svMultipliers, #menuVars.svMultipliers)
+        table.insert(menuVars.svMultipliers, settingVars.customSV)
+    end
+    menuVars.svDistances = calculateDistanceVsTime(svMultipliersNoEndSV, nil)
+    updateSVStats(menuVars, menuVars.svMultipliers, svMultipliersNoEndSV)
+end
+function makeSVInfoWindow(menuVars)
+    imgui.SetNextWindowSize(SV_INFO_WINDOW_SIZE)
+    imgui.Begin("SV Info", imgui_window_flags.AlwaysAutoResize)
+    imgui.Text("Projected Note Motion:")
+    helpMarker("Distance vs Time graph of notes")
+    plotSVMotion(menuVars.svDistances, menuVars.svStats.distMinScale, menuVars.svStats.distMaxScale)
+    imgui.Text("Projected SVs:")
+    plotSVs(menuVars.svMultipliers, menuVars.svStats.minScale, menuVars.svStats.maxScale)
+    displaySVStats(menuVars.svStats)
+    imgui.End()
+end
+function displaySVStats(svStats)
+    imgui.Columns(2, "SV Stats", false)
+    imgui.Text("Max SV:")
+    imgui.Text("Min SV:")
+    imgui.Text("Average SV:")
+    imgui.NextColumn()
+    imgui.Text(svStats.maxSV.."x")
+    imgui.Text(svStats.minSV.."x")
+    imgui.Text(svStats.avgSV.."x")
+    helpMarker("Rounded to 3 decimal places")
+    imgui.Columns(1)
+end
+function updateSVStats(menuVars, svMultipliers, svMultipliersNoEndSV)
+    menuVars.svStats.minScale, menuVars.svStats.maxScale = calculatePlotScale(svMultipliers)
+    menuVars.svStats.distMinScale, menuVars.svStats.distMaxScale = calculatePlotScale(menuVars.svDistances)
+    menuVars.svStats.minSV = round(calculateMinValue(svMultipliersNoEndSV), 2)
+    menuVars.svStats.maxSV = round(calculateMaxValue(svMultipliersNoEndSV), 2)
+    menuVars.svStats.avgSV = round(calculateAverage(svMultipliersNoEndSV, true), 3)
+end
+function getSettingVars(svType)
+    local settingVars
+    if svType == "Linear" then
+        settingVars = {
+            startSV = 1.5,
+            endSV = 0.5,
+            svPoints = 16,
+            finalSVIndex = 1,
+            customSV = 1
+        }
+    elseif svType == "Exponential" then
+        settingVars = {
+            behaviorIndex = 1,
+            intensity = 30,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 1,
+            customSV = 1
+        }
+    elseif svType == "Bezier" then
+        settingVars = {
+            x1 = 0,
+            y1 = 0,
+            x2 = 0,
+            y2 = 1,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 1,
+            customSV = 1
+        }
+    elseif svType == "Sinusoidal" then
+        settingVars = {
+            startSV = 2,
+            endSV = 2,
+            curveSharpness = 50,
+            verticalShift = 1,
+            periods = 1,
+            periodsShift = 0.25,
+            svsPerQuarterPeriod = 8,
+            svPoints = 16,
+            finalSVIndex = 1,
+            customSV = 1
+        }
+    elseif svType == "Random" then
+        settingVars = {
+            randomTypeIndex = 1,
+            randomScale = 2,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 1,
+            customSV = 1
+        }
+    elseif svType == "Custom" then
+        settingVars = {
+            svMultipliers = {1.5, -0.5, 1.5, -0.5, 1.5, -0.5, 1.5, -0.5},
+            selectedMultiplierIndex = 1,
+            svPoints = 8,
+            finalSVIndex = 1,
+            customSV = 1
+        }
+    end
+    getVariables(svType.."Settings", settingVars)
+    return settingVars
+end
+
 ---------------------------------------------------------------------------------------------------
 -- General Utility Functions ----------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -855,10 +863,14 @@ function removeDuplicateValues(list)
     end
     return newList
 end
+-- Makes a duplicate list
+-- Returns the new duplicate list [Table]
+-- Parameters
+--    list : list of values [Table]
 function makeDuplicateList(list)
     local duplicateList = {}
-    for _, thing in pairs(list) do
-        table.insert(duplicateList, thing)
+    for _, value in ipairs(list) do
+        table.insert(duplicateList, value)
     end  
     return duplicateList
 end
@@ -880,7 +892,7 @@ end
 --    endOffset   :
 function uniqueNoteOffsets(startOffset, endOffset)
     local offsets = {}
-    for i, hitObject in pairs(map.HitObjects) do
+    for _, hitObject in pairs(map.HitObjects) do
         if hitObject.StartTime >= startOffset and hitObject.StartTime <= endOffset then
             table.insert(offsets, hitObject.StartTime)
         end
@@ -906,7 +918,7 @@ end
 --    endOffset   : end time in milliseconds [Int]
 function getSVsBetweenOffsets(startOffset, endOffset)
     local svsBetweenOffsets = {}
-    for i, sv in pairs(map.ScrollVelocities) do
+    for _, sv in pairs(map.ScrollVelocities) do
         local svIsInRange = sv.StartTime >= startOffset and sv.StartTime < endOffset
         if svIsInRange then table.insert(svsBetweenOffsets, sv) end
     end
@@ -986,6 +998,13 @@ end
 function abc(a, b, c)
     if a then return b end
     return c
+end
+-- Forces a number to be a multiple of one quarter (0.25)
+-- Returns the result of the force [Int/Float]
+-- Parameters
+--    x : number to force to be a multiple of one quarter [Int/Float]
+function forceQuarter(x)
+    return (math.floor(x * 4 + 0.5)) / 4
 end
 -- Restricts a number to be within a closed interval
 -- Returns the result of the restriction [Int/Float]
@@ -1070,7 +1089,7 @@ function calculateMaxValue(values) return math.max(table.unpack(values)) end
 function calculateAverage(values, includeLastValue)
     if #values == 0 then return nil end
     local sum = 0
-    for i, value in pairs(values) do
+    for _, value in pairs(values) do
         sum = sum + value
     end
     if not includeLastValue then
@@ -1176,10 +1195,10 @@ function editSVs(globalVars, menuVars, func, needOffsets)
                     newSVsToRemove, newSVsToAdd = func(svsBetweenOffsets)
                 end
             end
-            for _, sv in ipairs(newSVsToRemove) do 
+            for _, sv in pairs(newSVsToRemove) do 
                 table.insert(svsToRemove, sv)
             end
-            for _, sv in ipairs(newSVsToAdd) do 
+            for _, sv in pairs(newSVsToAdd) do 
                 table.insert(svsToAdd, sv)
             end
         end
@@ -1226,6 +1245,14 @@ function chooseBezierPoints(settingVars)
     local firstPointChanged = firstXChanged or firstYChanged
     local secondPointChanged = secondXChanged or secondYChanged
     return firstPointChanged or secondPointChanged
+end
+-- Lets users choose the color scheme of the plugin
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseColorScheme(globalVars)
+    local comboIndex = globalVars.colorSchemeIndex - 1
+    _, comboIndex = imgui.Combo("Color Scheme", comboIndex, COLOR_SCHEMES, #COLOR_SCHEMES)
+    globalVars.colorSchemeIndex = comboIndex + 1
 end
 -- Lets users choose a constant amount to shift SVs
 -- Returns whether or not the shift amount changed [Boolean]
@@ -1299,7 +1326,7 @@ end
 function chooseExponentialBehavior(settingVars)
     local oldBehaviorIndex = settingVars.behaviorIndex
     local comboIndex = settingVars.behaviorIndex - 1
-    _, comboIndex = imgui.Combo("Behavior", comboIndex, BEHAVIORS, #BEHAVIORS)
+    _, comboIndex = imgui.Combo("Behavior", comboIndex, SV_BEHAVIORS, #SV_BEHAVIORS)
     settingVars.behaviorIndex = comboIndex + 1
     return oldBehaviorIndex ~= settingVars.behaviorIndex
 end
@@ -1343,19 +1370,11 @@ end
 -- Parameters
 --    settingVars : list of variables used for the current SV menu [Table]
 function chooseNumPeriods(settingVars)
-    addSeparator()
     local oldPeriods = settingVars.periods
     _, settingVars.periods = imgui.InputFloat("Periods/Cycles", settingVars.periods, 0.25, 0.25, "%.2f")
     settingVars.periods = forceQuarter(settingVars.periods)
     settingVars.periods = clampToInterval(settingVars.periods, 0.25, 20)
     return oldPeriods ~= settingVars.periods
-end
--- Forces a number to be a multiple of one quarter (0.25)
--- Returns the result of the force [Int/Float]
--- Parameters
---    x : number to force to be a multiple of one quarter [Int/Float]
-function forceQuarter(x)
-    return (math.floor(x * 4 + 0.5)) / 4
 end
 -- Lets users choose the number of periods to shift over (for a sinusoidal wave)
 -- Returns whether or not the period shift value changed [Boolean]
@@ -1369,6 +1388,17 @@ function choosePeriodShift(settingVars)
     settingVars.periodsShift = clampToInterval(settingVars.periodsShift, -0.75, 0.75)
     return oldPeriodsShift ~= settingVars.periodsShift
 end
+-- Lets users choose the place SV behavior
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function choosePlaceBehavior(globalVars)
+    local comboIndex = globalVars.placeBehaviorIndex - 1
+    _, comboIndex = imgui.Combo("Place Behavior", comboIndex, PLACE_BEHAVIORS, #PLACE_BEHAVIORS)
+    globalVars.placeBehaviorIndex = comboIndex + 1
+    local behavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if behavior == "Replace old SVs" then toolTip("Delete old SVs when placing SVs") end
+    if behavior == "Keep old SVs"    then toolTip("DON'T delete old SVs when placing SVs") end
+end
 -- Lets you choose the 'place SV' type
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -1377,7 +1407,7 @@ function choosePlaceSVType(globalVars)
     imgui.Text("  Type : ")
     imgui.SameLine(0, SAMELINE_SPACING)
     local comboIndex = globalVars.placeTypeIndex - 1
-    _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPE, #PLACE_TYPE)
+    _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPES, #PLACE_TYPES)
     globalVars.placeTypeIndex = comboIndex + 1
 end
 -- Lets users choose the variability of randomness
@@ -1484,21 +1514,29 @@ function chooseStartEndSVs(settingVars)
     settingVars.endSV = newValues[2]
     return oldValues[1] ~= newValues[1] or oldValues[2] ~= newValues[2]
 end
+-- Lets users choose the style scheme of the plugin
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseStyleScheme(globalVars)
+    local comboIndex = globalVars.styleSchemeIndex - 1
+    _, comboIndex = imgui.Combo("Style Scheme", comboIndex, STYLE_SCHEMES, #STYLE_SCHEMES)
+    globalVars.styleSchemeIndex = comboIndex + 1
+end
 -- Lets users choose the number of SV points per quarter period (for sinusoidal wave)
 -- Returns whether or not the number of SVs changed [Boolean]
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
 function chooseSVPerQuarterPeriod(settingVars)
-    addPadding()
-    imgui.Text("For every 0.25 period/cycle, place...")
     local oldPerQuarterPeriod = settingVars.svsPerQuarterPeriod
-    _, settingVars.svsPerQuarterPeriod = imgui.InputInt("SV points", settingVars.svsPerQuarterPeriod)
-    settingVars.svsPerQuarterPeriod = clampToInterval(settingVars.svsPerQuarterPeriod, 1, MAX_SV_POINTS / (4 * settingVars.periods))
+    _, settingVars.svsPerQuarterPeriod = imgui.InputInt("SV Points##perQuarter", settingVars.svsPerQuarterPeriod)
+    helpMarker("Number of SV points per 0.25 period/cycle")
+    local maxSVsPerQuarterPeriod = MAX_SV_POINTS / (4 * settingVars.periods)
+    settingVars.svsPerQuarterPeriod = clampToInterval(settingVars.svsPerQuarterPeriod, 1, maxSVsPerQuarterPeriod)
     return oldPerQuarterPeriod ~= settingVars.svsPerQuarterPeriod
 end
 function chooseSVPoints(settingVars)
     local oldSVPoints = settingVars.svPoints
-    _, settingVars.svPoints = imgui.InputInt("SV Points", oldSVPoints, 1, 1)
+    _, settingVars.svPoints = imgui.InputInt("SV Points##regular", oldSVPoints, 1, 1)
     settingVars.svPoints = clampToInterval(settingVars.svPoints, 1, MAX_SV_POINTS)
     return oldSVPoints ~= settingVars.svPoints
 end
@@ -1529,16 +1567,7 @@ function chooseSVSelection(globalVars)
         globalVars.useManualOffsets = true
     end
 end
---[[
--- Lets you choose the teleport distance for teleport SVs
--- Parameters
---    globalVars : list of variables used globally across all menus [Table]
-function chooseTeleportDistance(globalVars)
-    local tpDist = globalVars.teleportDistance
-    _, tpDist = imgui.InputFloat("Teleport distance", tpDist, 0, 0, "%.3f msx")
-    globalVars.teleportDistance = tpDist
-end
---]]
+
 ---------------------------------------------------------------------------------------------------
 -- Doing SV Stuff ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -1551,7 +1580,7 @@ function generateSVMultipliers(svType, settingVars)
         multipliers = generateLinearSet(settingVars.startSV, settingVars.endSV, settingVars.svPoints + 1)
     end
     if svType == "Exponential" then
-        local behavior = BEHAVIORS[settingVars.behaviorIndex]
+        local behavior = SV_BEHAVIORS[settingVars.behaviorIndex]
         multipliers = generateExponentialSet(behavior, settingVars.svPoints + 1, settingVars.avgSV, settingVars.intensity)
     end
     if svType == "Bezier" then
@@ -1566,7 +1595,7 @@ function generateSVMultipliers(svType, settingVars)
     end
     if svType == "Custom" then
         multipliers = {}
-        for i, multiplier in pairs(settingVars.svMultipliers) do
+        for _, multiplier in pairs(settingVars.svMultipliers) do
             table.insert(multipliers, multiplier)
         end
         local averageMultiplier = calculateAverage(multipliers, true)
@@ -1748,9 +1777,9 @@ function placeSVs(globalVars, menuVars)
     local numMultipliers = #menuVars.svMultipliers
     local offsets = getSelectedOffsets(globalVars)
     for i = 1, #offsets - 1 do
-        startOffset = offsets[i]
-        endOffset = offsets[i + 1]
-        svOffsets = generateLinearSet(startOffset, endOffset, #menuVars.svDistances)
+        local startOffset = offsets[i]
+        local endOffset = offsets[i + 1]
+        local svOffsets = generateLinearSet(startOffset, endOffset, #menuVars.svDistances)
         for j = 1, #svOffsets - 1 do
             table.insert(svsToAdd, utils.CreateScrollVelocity(svOffsets[j], menuVars.svMultipliers[j]))
         end
@@ -1758,6 +1787,12 @@ function placeSVs(globalVars, menuVars)
     local hasFinalSV = #menuVars.svDistances == numMultipliers
     if hasFinalSV then
         table.insert(svsToAdd, utils.CreateScrollVelocity(offsets[#offsets], menuVars.svMultipliers[numMultipliers]))
+    end
+    local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if placeBehavior == "Replace old SVs" then
+        local firstOffset = offsets[1]
+        local lastOffset = offsets[#offsets]
+        svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
     end
     if #svsToAdd > 0 then
         local editorActions = {
@@ -1867,7 +1902,7 @@ function displaceNoteSVs(globalVars, menuVars)
         table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
         table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
     end
-    for i, sv in pairs(map.ScrollVelocities) do
+    for _, sv in pairs(map.ScrollVelocities) do
         local svIsInRange = sv.StartTime > startOffset - 1 and sv.StartTime < endOffset + 1
         if svIsInRange then 
             local svRemovable = svTimeIsAdded[sv.StartTime]
@@ -1928,7 +1963,7 @@ function displaceViewSVs(globalVars, menuVars)
         table.insert(svsToAdd, utils.CreateScrollVelocity(time1After, newMultiplierAfter))
     end
     local svExistsAtEndOffset = false
-    for i, sv in pairs(map.ScrollVelocities) do
+    for _, sv in pairs(map.ScrollVelocities) do
         local svIsInRange = sv.StartTime >= startOffset and sv.StartTime <= endOffset
         if svIsInRange then 
             svExistsAtEndOffset = svExistsAtEndOffset or (sv.StartTime == endOffset)
@@ -1975,7 +2010,7 @@ function getSVsToMerge(svs)
     local svsToAdd = {}
     local svValuesToAdd = {}
     local svTimeExists = {}
-    for i, sv in pairs(svs) do
+    for _, sv in pairs(svs) do
         if svTimeExists[sv.StartTime] then
             svValuesToAdd[sv.StartTime] = svValuesToAdd[sv.StartTime] + sv.Multiplier
             merged = true
@@ -2002,7 +2037,7 @@ function getSVsToScale(menuVars, svs, startOffset, endOffset)
     local svsToRemove = {}
     local scaleType = SCALE_TYPES[menuVars.scaleTypeIndex]
     local scalingFactor
-    for i, sv in pairs(svs) do
+    for _, sv in pairs(svs) do
         table.insert(svsToRemove, sv)
     end
     if svs[1].StartTime ~= startOffset then
@@ -2020,21 +2055,21 @@ function getSVsToScale(menuVars, svs, startOffset, endOffset)
     if scaleType == "Relative Ratio" then
         scalingFactor = menuVars.ratio
     end
-    for i, sv in pairs(svs) do
+    for _, sv in pairs(svs) do
         local newSVMultiplier = sv.Multiplier * scalingFactor
         table.insert(svsToAdd, utils.CreateScrollVelocity(sv.StartTime, newSVMultiplier))
     end
     return svsToRemove, svsToAdd
 end
 -- Gets SVs to copy and copies them
--- Returns SVs to remove and add (none for copying) [Table]
+-- Returns SVs to remove and add (none, for copying) [Table]
 -- Parameters
---    menuVars : list of variables used for the current menu [Table]
---    svs      : SVs to copy [Table]
-function getSVsToCopy(menuVars, svs)
+--    menuVars  : list of variables used for the current menu [Table]
+--    svsToCopy : SVs to copy [Table]
+function getSVsToCopy(menuVars, svsToCopy)
     menuVars.copiedSVs = {}
-    local startOffset = svs[1].StartTime
-    for _, sv in pairs(svs) do
+    local startOffset = svsToCopy[1].StartTime
+    for _, sv in pairs(svsToCopy) do
         local relativeTime = sv.StartTime - startOffset 
         table.insert(menuVars.copiedSVs, {sv.Multiplier, relativeTime})
     end
