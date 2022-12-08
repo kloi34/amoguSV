@@ -1,4 +1,4 @@
--- amoguSV v5.0 beta (7 Dec 2022)
+-- amoguSV v5.0 beta (8 Dec 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -47,8 +47,6 @@ SV_INFO_WINDOW_SIZE = {271, 334}   -- dimensions of the window displaying SV inf
 
 MAX_SV_POINTS = 1000               -- maximum number of SV points allowed
 MIN_DURATION = 1/64                -- minimum millisecond duration allowed in general
-MIN_DURATION_FAR = 1/8             -- minimum millisecond duration for teleports above 4 minutes
---MIN_DURATION_FAR = 1               -- minimum millisecond duration for teleports above 17? minutes
 
 -------------------------------------------------------------------------------------- Menu related
 
@@ -1015,11 +1013,21 @@ function getSignOfNumber(number)
     if number >= 0 then return 1 end
     return -1
 end
--- Returns whether an offset is above 4 minutes [Boolean]
+-- Returns a usable multiplier for a given offset [Int/Float]
+--[[
+-- 64 until 2^18 = 262144 ms ~4.3 min, then —> 32
+-- 32 until 2^19 = 524288 ms ~8.7 min, then —> 16
+-- 16 until 2^20 = 1048576 ms ~17.4 min, then —> 8
+-- 8 until 2^21 = 2097152 ms ~34.9 min, then —> 4
+-- 4 until 2^22 = 4194304 ms ~69.9 min, then —> 2
+-- 2 until 2^23 = 8388608 ms ~139.8 min, then —> 1
+--]]
 -- Parameters
 --    offset: time in milliseconds [Int]
-function isAboveFourMinutes(offset)
-    return offset > 240000
+function getUsableOffsetMultiplier(offset)
+    local exponent = 23 - math.floor(math.log(math.abs(offset) + 1) / math.log(2))
+    if exponent > 6 then exponent = 6 end
+    return 2 ^ exponent
 end
 -- Normalizes a set of values to achieve a target average
 -- Parameters
@@ -1968,9 +1976,8 @@ function displaceNoteSVs(globalVars, menuVars)
     
     for i = 1, #offsets do
         local noteOffset = offsets[i]
-        local offsetAbove4Min = isAboveFourMinutes(noteOffset)
-        local multiplier = abc(offsetAbove4Min, 8, 64)
-        local duration = abc(offsetAbove4Min, MIN_DURATION_FAR, MIN_DURATION)
+        local multiplier = getUsableOffsetMultiplier(noteOffset)
+        local duration = 1 / multiplier
         local timeBefore = noteOffset - duration
         local timeAt = noteOffset
         local timeAfter = noteOffset + duration
@@ -2031,9 +2038,8 @@ function displaceViewSVs(globalVars, menuVars)
     for i = 1, #offsets - 1 do
         local note1Offset = offsets[i]
         local note2Offset = offsets[i + 1]
-        local offsetAbove4Min = isAboveFourMinutes(note2Offset)
-        local multiplier = abc(offsetAbove4Min, 8, 64)
-        local duration = abc(offsetAbove4Min, MIN_DURATION_FAR, MIN_DURATION)
+        local multiplier = getUsableOffsetMultiplier(note2Offset)
+        local duration = 1 / multiplier
         local time2Before = note2Offset - duration
         local time1At = note1Offset
         local time1After = note1Offset + duration
