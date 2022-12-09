@@ -46,7 +46,7 @@ SV_INFO_WINDOW_SIZE = {271, 334}   -- dimensions of the window displaying SV inf
 ------------------------------------------------------------------------------ SV/Time restrictions
 
 MAX_SV_POINTS = 1000               -- maximum number of SV points allowed
-MIN_DURATION = 1/64                -- minimum millisecond duration allowed in general
+--MIN_DURATION = 1/64                -- minimum millisecond duration allowed in general
 
 -------------------------------------------------------------------------------------- Menu related
 
@@ -59,6 +59,7 @@ DISPLACE_TYPES = {                 -- ways to scale/calculate distances
     "Absolute Distance"
 }
 EDIT_SV_TOOLS = {                  -- tools for editing SVs
+    "Add Teleport",
     "Copy & Paste",
     "Displace Note",
     "Displace View",
@@ -422,6 +423,7 @@ function editSVTab(globalVars)
     chooseEditTool(globalVars)
     addSeparator()
     local toolName = EDIT_SV_TOOLS[globalVars.editToolIndex]
+    if toolName == "Add Teleport"  then addTeleportMenu(globalVars) end
     if toolName == "Copy & Paste"  then copyNPasteMenu(globalVars) end
     if toolName == "Displace Note" then displaceNoteMenu(globalVars) end
     if toolName == "Displace View" then displaceViewMenu(globalVars) end
@@ -561,6 +563,19 @@ function placeSpecialSVMenu(globalVars)
     chooseSpecialSVType(menuVars)
     imgui.Text("Coming Soon (this is still beta amoguSV v5.0)")
     saveVariables("placeSpecialMenu", menuVars)
+end
+-- Creates the add teleport menu
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function addTeleportMenu(globalVars)
+    local menuVars = {
+        distance = 10727
+    }
+    getVariables("addTeleportMenu", menuVars)
+    chooseDistance(menuVars)
+    addSeparator()
+    simpleActionMenu("Add teleport", addTeleportSVs, globalVars, menuVars)
+    saveVariables("addTeleportMenu", menuVars)
 end
 -- Creates the copy and paste menu
 -- Parameters
@@ -1216,11 +1231,16 @@ end
 function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
     local minimumNotes = 2
     local actionThing = "between"
+    local onlyStart = false
     if actionName == "Displace note" then 
         minimumNotes = 1
         actionThing = "for"
+    elseif actionName == "Add teleport" then    
+        minimumNotes = 1
+        actionThing = "at"
+        onlyStart = true
     end
-    chooseStartEndOffsets(globalVars)
+    chooseStartEndOffsets(globalVars, onlyStart)
     local enoughSelectedNotes = #state.SelectedHitObjects < minimumNotes
     local needToSelectNotes = (not globalVars.useManualOffsets) and enoughSelectedNotes
     if needToSelectNotes then imgui.Text("Select "..minimumNotes.." or more notes") return end
@@ -1407,6 +1427,7 @@ function chooseEditTool(globalVars)
     _, comboIndex = imgui.Combo("##edittool", comboIndex, EDIT_SV_TOOLS, #EDIT_SV_TOOLS)
     globalVars.editToolIndex = comboIndex + 1
     local currentTool = EDIT_SV_TOOLS[globalVars.editToolIndex]
+    if currentTool == "Add Teleport"  then toolTip("Add a large teleport SV to move far away") end
     if currentTool == "Copy & Paste"  then toolTip("Copy SVs and paste them somewhere else") end
     if currentTool == "Displace Note" then toolTip("Move where notes are hit on the screen") end
     if currentTool == "Displace View" then toolTip("Temporarily displace the playfield view") end
@@ -1578,7 +1599,8 @@ end
 -- Lets you choose start and end offsets (globally available)
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
-function chooseStartEndOffsets(globalVars)
+--    onlyStart  : whether or not to only choose the start [Boolean]
+function chooseStartEndOffsets(globalVars, onlyStart)
     if not globalVars.useManualOffsets then return end
     
     local currentButtonSize = {DEFAULT_WIDGET_WIDTH * 0.4, DEFAULT_WIDGET_HEIGHT - 2}
@@ -1591,6 +1613,8 @@ function chooseStartEndOffsets(globalVars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.8)
     _, globalVars.startOffset = imgui.InputInt("Start", globalVars.startOffset)
     helpMarker("Start offset/time in milliseconds")
+    
+    if onlyStart then addSeparator() return end
     
     if imgui.Button("Current##endOffset", currentButtonSize) then
         globalVars.endOffset = state.SongTime
@@ -1909,6 +1933,55 @@ function deleteSVs(globalVars)
     local svsToRemove = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
     if #svsToRemove > 0 then actions.RemoveScrollVelocityBatch(svsToRemove) end
 end
+-- Adds teleport SVs 
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function addTeleportSVs(globalVars, menuVars)
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local svTimeIsAdded = {}
+    local offsets = {globalVars.startOffset}
+    if not globalVars.useManualOffsets then
+        offsets = uniqueSelectedNoteOffsets()
+    end
+    local startOffset = offsets[1]
+    local endOffset = offsets[#offsets]
+    local displaceAmount = menuVars.distance
+    
+    for i = 1, #offsets do
+        local noteOffset = offsets[i]
+        local multiplier = getUsableOffsetMultiplier(noteOffset)
+        local duration = 1 / multiplier
+        local timeAt = noteOffset
+        local timeAfter = noteOffset + duration
+        svTimeIsAdded[timeAt] = true
+        svTimeIsAdded[timeAfter] = true
+        local svMultiplierAt = getSVMultiplierAt(timeAt)
+        local svMultiplierAfter = getSVMultiplierAt(timeAfter)
+        local newMultiplierAt = displaceAmount * multiplier
+        local newMultiplierAfter = svMultiplierAfter
+        newMultiplierAt = newMultiplierAt + svMultiplierAt
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
+    end
+    
+    for _, sv in pairs(map.ScrollVelocities) do
+        local svIsInRange = sv.StartTime > startOffset - 1 and sv.StartTime < endOffset + 1
+        if svIsInRange then 
+            local svRemovable = svTimeIsAdded[sv.StartTime]
+            if svRemovable then table.insert(svsToRemove, sv) end
+        end
+    end
+    
+    if #svsToAdd > 0 then
+        local editorActions = {
+            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
+            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
+        }
+        actions.PerformBatch(editorActions)
+    end
+end
 -- Copies SVs
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -2024,10 +2097,8 @@ function displaceViewSVs(globalVars, menuVars)
     local svsToAdd = {}
     local svsToRemove = {}
     local svTimeIsAdded = {}
-    local offsets
-    if globalVars.useManualOffsets then
-        offsets = {globalVars.startOffset, globalVars.endOffset}
-    else
+    local offsets = {globalVars.startOffset, globalVars.endOffset}
+    if not globalVars.useManualOffsets then
         local selectedOffsets = uniqueSelectedNoteOffsets()
         offsets = uniqueNoteOffsets(selectedOffsets[1], selectedOffsets[#selectedOffsets])
     end
