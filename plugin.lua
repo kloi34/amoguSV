@@ -1,4 +1,4 @@
--- amoguSV v5.0 beta (11 Dec 2022)
+-- amoguSV v5.0 beta (13 Dec 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -51,7 +51,9 @@ MAX_SV_POINTS = 1000               -- maximum number of SV points allowed
 -------------------------------------------------------------------------------------- Menu related
 
 COLOR_SCHEMES = {                  -- available color themes for the plugin
-    "Default",
+    "Classic",
+    "Strawberry",
+    "Glass",
     "RGB Gamer Mode"
 }
 DISPLACE_TYPES = {                 -- ways to scale/calculate distances
@@ -165,7 +167,8 @@ function setPluginAppearance(globalVars)
     setPluginAppearanceStyles(styleScheme)
     setPluginAppearanceColors(globalVars, colorScheme)
     
-    if colorScheme == "RGB Gamer Mode" then updateRGBColors(globalVars) end
+    local updateRGB = colorScheme == "RGB Gamer Mode"
+    if updateRGB then updateRGBColors(globalVars) end
 end
 -- Configures the plugin GUI styles
 -- Parameters
@@ -190,8 +193,9 @@ end
 --    globalVars  : list of variables used globally across all menus [Table]
 --    colorScheme : name of the desired color scheme [String]
 function setPluginAppearanceColors(globalVars, colorScheme)
-    if colorScheme == "Default" then
+    if colorScheme == "Classic" then
         imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Border,                 { 0.81, 0.88, 1.00, 0.30 } )
         imgui.PushStyleColor( imgui_col.FrameBg,                { 0.14, 0.24, 0.28, 1.00 } )
         imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.24, 0.34, 0.38, 1.00 } )
         imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.29, 0.39, 0.43, 1.00 } )
@@ -215,12 +219,68 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.31, 0.38, 0.50, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.41, 0.48, 0.60, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.51, 0.58, 0.70, 1.00 } )
+    elseif colorScheme == "Strawberry" then
+        imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Border,                 { 1.00, 0.81, 0.88, 0.30 } )
+        imgui.PushStyleColor( imgui_col.FrameBg,                { 0.28, 0.14, 0.24, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.38, 0.24, 0.34, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.43, 0.29, 0.39, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBg,                { 0.65, 0.41, 0.48, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          { 0.75, 0.51, 0.58, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       { 0.75, 0.51, 0.58, 0.50 } )
+        imgui.PushStyleColor( imgui_col.CheckMark,              { 1.00, 0.81, 0.88, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             { 0.75, 0.56, 0.63, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       { 0.80, 0.61, 0.68, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Button,                 { 0.50, 0.31, 0.38, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.60, 0.41, 0.48, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.70, 0.51, 0.58, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Tab,                    { 0.50, 0.31, 0.38, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabHovered,             { 0.75, 0.51, 0.58, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabActive,              { 0.75, 0.51, 0.58, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Header,                 { 1.00, 0.81, 0.88, 0.40 } )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          { 1.00, 0.81, 0.88, 0.50 } )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           { 1.00, 0.81, 0.88, 0.54 } )
+        imgui.PushStyleColor( imgui_col.Separator,              { 1.00, 0.81, 0.88, 0.30 } )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 1.00, 0.81, 0.88, 0.40 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.50, 0.31, 0.38, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.60, 0.41, 0.48, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.70, 0.51, 0.58, 1.00 } )
+    elseif colorScheme == "Glass" then
+        local transparent = {0.00, 0.00, 0.00, 0.25}
+        imgui.PushStyleColor( imgui_col.WindowBg,               transparent )
+        imgui.PushStyleColor( imgui_col.Border,                 transparent )
+        imgui.PushStyleColor( imgui_col.FrameBg,                transparent )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         transparent )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          transparent )
+        imgui.PushStyleColor( imgui_col.TitleBg,                transparent )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent )
+        imgui.PushStyleColor( imgui_col.CheckMark,              transparent )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             transparent )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       transparent )
+        imgui.PushStyleColor( imgui_col.Button,                 transparent )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          transparent )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           transparent )
+        imgui.PushStyleColor( imgui_col.Tab,                    transparent )
+        imgui.PushStyleColor( imgui_col.TabHovered,             transparent )
+        imgui.PushStyleColor( imgui_col.TabActive,              transparent )
+        imgui.PushStyleColor( imgui_col.Header,                 transparent )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          transparent ) 
+        imgui.PushStyleColor( imgui_col.HeaderActive,           transparent )
+        imgui.PushStyleColor( imgui_col.Separator,              transparent )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         transparent )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          transparent )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   transparent )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    transparent )
     elseif colorScheme == "RGB Gamer Mode" then
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
         local inactiveColor = {globalVars.red, globalVars.green, globalVars.blue, 0.5}
         local white = {1.00, 1.00, 1.00, 1.00}
         local clearWhite = {1.00, 1.00, 1.00, 0.40}
+        local black = {0.00, 0.00, 0.00, 1.00}
         
+        imgui.PushStyleColor( imgui_col.WindowBg,               black         )
+        imgui.PushStyleColor( imgui_col.Border,                 inactiveColor )
         imgui.PushStyleColor( imgui_col.FrameBg,                inactiveColor )
         imgui.PushStyleColor( imgui_col.FrameBgHovered,         activeColor   )
         imgui.PushStyleColor( imgui_col.FrameBgActive,          activeColor   )
@@ -239,7 +299,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.Header,                 inactiveColor )
         imgui.PushStyleColor( imgui_col.HeaderHovered,          inactiveColor )
         imgui.PushStyleColor( imgui_col.HeaderActive,           activeColor   )
-        imgui.PushStyleColor( imgui_col.Separator,              activeColor   )
+        imgui.PushStyleColor( imgui_col.Separator,              inactiveColor )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         clearWhite    )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          inactiveColor )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor   )
@@ -360,7 +420,7 @@ function draw()
         blue = 1,
         editToolIndex = 1,
         placeTypeIndex = 1,
-        debugText = "debuggy"
+        debugText = "debuggy capybara"
     }
     getVariables("globalVars", globalVars)
     setPluginAppearance(globalVars)
@@ -418,6 +478,16 @@ function choosePluginSettings(globalVars)
     addSeparator()
     chooseStyleScheme(globalVars)
     chooseColorScheme(globalVars)
+    addSeparator()
+    imgui.TextDisabled("How to permanently change default settings?")
+    if not imgui.IsItemHovered() then return end
+    imgui.BeginTooltip()
+    imgui.BulletText("Open the plugin file (\"plugin.lua\") in a text editor or code editor")
+    imgui.BulletText("Find the line with \"globalVars = \"")
+    imgui.BulletText("Edit index values in globalVars that correspond to a plugin setting")
+    imgui.BulletText("Save the file with changes and reload the plugin")
+    imgui.Text("Example: change \"colorSchemeIndex = 1,\" to \"colorSchemeIndex = 2,\"")
+    imgui.EndTooltip()
 end
 -- Creates the "Place SVs" tab
 -- Parameters
@@ -1450,13 +1520,7 @@ function editSVs(globalVars, menuVars, func, needOffsets)
             end
         end
     end
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -1647,6 +1711,12 @@ function chooseStillType(menuVars)
     local comboIndex = menuVars.stillTypeIndex - 1
     _, comboIndex = imgui.Combo("Displacement", comboIndex, STILL_TYPES, #STILL_TYPES)
     menuVars.stillTypeIndex = comboIndex + 1
+    
+    if stillType == "No"    then toolTip("Don't use an inital or end displacement") end
+    if stillType == "Start" then toolTip("Use an inital starting displacement for the still") end
+    if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
+    if stillType == "Auto"  then toolTip("Use last displacement of a previous still to start") end
+    
     if dontChooseDistance then
         imgui.Unindent(indentWidth)
     end
@@ -2080,6 +2150,34 @@ end
 
 ------------------------------------------------------------------------------------- Acting on SVs
 
+-- Gets removable SVs
+-- Parameters
+--    svsToRemove   : list of SVs to remove [Table]
+--    svTimeIsAdded : list of SVs times added [Table]
+--    startOffset   : starting offset to remove after [Int]
+--    endOffset     : endd offset to remove before [Int]
+function getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    for _, sv in pairs(map.ScrollVelocities) do
+        local svIsInRange = sv.StartTime >= startOffset - 1 and sv.StartTime <= endOffset + 1
+        if svIsInRange then 
+            local svRemovable = svTimeIsAdded[sv.StartTime]
+            if svRemovable then table.insert(svsToRemove, sv) end
+        end
+    end
+end
+-- Removes and adds SVs
+-- Parameters
+--    svsToRemove : list of SVs to remove [Table]
+--    svsToAdd    : list of SVs to add [Table]
+function removeAndAddSVs(svsToRemove, svsToAdd)
+    if #svsToAdd > 0 then
+        local editorActions = {
+            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
+            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
+        }
+        actions.PerformBatch(editorActions)
+    end
+end
 -- Places SVs
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -2114,21 +2212,15 @@ function placeSVs(globalVars, menuVars)
         svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
     end
     
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    removeAndAddSVs(svsToRemove, svsToAdd)
     
     if placingStillSVs then placeStillSVs(menuVars, firstOffset, lastOffset) end
 end
 -- Places still SVs
 -- Parameters
---    menuVars    : list of variables used for the current menu [Table]
---    firstOffset : starting millisecond time of the still [Int]
---    lastOffset  : ending millisecond time of the still [Int]
+--    menuVars      : list of variables used for the current menu [Table]
+--    firstOffset   : starting millisecond time of the still [Int]
+--    lastOffset    : ending millisecond time of the still [Int]
 function placeStillSVs(menuVars, firstOffset, lastOffset)
     local stillType = STILL_TYPES[menuVars.stillTypeIndex]
     local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
@@ -2175,22 +2267,8 @@ function placeStillSVs(menuVars, firstOffset, lastOffset)
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, newMultiplierBefore))
         end
     end
-    
-    for _, sv in pairs(map.ScrollVelocities) do
-        local svIsInRange = sv.StartTime >= firstOffset - 1 and sv.StartTime <= lastOffset + 1
-        if svIsInRange then 
-            local svRemovable = svTimeIsAdded[sv.StartTime]
-            if svRemovable then table.insert(svsToRemove, sv) end
-        end
-    end
-    
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, firstOffset, lastOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Deletes SVs
 -- Parameters
@@ -2233,21 +2311,8 @@ function addTeleportSVs(globalVars, menuVars)
         table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
     end
     
-    for _, sv in pairs(map.ScrollVelocities) do
-        local svIsInRange = sv.StartTime >= startOffset - 1 and sv.StartTime <= endOffset + 1
-        if svIsInRange then 
-            local svRemovable = svTimeIsAdded[sv.StartTime]
-            if svRemovable then table.insert(svsToRemove, sv) end
-        end
-    end
-    
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Copies SVs
 -- Parameters
@@ -2299,21 +2364,8 @@ function flickerSVs(globalVars, menuVars)
         end
     end
     
-    for _, sv in pairs(map.ScrollVelocities) do
-        local svIsInRange = sv.StartTime >= startOffset - 1 and sv.StartTime <= endOffset + 1
-        if svIsInRange then 
-            local svRemovable = svTimeIsAdded[sv.StartTime]
-            if svRemovable then table.insert(svsToRemove, sv) end
-        end
-    end
-    
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Measures SVs
 -- Parameters
@@ -2399,21 +2451,8 @@ function displaceNoteSVs(globalVars, menuVars)
         table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
     end
     
-    for _, sv in pairs(map.ScrollVelocities) do
-        local svIsInRange = sv.StartTime >= startOffset - 1 and sv.StartTime <= endOffset + 1
-        if svIsInRange then 
-            local svRemovable = svTimeIsAdded[sv.StartTime]
-            if svRemovable then table.insert(svsToRemove, sv) end
-        end
-    end
-    
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Adds SVs that temporarily displace the playfield view
 -- Parameters
@@ -2458,27 +2497,13 @@ function displaceViewSVs(globalVars, menuVars)
         table.insert(svsToAdd, utils.CreateScrollVelocity(time1At, newMultiplierAt))
         table.insert(svsToAdd, utils.CreateScrollVelocity(time1After, newMultiplierAfter))
     end
-    
-    local svExistsAtEndOffset = false
-    for _, sv in pairs(map.ScrollVelocities) do
-        local svIsInRange = sv.StartTime >= startOffset and sv.StartTime <= endOffset
-        if svIsInRange then 
-            svExistsAtEndOffset = svExistsAtEndOffset or (sv.StartTime == endOffset)
-            local svRemovable = svTimeIsAdded[sv.StartTime]
-            if svRemovable then table.insert(svsToRemove, sv) end
-        end
-    end
+    local sv = map.GetScrollVelocityAt(endOffset) 
+    local svExistsAtEndOffset = sv and (sv.StartTime == endOffset)
     if not svExistsAtEndOffset then
         table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, 1))
     end
-    
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Pastes copied SVs
 -- Parameters
