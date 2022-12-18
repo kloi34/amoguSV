@@ -1,4 +1,4 @@
--- amoguSV v5.0 beta (13 Dec 2022)
+-- amoguSV v5.0 (18 Dec 2022)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -46,7 +46,6 @@ SV_INFO_WINDOW_SIZE = {271, 334}   -- dimensions of the window displaying SV inf
 ------------------------------------------------------------------------------ SV/Time restrictions
 
 MAX_SV_POINTS = 1000               -- maximum number of SV points allowed
---MIN_DURATION = 1/64                -- minimum millisecond duration allowed in general
 
 -------------------------------------------------------------------------------------- Menu related
 
@@ -69,7 +68,6 @@ EDIT_SV_TOOLS = {                  -- tools for editing SVs
     "Measure",
     "Merge",
     "Scale"
---    "Vibe"
 }
 EMOTICONS = {                      -- emoticons to visually clutter the plugin and confuse users
     "( - _ - )",
@@ -80,7 +78,7 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "( ^ w ^ )",
     "( o _ 0 )",
     "( > . < )",
-    "( c . p )",
+    "( v . ^ )",
     "( ; _ ; )",
     "[mwm]",
     "[ v . ^ ]"
@@ -118,8 +116,6 @@ SECTIONS = {                       -- ways to apply SV actions on sections
 }
 SPECIAL_SVS = {                    -- tools for placing special SVs
     "Stutter",
-    "Single",
---    "Combo",
     "Reverse Scroll",
     "Splitscroll",
     "Animate"
@@ -247,6 +243,8 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.70, 0.51, 0.58, 1.00 } )
     elseif colorScheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
+        local white = {1.00, 1.00, 1.00, 1.00}
+        
         imgui.PushStyleColor( imgui_col.WindowBg,               transparent )
         imgui.PushStyleColor( imgui_col.Border,                 transparent )
         imgui.PushStyleColor( imgui_col.FrameBg,                transparent )
@@ -255,9 +253,9 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.TitleBg,                transparent )
         imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent )
         imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent )
-        imgui.PushStyleColor( imgui_col.CheckMark,              transparent )
-        imgui.PushStyleColor( imgui_col.SliderGrab,             transparent )
-        imgui.PushStyleColor( imgui_col.SliderGrabActive,       transparent )
+        imgui.PushStyleColor( imgui_col.CheckMark,              white       )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             white       )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       white       )
         imgui.PushStyleColor( imgui_col.Button,                 transparent )
         imgui.PushStyleColor( imgui_col.ButtonHovered,          transparent )
         imgui.PushStyleColor( imgui_col.ButtonActive,           transparent )
@@ -269,9 +267,9 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderActive,           transparent )
         imgui.PushStyleColor( imgui_col.Separator,              transparent )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         transparent )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          transparent )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   transparent )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    transparent )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          white       )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white       )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white       )
     elseif colorScheme == "RGB Gamer Mode" then
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
         local inactiveColor = {globalVars.red, globalVars.green, globalVars.blue, 0.5}
@@ -324,7 +322,7 @@ function updateRGBColors(globalVars)
     local decreaseGreen = fullyBlue and noRed and (not noGreen)
     local decreaseBlue = fullyRed and noGreen and (not noBlue)
     
-    local increment = 0.0005
+    local increment = 0.0004
     if increaseRed then globalVars.red = round(globalVars.red + increment, 4) return end
     if decreaseRed then globalVars.red = round(globalVars.red - increment, 4) return end
     if increaseGreen then globalVars.green = round(globalVars.green + increment, 4) return end
@@ -425,7 +423,7 @@ function draw()
     getVariables("globalVars", globalVars)
     setPluginAppearance(globalVars)
     
-    imgui.Begin("amoguSV (v5.0 beta)", imgui_window_flags.AlwaysAutoResize)
+    imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     imgui.BeginTabBar("SV tabs")
     for i = 1, #TAB_MENUS do
@@ -483,7 +481,7 @@ function choosePluginSettings(globalVars)
     if not imgui.IsItemHovered() then return end
     imgui.BeginTooltip()
     imgui.BulletText("Open the plugin file (\"plugin.lua\") in a text editor or code editor")
-    imgui.BulletText("Find the line with \"globalVars = \"")
+    imgui.BulletText("Find the line with \"local globalVars = { \"")
     imgui.BulletText("Edit index values in globalVars that correspond to a plugin setting")
     imgui.BulletText("Save the file with changes and reload the plugin")
     imgui.Text("Example: change \"colorSchemeIndex = 1,\" to \"colorSchemeIndex = 2,\"")
@@ -646,8 +644,94 @@ function placeSpecialSVMenu(globalVars)
     }
     getVariables("placeSpecialMenu", menuVars)
     chooseSpecialSVType(menuVars)
-    imgui.Text("Coming Soon (this is still beta amoguSV v5.0)")
+    local currentSVType = SPECIAL_SVS[menuVars.svTypeIndex]
+    if currentSVType == "Stutter"        then stutterMenu(globalVars) end
+    if currentSVType == "Reverse Scroll" then reverseScrollMenu(globalVars) end
+    if currentSVType == "Splitscroll"    then splitScrollMenu(globalVars) end
+    if currentSVType == "Animate"        then imgui.Text("Coming Soon ?!?!") end
     saveVariables("placeSpecialMenu", menuVars)
+end
+-- Creates the menu for stutter SV
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function stutterMenu(globalVars)
+    local menuVars = {
+        startSV = 1.5,
+        endSV = 0.5,
+        stutterDuration = 50,
+        stuttersPerSection = 1,
+        avgSV = 1,
+        finalSVIndex = 3,
+        customSV = 1,
+        linearlyChange = false,
+        svMultipliers = {},
+        svDistances = {},
+        svStats = {
+            minScale = 0,
+            maxScale = 0,
+            distMinScale = 0,
+            distMaxScale = 0,
+        },
+        svMultipliers2 = {},
+        svDistances2 = {},
+        svStats2 = {
+            minScale = 0,
+            maxScale = 0,
+            distMinScale = 0,
+            distMaxScale = 0,
+        }
+    }
+    getVariables("stutterMenu", menuVars)
+    
+    local settingsChanged = #menuVars.svMultipliers == 0
+    imgui.Text("First SV:")
+    settingsChanged = chooseStartEndSVs(menuVars) or settingsChanged
+    settingsChanged = chooseStutterDuration(menuVars) or settingsChanged
+    addSeparator()
+    settingsChanged = chooseStuttersPerSection(menuVars) or settingsChanged
+    settingsChanged = chooseAverageSV(menuVars) or settingsChanged
+    settingsChanged = chooseFinalSV(menuVars) or settingsChanged
+    settingsChanged = chooseLinearlyChange(menuVars) or settingsChanged
+        
+    if settingsChanged then updateStutterMenuSVs(menuVars) end
+    
+    makeSVInfoWindow(menuVars)
+    
+    addSeparator()
+    simpleActionMenu("Place", placeStutterSVs, globalVars, menuVars)
+    saveVariables("stutterMenu", menuVars)
+end
+-- Creates the menu for reverse scroll SV
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function reverseScrollMenu(globalVars)
+    local menuVars = {
+        avgSV = -1,
+        distance = 400
+    }
+    getVariables("reverseScrollMenu", menuVars)
+    chooseAverageSV(menuVars)
+    chooseDistance(menuVars)
+    helpMarker("Height at which revesrse scroll notes are hit")
+    addSeparator()
+    simpleActionMenu("Place", placeReverseScrollSVs, globalVars, menuVars)
+    saveVariables("reverseScrollMenu", menuVars)
+end
+-- Creates the menu for splitscroll SV
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function splitScrollMenu(globalVars)
+    local menuVars = {
+        avgSV = -1,
+        distance = 400
+    }
+    getVariables("splitScrollMenu", menuVars)
+    imgui.Text("Coming Soon ?!?!")
+    --chooseAverageSV(menuVars)
+    --chooseDistance(menuVars)
+    --addSeparator()
+    -- simpleActionMenu("Place", placeSplitScrollSVs, globalVars, menuVars)
+    saveVariables("splitScrollMenu", menuVars)
 end
 -- Creates the menu for placing still SVs
 -- Parameters
@@ -780,6 +864,7 @@ function flickerMenu(globalVars)
     }
     getVariables("flickerMenu", menuVars)
     chooseFlickerType(menuVars)
+    helpMarker("Use \"Displace View\" + large negative distance for manual flickers")
     chooseDistance(menuVars)
     chooseNumFlickers(menuVars)
     addSeparator()
@@ -853,6 +938,23 @@ function displayMeasuredStats(menuVars)
                "places), calculated with SVs")
     imgui.Text("Average SV: "..menuVars.avgSV.."x")
     helpMarker("(rounded to 5 decimal places)")
+end
+-- Displays stats for stutter SVs
+-- Parameters
+--    svMultipliers   : stutter multipliers [Table]
+--    stutterDuration : duration of the stutter (out of 100) [Int]
+function displayStutterSVStats(svMultipliers, stutterDuration)
+    local firstSV = round(svMultipliers[1], 3)
+    local secondSV = round(svMultipliers[2], 3)
+    local firstDuration = stutterDuration
+    local secondDuration = 100 - stutterDuration
+    imgui.Columns(2, "SV Stutter Stats", false)
+    imgui.Text("First SV:")
+    imgui.Text("Second SV:")
+    imgui.NextColumn()
+    imgui.Text(firstSV.."x  ("..firstDuration.."%% duration)")
+    imgui.Text(secondSV.."x  ("..secondDuration.."%% duration)")
+    imgui.Columns(1)
 end
 -- Displays stats for the current menu's SVs
 -- Parameters
@@ -938,18 +1040,38 @@ function getSettingVars(svType)
 end
 -- Creates a new window with plots/graphs and stats of the current menu's SVs
 -- Parameters
---    menuVars : list of variables used for the current SV menu [Table]
+--    menuVars : list of variables used for the current menu [Table]
 function makeSVInfoWindow(menuVars)
     local svStats = menuVars.svStats
+    local windowText = "SV Info"
+    if menuVars.linearlyChange then windowText = windowText.." (Starting first SV)" end
+    
     imgui.SetNextWindowSize(SV_INFO_WINDOW_SIZE)
-    imgui.Begin("SV Info", imgui_window_flags.AlwaysAutoResize)
+    imgui.Begin(windowText, imgui_window_flags.AlwaysAutoResize)
     imgui.Text("Projected Note Motion:")
     helpMarker("Distance vs Time graph of notes")
     plotSVMotion(menuVars.svDistances, svStats.distMinScale, svStats.distMaxScale)
     imgui.Text("Projected SVs:")
     plotSVs(menuVars.svMultipliers, svStats.minScale, svStats.maxScale)
-    displaySVStats(svStats)
+    if menuVars.stutterDuration then
+        displayStutterSVStats(menuVars.svMultipliers, menuVars.stutterDuration)
+    else
+        displaySVStats(svStats)
+    end
     imgui.End()
+    
+    if menuVars.linearlyChange then
+        imgui.SetNextWindowSize(SV_INFO_WINDOW_SIZE)
+        imgui.Begin("SV Info (Ending first SV)", imgui_window_flags.AlwaysAutoResize)
+        local svStats2 = menuVars.svStats2
+        imgui.Text("Projected Note Motion:")
+        helpMarker("Distance vs Time graph of notes")
+        plotSVMotion(menuVars.svDistances2, svStats2.distMinScale, svStats2.distMaxScale)
+        imgui.Text("Projected SVs:")
+        plotSVs(menuVars.svMultipliers2, svStats2.minScale, svStats2.maxScale)
+        displayStutterSVStats(menuVars.svMultipliers2, menuVars.stutterDuration)
+        imgui.End()
+    end
 end
 -- Provides a copy-pastable link to a cubic bezier website and also can parse inputted links
 -- Returns whether new bezier coordinates were parsed [Boolean]
@@ -1003,6 +1125,50 @@ function updateMenuSVs(currentSVType, menuVars, settingVars)
     
     updateSVStats(menuVars.svStats, menuVars.svMultipliers, svMultipliersNoEndSV,
                   menuVars.svDistances)
+end
+-- Updates SVs and SV info stored in the stutter menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function updateStutterMenuSVs(menuVars)
+    menuVars.svMultipliers = generateSVMultipliers("Stutter1", menuVars)
+    local svMultipliersNoEndSV = makeDuplicateList(menuVars.svMultipliers)
+    table.remove(svMultipliersNoEndSV, #svMultipliersNoEndSV)
+    
+    menuVars.svMultipliers2 = generateSVMultipliers("Stutter2", menuVars)
+    local svMultipliersNoEndSV2 = makeDuplicateList(menuVars.svMultipliers2)
+    table.remove(svMultipliersNoEndSV2, #svMultipliersNoEndSV2)
+    
+    menuVars.svDistances = calculateStutterDistanceVsTime(svMultipliersNoEndSV, 
+                                                          menuVars.stutterDuration,
+                                                          menuVars.stuttersPerSection)
+    menuVars.svDistances2 = calculateStutterDistanceVsTime(svMultipliersNoEndSV2, 
+                                                           menuVars.stutterDuration,
+                                                           menuVars.stuttersPerSection)
+    
+    local finalSVType = FINAL_SV_TYPES[menuVars.finalSVIndex]
+    if menuVars.linearlyChange then
+        if finalSVType == "Skip" then
+            table.remove(menuVars.svMultipliers2, #menuVars.svMultipliers2)
+        end
+        if finalSVType == "Custom" then
+            table.remove(menuVars.svMultipliers2, #menuVars.svMultipliers2)
+            table.insert(menuVars.svMultipliers2, menuVars.customSV)
+        end
+    else
+        if finalSVType == "Skip" then
+            table.remove(menuVars.svMultipliers, #menuVars.svMultipliers)
+        end
+        if finalSVType == "Custom" then
+            table.remove(menuVars.svMultipliers, #menuVars.svMultipliers)
+            table.insert(menuVars.svMultipliers, menuVars.customSV)
+        end
+    end
+    local svStats = menuVars.svStats
+    svStats.minScale, svStats.maxScale = calculatePlotScale(menuVars.svMultipliers)
+    svStats.distMinScale, svStats.distMaxScale = calculatePlotScale(menuVars.svDistances)
+    local svStats2 = menuVars.svStats2
+    svStats2.minScale, svStats2.maxScale = calculatePlotScale(menuVars.svMultipliers2)
+    svStats2.distMinScale, svStats2.distMaxScale = calculatePlotScale(menuVars.svDistances2)
 end
 -- Updates stats for the current menu's SVs
 -- Parameters
@@ -1314,8 +1480,7 @@ end
 -- Calculates distance vs time values of a note given a set of SV values
 -- Returns the list of distances [Table]
 -- Parameters
---    svValues        : set of SV values [Table]
---    stutterDuration : duration of stutter SV (if applicable) [Int/Float]
+--    svValues : set of SV values [Table]
 function calculateDistanceVsTime(svValues)
     local distance = 0
     local distancesBackwards = {distance}
@@ -1349,13 +1514,17 @@ end
 -- Calculates distance vs time values of a note given a set of stutter SV values
 -- Returns the list of distances [Table]
 -- Parameters
---    svValues        : set of SV values [Table]
---    stutterDuration : duration of stutter SV [Int/Float]
-function calculateStutterDistanceVsTime(svValues, stutterDuration)
+--    svValues           : set of SV values [Table]
+--    stutterDuration    : duration of stutter SV [Int/Float]
+--    stuttersPerSection : number of stutters per section [Int]
+function calculateStutterDistanceVsTime(svValues, stutterDuration, stuttersPerSection)
     local distance = 0
     local distancesBackwards = {distance}
-    for i = 1, 100 do
-        if i < (100 - stutterDuration) then
+    local iterations = stuttersPerSection * 100
+    if iterations > 1000 then iterations = 1000 end
+    for i = 1, iterations do
+        local x = ((i - 1) % 100) + 1
+        if x <= (100 - stutterDuration) then
             distance = distance + svValues[2]
         else
             distance = distance + svValues[1]
@@ -1692,35 +1861,15 @@ function chooseFinalSV(settingVars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     return (oldIndex ~= settingVars.finalSVIndex) or (oldCustomSV ~= settingVars.customSV)
 end
--- Lets you choose the still type
+-- Lets you choose whether or not to linearly change something
+-- Returns whether or not the choice changed [Boolean]
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
-function chooseStillType(menuVars)
-    local stillType = STILL_TYPES[menuVars.stillTypeIndex]
-    local dontChooseDistance = stillType == "No" or stillType == "Auto"
-    local indentWidth = DEFAULT_WIDGET_WIDTH * 0.5 + 16
-    if dontChooseDistance then
-        imgui.Indent(indentWidth)
-    else
-        imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.6 - 5)
-        _, menuVars.stillDistance = imgui.InputFloat("##still", menuVars.stillDistance, 0, 0,
-                                                     "%.2f msx")
-        imgui.SameLine(0, SAMELINE_SPACING)
-    end
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.4)
-    local comboIndex = menuVars.stillTypeIndex - 1
-    _, comboIndex = imgui.Combo("Displacement", comboIndex, STILL_TYPES, #STILL_TYPES)
-    menuVars.stillTypeIndex = comboIndex + 1
-    
-    if stillType == "No"    then toolTip("Don't use an inital or end displacement") end
-    if stillType == "Start" then toolTip("Use an inital starting displacement for the still") end
-    if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
-    if stillType == "Auto"  then toolTip("Use last displacement of a previous still to start") end
-    
-    if dontChooseDistance then
-        imgui.Unindent(indentWidth)
-    end
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+function chooseLinearlyChange(menuVars)
+    local oldChoice = menuVars.linearlyChange
+    local _, newChoice = imgui.Checkbox("Change stutter over time", oldChoice)
+    menuVars.linearlyChange = newChoice
+    return oldChoice ~= newChoice
 end
 -- Lets you choose the flicker type
 -- Parameters
@@ -1900,11 +2049,71 @@ end
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function chooseStartEndSVs(settingVars)
-    local oldValues = {settingVars.startSV, settingVars.endSV}
-    local _, newValues = imgui.InputFloat2("Start/End SV", oldValues, "%.2fx")
-    settingVars.startSV = newValues[1]
-    settingVars.endSV = newValues[2]
-    return oldValues[1] ~= newValues[1] or oldValues[2] ~= newValues[2]
+    if settingVars.linearlyChange == false then
+        local oldValue = settingVars.startSV
+        local _, newValue = imgui.InputFloat("Start SV", oldValue, 0, 0, "%.2fx")
+        settingVars.startSV = newValue
+        return oldValue ~= newValue
+    else
+        local oldValues = {settingVars.startSV, settingVars.endSV}
+        local _, newValues = imgui.InputFloat2("Start/End SV", oldValues, "%.2fx")
+        settingVars.startSV = newValues[1]
+        settingVars.endSV = newValues[2]
+        return oldValues[1] ~= newValues[1] or oldValues[2] ~= newValues[2]
+    end
+end
+-- Lets you choose the still type
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseStillType(menuVars)
+    local stillType = STILL_TYPES[menuVars.stillTypeIndex]
+    local dontChooseDistance = stillType == "No" or stillType == "Auto"
+    local indentWidth = DEFAULT_WIDGET_WIDTH * 0.5 + 16
+    if dontChooseDistance then
+        imgui.Indent(indentWidth)
+    else
+        imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.6 - 5)
+        _, menuVars.stillDistance = imgui.InputFloat("##still", menuVars.stillDistance, 0, 0,
+                                                     "%.2f msx")
+        imgui.SameLine(0, SAMELINE_SPACING)
+    end
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.4)
+    local comboIndex = menuVars.stillTypeIndex - 1
+    _, comboIndex = imgui.Combo("Displacement", comboIndex, STILL_TYPES, #STILL_TYPES)
+    menuVars.stillTypeIndex = comboIndex + 1
+    
+    if stillType == "No"    then toolTip("Don't use an inital or end displacement") end
+    if stillType == "Start" then toolTip("Use an inital starting displacement for the still") end
+    if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
+    if stillType == "Auto"  then toolTip("Use last displacement of a previous still to start") end
+    
+    if dontChooseDistance then
+        imgui.Unindent(indentWidth)
+    end
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+end
+-- Lets users choose the duration of the first stutter SV
+-- Returns whether or not the duration changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseStutterDuration(menuVars)
+    local oldDuration = menuVars.stutterDuration
+    local _, newDuration = imgui.SliderInt("Duration", oldDuration, 1, 99, oldDuration.."%%")
+    newDuration = clampToInterval(newDuration, 1, 99)
+    menuVars.stutterDuration = newDuration 
+    return oldDuration ~= newDuration 
+end
+-- Lets users choose the number of stutters per section
+-- Returns whether or not the number of stutters changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseStuttersPerSection(menuVars)
+    local oldNumber = menuVars.stuttersPerSection
+    local _, newNumber = imgui.InputInt("Stutters", oldNumber, 1, 1)
+    helpMarker("Number of stutters per note/per section")
+    newNumber = clampToInterval(newNumber, 1, 100)
+    menuVars.stuttersPerSection = newNumber
+    return oldNumber ~= newNumber
 end
 -- Lets users choose the style scheme of the plugin
 -- Parameters
@@ -1998,6 +2207,12 @@ function generateSVMultipliers(svType, settingVars)
                                         settingVars.randomScale)
     elseif svType == "Custom" then
         multipliers = generateCustomSet(settingVars.svMultipliers)
+    elseif svType == "Stutter1" then
+        multipliers = generateStutterSet(settingVars.startSV, settingVars.stutterDuration,
+                                         settingVars.avgSV)
+    elseif svType == "Stutter2" then
+        multipliers = generateStutterSet(settingVars.endSV, settingVars.stutterDuration,
+                                         settingVars.avgSV)
     end
     return multipliers
 end
@@ -2147,6 +2362,16 @@ function generateCustomSet(oldMultipliers)
     table.insert(newMultipliers, averageMultiplier)
     return newMultipliers
 end
+-- Returns a set of stutter values [Table]
+-- Parameters
+--    firstSV         : value of the first SV of the stutter [Int/Float]
+--    stutterDuration : duration of the stutter (out of 100) [Int]
+--    avgSV           : average SV value [Int/Float]
+function generateStutterSet(firstSV, stutterDuration, avgSV)
+    local durationPercent = stutterDuration / 100
+    local secondSV = (avgSV - firstSV * durationPercent) / (1 - durationPercent)
+    return {firstSV, secondSV, avgSV}
+end
 
 ------------------------------------------------------------------------------------- Acting on SVs
 
@@ -2178,12 +2403,62 @@ function removeAndAddSVs(svsToRemove, svsToAdd)
         actions.PerformBatch(editorActions)
     end
 end
+-- Places stutter SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function placeStutterSVs(globalVars, menuVars)
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local offsets = getSelectedOffsets(globalVars)
+    local firstOffset = offsets[1]
+    local lastOffset = offsets[#offsets]
+    local firstStutterSVs
+    if menuVars.linearlyChange then 
+        firstStutterSVs = generateLinearSet(menuVars.startSV, menuVars.endSV, #offsets - 1)
+    else
+        firstStutterSVs = generateLinearSet(menuVars.startSV, menuVars.startSV, #offsets - 1)
+    end
+    for i = 1, #offsets - 1 do
+        local svMultipliers = generateStutterSet(firstStutterSVs[i], menuVars.stutterDuration,
+                                                 menuVars.avgSV)
+        local startOffset = offsets[i]
+        local endOffset = offsets[i + 1]
+        local stutterOffsets =  generateLinearSet(startOffset, endOffset,
+                                                  menuVars.stuttersPerSection + 1)
+        for j = 1, #stutterOffsets - 1 do
+            local stutterStart = stutterOffsets[j]
+            local stutterEnd = stutterOffsets[j + 1]
+            local timeInterval = stutterEnd - stutterStart
+            local secondSVOffset = stutterStart + timeInterval * menuVars.stutterDuration / 100
+            table.insert(svsToAdd, utils.CreateScrollVelocity(stutterStart, svMultipliers[1]))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(secondSVOffset, svMultipliers[2]))
+        end
+    end
+    local finalSVType = FINAL_SV_TYPES[menuVars.finalSVIndex]
+    local hasFinalSV = finalSVType ~= "Skip"
+    if hasFinalSV then
+        local lastMultiplier
+        if menuVars.linearlyChange then
+            lastMultiplier = menuVars.svMultipliers2[3]
+        else
+            lastMultiplier = menuVars.svMultipliers[3]
+        end
+        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, lastMultiplier))
+    end
+    local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if placeBehavior == "Replace old SVs" then
+        svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
+    end
+    
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
 -- Places SVs
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 --    menuVars   : list of variables used for the current menu [Table]
 function placeSVs(globalVars, menuVars)
-    local placingStillSVs = menuVars.stillDistance ~= nil
+    local placingStillSVs = menuVars.stillDistance ~= nil and not globalVars.useManualOffsets
     local svsToAdd = {}
     local svsToRemove = {}
     local numMultipliers = #menuVars.svMultipliers
@@ -2197,7 +2472,9 @@ function placeSVs(globalVars, menuVars)
         local endOffset = offsets[i + 1]
         local svOffsets = generateLinearSet(startOffset, endOffset, #menuVars.svDistances)
         for j = 1, #svOffsets - 1 do
-            table.insert(svsToAdd, utils.CreateScrollVelocity(svOffsets[j], menuVars.svMultipliers[j]))
+            local offset = svOffsets[j]
+            local multiplier = menuVars.svMultipliers[j]
+            table.insert(svsToAdd, utils.CreateScrollVelocity(offset, multiplier))
         end
     end
     
@@ -2213,14 +2490,13 @@ function placeSVs(globalVars, menuVars)
     end
     
     removeAndAddSVs(svsToRemove, svsToAdd)
-    
     if placingStillSVs then placeStillSVs(menuVars, firstOffset, lastOffset) end
 end
 -- Places still SVs
 -- Parameters
---    menuVars      : list of variables used for the current menu [Table]
---    firstOffset   : starting millisecond time of the still [Int]
---    lastOffset    : ending millisecond time of the still [Int]
+--    menuVars    : list of variables used for the current menu [Table]
+--    firstOffset : starting millisecond time of the still [Int]
+--    lastOffset  : ending millisecond time of the still [Int]
 function placeStillSVs(menuVars, firstOffset, lastOffset)
     local stillType = STILL_TYPES[menuVars.stillTypeIndex]
     local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
@@ -2268,6 +2544,46 @@ function placeStillSVs(menuVars, firstOffset, lastOffset)
         end
     end
     getRemovableSVs(svsToRemove, svTimeIsAdded, firstOffset, lastOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Places reverse scroll SVs 
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function placeReverseScrollSVs(globalVars, menuVars)
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local offsets = getSelectedOffsets(globalVars)
+    local firstOffset = offsets[1]
+    local lastOffset = offsets[#offsets]
+    local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
+    for i = 1, #noteOffsets do
+        local noteOffset = noteOffsets[i]
+        local multiplier = getUsableOffsetMultiplier(noteOffset)
+        local duration = 1 / multiplier
+        local timeBefore = noteOffset - duration
+        local timeAt = noteOffset
+        local timeAfter = noteOffset + duration
+        local svBefore =  multiplier * menuVars.distance + menuVars.avgSV
+        local svAt = multiplier * -menuVars.distance + menuVars.avgSV
+        local svAfter = menuVars.avgSV
+        if i == #noteOffsets then
+            svAt = ((lastOffset - firstOffset) * math.abs(menuVars.avgSV) + 10000) * multiplier
+            svAfter = 1
+        end
+        if i == 1 then
+            svAt = ((lastOffset - firstOffset) * math.abs(menuVars.avgSV) + 10000) * multiplier
+        end
+        if i ~= 1 then
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, svBefore))
+        end
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, svAt))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, svAfter))
+    end
+    local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if placeBehavior == "Replace old SVs" then
+        svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
+    end
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Deletes SVs
