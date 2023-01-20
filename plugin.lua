@@ -1,4 +1,4 @@
--- amoguSV v5.05.2 (16 Jan 2023)
+-- amoguSV v5.1 (20 Jan 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -115,6 +115,7 @@ SECTIONS = {                       -- ways to apply SV actions on sections
 }
 SPECIAL_SVS = {                    -- tools for placing special SVs
     "Stutter",
+    "Teleport Stutter",
     "Reverse Scroll",
     "Splitscroll",
     "Animate"
@@ -164,8 +165,8 @@ function setPluginAppearance(globalVars)
     setPluginAppearanceStyles(styleScheme)
     setPluginAppearanceColors(globalVars, colorScheme)
     
-    local updateRGB = colorScheme == "RGB Gamer Mode" or colorScheme == "Glass + RGB"
-    if updateRGB then updateRGBColors(globalVars) end
+    local rgbColorScheme = colorScheme == "RGB Gamer Mode" or colorScheme == "Glass + RGB"
+    if rgbColorScheme and (not globalVars.rgbPaused) then updateRGBColors(globalVars) end
 end
 -- Configures the plugin GUI styles
 -- Parameters
@@ -254,60 +255,61 @@ function setPluginAppearanceColors(globalVars, colorScheme)
     elseif colorScheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
-        local white = {1.00, 1.00, 1.00, 1.00}
+        local whiteTint = {1.00, 1.00, 1.00, 0.30}
         
-        imgui.PushStyleColor( imgui_col.WindowBg,               transparent )
+        imgui.PushStyleColor( imgui_col.WindowBg,               transparent      )
         imgui.PushStyleColor( imgui_col.Border,                 transparentWhite )
-        imgui.PushStyleColor( imgui_col.FrameBg,                transparent )
-        imgui.PushStyleColor( imgui_col.FrameBgHovered,         transparent )
-        imgui.PushStyleColor( imgui_col.FrameBgActive,          transparent )
-        imgui.PushStyleColor( imgui_col.TitleBg,                transparent )
-        imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent )
-        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent )
-        imgui.PushStyleColor( imgui_col.CheckMark,              white       )
-        imgui.PushStyleColor( imgui_col.SliderGrab,             white       )
-        imgui.PushStyleColor( imgui_col.SliderGrabActive,       white       )
-        imgui.PushStyleColor( imgui_col.Button,                 transparent )
-        imgui.PushStyleColor( imgui_col.ButtonHovered,          transparent )
-        imgui.PushStyleColor( imgui_col.ButtonActive,           transparent )
-        imgui.PushStyleColor( imgui_col.Tab,                    transparent )
-        imgui.PushStyleColor( imgui_col.TabHovered,             transparent )
-        imgui.PushStyleColor( imgui_col.TabActive,              transparent )
-        imgui.PushStyleColor( imgui_col.Header,                 transparent )
-        imgui.PushStyleColor( imgui_col.HeaderHovered,          transparent ) 
-        imgui.PushStyleColor( imgui_col.HeaderActive,           transparent )
-        imgui.PushStyleColor( imgui_col.Separator,              transparent )
-        imgui.PushStyleColor( imgui_col.TextSelectedBg,         transparent )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          white       )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white       )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white       )
+        imgui.PushStyleColor( imgui_col.FrameBg,                transparent      )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         whiteTint        )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.TitleBg,                transparent      )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent      )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent      )
+        imgui.PushStyleColor( imgui_col.CheckMark,              transparentWhite )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             whiteTint        )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       transparentWhite )
+        imgui.PushStyleColor( imgui_col.Button,                 transparent      )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           whiteTint        )
+        imgui.PushStyleColor( imgui_col.Tab,                    transparent      )
+        imgui.PushStyleColor( imgui_col.TabHovered,             whiteTint        )
+        imgui.PushStyleColor( imgui_col.TabActive,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.Header,                 transparent      )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           whiteTint        )
+        imgui.PushStyleColor( imgui_col.Separator,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         whiteTint        )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   transparentWhite )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    transparentWhite )
     elseif colorScheme == "Glass + RGB" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
+        local colorTint = {globalVars.red, globalVars.green, globalVars.blue, 0.3}
         
         imgui.PushStyleColor( imgui_col.WindowBg,               transparent )
         imgui.PushStyleColor( imgui_col.Border,                 activeColor )
         imgui.PushStyleColor( imgui_col.FrameBg,                transparent )
-        imgui.PushStyleColor( imgui_col.FrameBgHovered,         transparent )
-        imgui.PushStyleColor( imgui_col.FrameBgActive,          transparent )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         colorTint   )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          colorTint   )
         imgui.PushStyleColor( imgui_col.TitleBg,                transparent )
         imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent )
         imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent )
         imgui.PushStyleColor( imgui_col.CheckMark,              activeColor )
-        imgui.PushStyleColor( imgui_col.SliderGrab,             activeColor )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             colorTint   )
         imgui.PushStyleColor( imgui_col.SliderGrabActive,       activeColor )
         imgui.PushStyleColor( imgui_col.Button,                 transparent )
-        imgui.PushStyleColor( imgui_col.ButtonHovered,          transparent )
-        imgui.PushStyleColor( imgui_col.ButtonActive,           transparent )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          colorTint   )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           colorTint   )
         imgui.PushStyleColor( imgui_col.Tab,                    transparent )
-        imgui.PushStyleColor( imgui_col.TabHovered,             transparent )
-        imgui.PushStyleColor( imgui_col.TabActive,              transparent )
+        imgui.PushStyleColor( imgui_col.TabHovered,             colorTint   )
+        imgui.PushStyleColor( imgui_col.TabActive,              colorTint   )
         imgui.PushStyleColor( imgui_col.Header,                 transparent )
-        imgui.PushStyleColor( imgui_col.HeaderHovered,          transparent ) 
-        imgui.PushStyleColor( imgui_col.HeaderActive,           transparent )
-        imgui.PushStyleColor( imgui_col.Separator,              transparent )
-        imgui.PushStyleColor( imgui_col.TextSelectedBg,         transparent )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          activeColor )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          colorTint   ) 
+        imgui.PushStyleColor( imgui_col.HeaderActive,           colorTint   )
+        imgui.PushStyleColor( imgui_col.Separator,              colorTint   )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         colorTint   )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          colorTint   )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    activeColor )
     elseif colorScheme == "RGB Gamer Mode" then
@@ -326,7 +328,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.TitleBgActive,          activeColor   )
         imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       inactiveColor )
         imgui.PushStyleColor( imgui_col.CheckMark,              white         )
-        imgui.PushStyleColor( imgui_col.SliderGrab,             white         )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             activeColor   )
         imgui.PushStyleColor( imgui_col.SliderGrabActive,       white         )
         imgui.PushStyleColor( imgui_col.Button,                 inactiveColor )
         imgui.PushStyleColor( imgui_col.ButtonHovered,          activeColor   )
@@ -456,6 +458,7 @@ function draw()
         red = 0,
         green = 1,
         blue = 1,
+        rgbPaused = false,
         editToolIndex = 1,
         placeTypeIndex = 1,
         debugText = "debuggy capybara"
@@ -466,6 +469,7 @@ function draw()
     initializeNextWindowNotCollapsed("mainCollapsed")
     
     imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
+    centerWindowIfHotkeysPressed()
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     imgui.BeginTabBar("SV tabs")
     for i = 1, #TAB_MENUS do
@@ -490,6 +494,18 @@ function initializeNextWindowNotCollapsed(key)
     if state.GetValue(key) then return end
     imgui.SetNextWindowCollapsed(false)
     state.SetValue(key, true)
+end
+-- Makes the plugin window centered if Ctrl + Shift + Tab is pressed
+function centerWindowIfHotkeysPressed()
+    local ctrlKeyPressedDown = utils.IsKeyDown(keys.LeftControl) or utils.IsKeyDown(keys.RightControl)
+    local shiftKeyPressedDown = utils.IsKeyDown(keys.LeftShift) or utils.IsKeyDown(keys.RightShift)
+    local tabKeyPressed = utils.IsKeyPressed(keys.Tab)
+    if not (ctrlKeyPressedDown and shiftKeyPressedDown and tabKeyPressed) then return end
+    
+    local windowWidth, windowHeight = table.unpack(state.WindowSize)
+    local pluginWidth, pluginHeight = table.unpack(imgui.GetWindowSize())
+    local coordinatesToCenter = {(windowWidth - pluginWidth) / 2, (windowHeight - pluginHeight) / 2}
+    imgui.SetWindowPos("amoguSV", coordinatesToCenter)
 end
 
 ----------------------------------------------------------------------------------------- Tab stuff
@@ -518,8 +534,19 @@ end
 -- Display shortcuts for the plugin
 function showShortcuts()
     if not imgui.CollapsingHeader("Key Shortcuts") then return end
+    local indentWidth = -6
+    imgui.Indent(indentWidth)
+    addPadding()
+    imgui.BulletText("Ctrl + Shift + Tab = center plugin window")
+    toolTip("Useful if the plugin begins or ends up offscreen")
+    addSeparator()
     imgui.BulletText("Shift + Tab = focus plugin + navigate inputs")
+    toolTip("Useful if you click off the plugin but want to quickly change an input value")
+    addSeparator()
     imgui.BulletText("T = activate the big button doing SV stuff")
+    toolTip("Use this everytime for quick workflow")
+    addPadding()
+    imgui.Unindent(indentWidth)
 end
 -- Display links relevant to the plugin
 function showInfoLinks()
@@ -539,6 +566,7 @@ function choosePluginSettings(globalVars)
     addSeparator()
     chooseStyleScheme(globalVars)
     chooseColorScheme(globalVars)
+    chooseRGBPause(globalVars)
     addSeparator()
     imgui.TextDisabled("How to permanently change default settings?")
     if not imgui.IsItemHovered() then return end
@@ -708,10 +736,11 @@ function placeSpecialSVMenu(globalVars)
     getVariables("placeSpecialMenu", menuVars)
     chooseSpecialSVType(menuVars)
     local currentSVType = SPECIAL_SVS[menuVars.svTypeIndex]
-    if currentSVType == "Stutter"        then stutterMenu(globalVars) end
-    if currentSVType == "Reverse Scroll" then reverseScrollMenu(globalVars) end
-    if currentSVType == "Splitscroll"    then splitScrollMenu(globalVars) end
-    if currentSVType == "Animate"        then imgui.Text("Coming Soon ?!?!") end
+    if currentSVType == "Stutter"          then stutterMenu(globalVars) end
+    if currentSVType == "Teleport Stutter" then telportStutterMenu(globalVars) end
+    if currentSVType == "Reverse Scroll"   then reverseScrollMenu(globalVars) end
+    if currentSVType == "Splitscroll"      then splitScrollMenu(globalVars) end
+    if currentSVType == "Animate"          then imgui.Text("Coming Soon ?!?!") end
     saveVariables("placeSpecialMenu", menuVars)
 end
 -- Creates the menu for stutter SV
@@ -776,6 +805,34 @@ function stutterMenu(globalVars)
     addSeparator()
     simpleActionMenu("Place", placeStutterSVs, globalVars, menuVars)
     saveVariables("stutterMenu", menuVars)
+end
+-- Creates the menu for teleport stutter SV
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function telportStutterMenu(globalVars)
+    local menuVars = {
+        svPercent = 50,
+        distance = 50,
+        mainSV = 0.5,
+        useDistance = false,
+        avgSV = 1,
+        finalSVIndex = 3,
+        customSV = 1
+    }
+    getVariables("teleportStutterMenu", menuVars)
+    if menuVars.useDistance then
+        chooseDistance(menuVars)
+        helpMarker("Start SV teleport distance")
+    else
+        chooseStartSVPercent(menuVars)
+    end
+    chooseMainSV(menuVars)
+    chooseAverageSV(menuVars)
+    chooseFinalSV(menuVars)
+    chooseUseDistance(menuVars)
+    addSeparator()
+    simpleActionMenu("Place", placeTeleportStutterSVs, globalVars, menuVars)
+    saveVariables("teleportStutterMenu", menuVars)
 end
 -- Creates the menu for reverse scroll SV
 -- Parameters
@@ -1584,12 +1641,9 @@ function calculatePlotScale(plotValues)
     local minScale = -absMax
     local maxScale = absMax
     -- restrict the plot range to non-positive values when all values are non-positive
-    if max <= 0 then
-        maxScale = 0
+    if max <= 0 then maxScale = 0 end
     -- restrict the plot range to non-negative values when all values are non-negative
-    elseif min >= 0 then
-        minScale = 0
-    end
+    if min >= 0 then minScale = 0 end
     return minScale, maxScale
 end
 -- Calculates distance vs time values of a note given a set of stutter SV values
@@ -1703,7 +1757,7 @@ function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
         onlyStartOffset = true
     end
     chooseStartEndOffsets(globalVars, onlyStartOffset)
-    local enoughSelectedNotes = checkSelectedNotes(minimumNotes)
+    local enoughSelectedNotes = checkEnoughSelectedNotes(minimumNotes)
     local needToSelectNotes = not (globalVars.useManualOffsets or enoughSelectedNotes)
     if needToSelectNotes then imgui.Text("Select "..minimumNotes.." or more notes") return end
     
@@ -1718,7 +1772,7 @@ end
 -- Returns whether or not there are enought notes [Boolean]
 -- Parameters
 --    minimumNotes : minimum number of notes needed to select [Int]
-function checkSelectedNotes(minimumNotes)
+function checkEnoughSelectedNotes(minimumNotes)
     local selectedNotes = state.SelectedHitObjects
     local numSelectedNotes = #selectedNotes
     if numSelectedNotes == 0 then return false end
@@ -1956,6 +2010,13 @@ function chooseFirstScrollSpeed(menuVars)
     local text = "1st Scroll Speed"
     _, menuVars.scrollSpeed1 = imgui.InputFloat(text, menuVars.scrollSpeed1, 0, 0, "%.2fx")
 end
+-- Lets you choose the main SV multiplier of a teleport stutter
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseMainSV(menuVars)
+    _, menuVars.mainSV = imgui.InputFloat("Main SV", menuVars.mainSV, 0, 0, "%.2fx")
+    helpMarker("This SV will last ~99.99%% of the stutter")
+end
 -- Lets you choose the mspf (milliseconds per frame) for splitscroll
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
@@ -2054,6 +2115,8 @@ function choosePlaceSVType(globalVars)
     local comboIndex = globalVars.placeTypeIndex - 1
     _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPES, #PLACE_TYPES)
     globalVars.placeTypeIndex = comboIndex + 1
+    local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
+    if placeType == "Still" then toolTip("Still makes notes keep the normal distance apart") end
 end
 -- Lets you choose the variability scale of randomness
 -- Returns whether or not the variability value changed [Boolean]
@@ -2081,6 +2144,14 @@ end
 --    menuVars : list of variables used for the current menu [Table]
 function chooseRatio(menuVars)
     _, menuVars.ratio = imgui.InputFloat("Ratio", menuVars.ratio, 0, 0, "%.2f")
+end
+-- Lets you choose whether or not to pause RGB color cycling
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseRGBPause(globalVars)
+    addPadding()
+    _, globalVars.rgbPaused = imgui.Checkbox("Pause RGB color changing", globalVars.rgbPaused)
+    helpMarker("If you have a RGB color scheme selected, stops the colors from cycling/changing")
 end
 -- Lets you choose the second height/displacement for splitscroll
 -- Parameters
@@ -2180,6 +2251,13 @@ function chooseStartEndSVs(settingVars)
     settingVars.startSV = newValues[1]
     settingVars.endSV = newValues[2]
     return oldValues[1] ~= newValues[1] or oldValues[2] ~= newValues[2]
+end
+-- Lets you choose a start SV percent
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseStartSVPercent(menuVars)
+    _, menuVars.svPercent = imgui.InputFloat("Start SV %", menuVars.svPercent, 1, 1, "%.2f%%")
+    helpMarker("%% distance between notes")
 end
 -- Lets you choose the still type
 -- Parameters
@@ -2292,7 +2370,12 @@ function chooseSVSelection(globalVars)
         globalVars.useManualOffsets = true
     end
 end
-
+-- Lets you choose whether to use distnace or not
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseUseDistance(menuVars)
+    _, menuVars.useDistance = imgui.Checkbox("Use distance for start SV", menuVars.useDistance)
+end
 ---------------------------------------------------------------------------------------------------
 -- Doing SV Stuff ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -2514,13 +2597,12 @@ end
 --    svsToRemove : list of SVs to remove [Table]
 --    svsToAdd    : list of SVs to add [Table]
 function removeAndAddSVs(svsToRemove, svsToAdd)
-    if #svsToAdd > 0 then
-        local editorActions = {
-            utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
-            utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
-        }
-        actions.PerformBatch(editorActions)
-    end
+    if #svsToAdd == 0 then return end
+    local editorActions = {
+        utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
+        utils.CreateEditorAction(action_type.AddScrollVelocityBatch, svsToAdd)
+    }
+    actions.PerformBatch(editorActions)
 end
 -- Places stutter SVs
 -- Parameters
@@ -2574,7 +2656,51 @@ function placeStutterSVs(globalVars, menuVars)
     
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
--- Places SVs
+-- Places teleport stutter SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function placeTeleportStutterSVs(globalVars, menuVars)
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local offsets = getSelectedOffsets(globalVars)
+    local firstOffset = offsets[1]
+    local lastOffset = offsets[#offsets]
+    for i = 1, #offsets - 1 do
+        local startOffset = offsets[i]
+        local endOffset = offsets[i + 1]
+        local offsetInterval = endOffset - startOffset
+        local startMultiplier = getUsableOffsetMultiplier(startOffset)
+        local startDuration = 1 / startMultiplier
+        local endMultiplier = getUsableOffsetMultiplier(endOffset)
+        local endDuration = 1 / endMultiplier
+
+        local startDistance = menuVars.distance
+        if not menuVars.useDistance then startDistance = offsetInterval * (menuVars.svPercent / 100) end
+        local expectedDistance = offsetInterval * menuVars.avgSV
+        local traveledDistance = offsetInterval * menuVars.mainSV
+        local endDistance = expectedDistance - startDistance - traveledDistance
+        
+        table.insert(svsToAdd, utils.CreateScrollVelocity(startOffset, menuVars.mainSV + startDistance * startMultiplier))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(startOffset + startDuration, menuVars.mainSV))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset - endDuration, menuVars.mainSV + endDistance * endMultiplier))
+    end
+    
+    local finalSVType = FINAL_SV_TYPES[menuVars.finalSVIndex]
+    if finalSVType == "Custom" then
+        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, menuVars.customSV))
+    elseif finalSVType == "Normal" then
+        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, menuVars.avgSV))
+    end
+    
+    local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if placeBehavior == "Replace old SVs" then
+        svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
+    end
+    
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Places (standard) SVs
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 --    menuVars   : list of variables used for the current menu [Table]
@@ -2762,11 +2888,13 @@ function placeSplitScrollSVs(globalVars, menuVars)
         
         local noteOffset = noteOffsets[noteIndex]
         while noteOffset < timeAt do
+            local noteMultiplier = getUsableOffsetMultiplier(noteOffset)
+            local noteDuration = 1 / noteMultiplier
             local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
                                       (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
-            local noteTimeBefore = noteOffset - duration
+            local noteTimeBefore = noteOffset - noteDuration
             local noteTimeAt = noteOffset
-            local noteTimeAfter = noteOffset + duration
+            local noteTimeAfter = noteOffset + noteDuration
             local thisHeight = height1
             if isNoteOffsetFor2nd[noteOffset] then
                 thisHeight = height2
@@ -2778,8 +2906,8 @@ function placeSplitScrollSVs(globalVars, menuVars)
             if goingFrom1To2 then
                 extraDisplacement = -extraDisplacement
             end
-            local svBefore = currentScrollSpeed + (thisHeight + extraDisplacement) * multiplier
-            local svAt = currentScrollSpeed - (thisHeight + extraDisplacement) * multiplier
+            local svBefore = currentScrollSpeed + (thisHeight + extraDisplacement) * noteMultiplier
+            local svAt = currentScrollSpeed - (thisHeight + extraDisplacement) * noteMultiplier
             local svAfter = currentScrollSpeed
             table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeBefore, svBefore))
             table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAt, svAt))
