@@ -30,7 +30,9 @@ Standard or "still" sets SV of different shapes:
 
 Special types of SVs:
 * Stutter (also known as Bump)
+* Teleport Stutter
 * Reverse scroll
+* Split scroll
 
 ### Edit SVs
 * Add Teleport
