@@ -33,6 +33,7 @@ Special types of SVs:
 * Teleport Stutter
 * Reverse scroll
 * Split scroll
+* Animate
 
 ### Edit SVs
 * Add Teleport
