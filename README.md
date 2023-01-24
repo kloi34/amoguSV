@@ -3,7 +3,7 @@
 
 > "The ultimate community-driven and open-source competitive SV plugin"
 
-This is a plugin for Quaver, the ultimate community-driven and open-source competitive rhythm game. The plugin provides various tools to place, edit, and delete SVs (Scroll Velocities) quickly and efficiently when making maps.
+This is a plugin for [Quaver](https://github.com/Quaver), the ultimate community-driven and open-source competitive rhythm game. The plugin provides various tools to place, edit, and delete SVs (Scroll Velocities) quickly and efficiently when making maps.
 
 ## Installation
 1. Download the ZIP file by pressing the green code button on GitHub and clicking "Download ZIP"
