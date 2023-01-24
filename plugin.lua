@@ -1,4 +1,4 @@
--- amoguSV v5.15 (22 Jan 2023)
+-- amoguSV v5.2 capybara beta (24 Jan 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -153,9 +153,23 @@ TAB_MENUS = {                      -- tab names for different SV menus
 }
 
 ---------------------------------------------------------------------------------------------------
--- Plugin Styles and Colors -----------------------------------------------------------------------
+-- Plugin Appearance, Styles and Colors -----------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 
+-- Returns coordinates relative to the plugin window
+-- Parameters
+--    x : x coordinate relative to the plugin window [Int]
+--    y : y coordinate relative to the plugin window [Int]
+function coordsRelativeToWindow(x, y)
+    return {x + imgui.GetWindowPos()[1], y + imgui.GetWindowPos()[2]}
+end
+-- Converts an RGBA color value into uint (unsigned integer) and returns the converted value [Int]
+-- Parameters
+--    r : red value [Int]
+--    g : green value [Int]
+--    b : blue value [Int]
+--    a : alpha value [Int]
+function rgbaToUint(r, g, b, a) return a*16^6 + b*16^4 + g*16^2 + r end
 -- Configures the plugin GUI appearance
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -898,12 +912,11 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function animateMenu(globalVars)
-    --[[
     local menuVars = {
         numFrames = 5,
-        frameNotes = {},
+        frameTimes = {},
         laneCounts = zerosList(map.GetKeyCount()),
-        selectedNoteIndex = 1,
+        selectedTimeIndex = 1,
         currentFrame = 1,
         frameDistance = 2000,
         noteInfoTextDump = "",
@@ -911,21 +924,42 @@ function animateMenu(globalVars)
         noteInfoImport = ""
     }
     getVariables("animateMenu", menuVars)
-    chooseNumFrames(menuVars)
-    chooseFrameDistance(menuVars)
-    addSeparator()
-    displayLaneNoteCounts(menuVars)
-    imgui.Text(#menuVars.frameNotes)
-    imgui.Text(menuVars.selectedNoteIndex)
-    button("Clear/reset keyframe notes", ACTION_BUTTON_SIZE, resetFrameNotes, globalVars, menuVars)
-    addSeparator()
-    chooseCurrentFrame(menuVars)
-    addSeparator()
-    imgui.Text("Capybara")
-    --simpleActionMenu("Place Animation", placeAnimationSVs, globalVars, menuVars)
+    imgui.BeginTabBar("SV tabs")
+    if imgui.BeginTabItem("Settings") then
+        addPadding()
+        chooseNumFrames(menuVars)
+        chooseFrameDistance(menuVars)
+        addSeparator()
+        displayLaneNoteCounts(menuVars)
+        addFrameTimes(menuVars)
+        button("Clear/Reset All Notes", ACTION_BUTTON_SIZE, resetFrameTimes, globalVars, menuVars)
+        imgui.EndTabItem()
+    end
+    local frameTimesExist = #menuVars.frameTimes ~= 0
+    if frameTimesExist and imgui.BeginTabItem("Notes & Frames") then
+        addPadding()
+        imgui.Columns(2, "Times + Frames", false)
+        displayFrameTimes(menuVars)
+        chooseFrameTimeData(menuVars)
+        imgui.NextColumn()
+        chooseCurrentFrame(menuVars)
+        drawCurrentFrame(menuVars)
+        imgui.Columns(1)
+        imgui.PushItemWidth(2 * (ACTION_BUTTON_SIZE[1] + 1.5 * SAMELINE_SPACING))
+        local text = "Capybara (notes are correct for downscroll, but upside down for upscroll)"
+        imgui.InputText("##capybara", text, #text, imgui_input_text_flags.AutoSelectAll)
+        imgui.PopItemWidth()
+        imgui.EndTabItem()
+    end
+    if frameTimesExist and imgui.BeginTabItem("Finish") then
+        addPadding()
+        imgui.TextWrapped("Select a time BEFORE ALL ANIMATION NOTES to begin the animation SVs")
+        addSeparator()
+        simpleActionMenu("Begin animation", placeAnimationSVs, globalVars, menuVars)
+        imgui.EndTabItem()
+    end
+    imgui.EndTabBar()
     saveVariables("animateMenu", menuVars)
-    --]]
-    imgui.Text("Capybara (animate coming soon tm)")
 end
 -- Creates the menu for placing still SVs
 -- Parameters
@@ -1101,6 +1135,48 @@ end
 
 -------------------------------------------------------------------------------------- Menu related
 
+-- Adds frame time objects to the list for the animate menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function addFrameTimes(menuVars)
+    if not imgui.Button("Add selected notes to pool", ACTION_BUTTON_SIZE) then return end
+    menuVars.laneCounts = zerosList(map.GetKeyCount())
+    local hasAlreadyAddedLaneTime = {}
+    for i = 1, map.GetKeyCount() do
+        table.insert(hasAlreadyAddedLaneTime, {})
+    end
+    local frameTimeToIndex = {}
+    local totalTimes = #menuVars.frameTimes
+    for i = 1, totalTimes do
+        local frameTime = menuVars.frameTimes[i]
+        local time = frameTime.time
+        local lanes = frameTime.lanes
+        frameTimeToIndex[time] = i
+        for j = 1, #lanes do
+            local lane = lanes[j]
+            hasAlreadyAddedLaneTime[lane][time] = true
+            menuVars.laneCounts[lane] = menuVars.laneCounts[lane] + 1
+        end
+    end
+    for _, hitObject in pairs(state.SelectedHitObjects) do
+        local lane = hitObject.Lane
+        local time = hitObject.StartTime
+        if (not hasAlreadyAddedLaneTime[lane][time]) then
+            hasAlreadyAddedLaneTime[lane][time] = true
+            menuVars.laneCounts[lane] = menuVars.laneCounts[lane] + 1
+            if frameTimeToIndex[time] then
+                local index = frameTimeToIndex[time]
+                local frameTime = menuVars.frameTimes[index]
+                table.insert(frameTime.lanes, lane)
+                frameTime.lanes = table.sort(frameTime.lanes , function(a, b) return a < b end)
+            else
+                table.insert(menuVars.frameTimes, createFrameTime(time, {lane}, 1, 0))
+                frameTimeToIndex[time] = #menuVars.frameTimes
+            end  
+        end
+    end
+    menuVars.frameTimes = table.sort(menuVars.frameTimes, function(a, b) return a.time < b.time end)
+end
 -- Adjusts the number of SV multipliers available for the custom SV menu
 -- Parameters
 --    settingVars : list of variables used for the custom SV menu [Table]
@@ -1121,16 +1197,53 @@ function adjustNumberOfMultipliers(settingVars)
         end
     end
 end
+-- Creates a frame time object
+-- Parameters
+--    thisTime     : time in milliseconds [Int]
+--    thisLanes    : note lanes [Table]
+--    thisFrame    : frame number [Int]
+--    thisPosition : msx position (height) on the frame [Int/Float]
+function createFrameTime(thisTime, thisLanes, thisFrame, thisPosition)
+    local frameTime = {
+        time = thisTime,
+        lanes = thisLanes,
+        frame = thisFrame,
+        position = thisPosition
+    }
+    return frameTime
+end
+-- Displays all existing frame times for the animate menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function displayFrameTimes(menuVars)
+    imgui.Text("time | lanes | frame | position")
+    addPadding()
+    imgui.BeginChild("Times", {ACTION_BUTTON_SIZE[1], 200}, true)
+    for i = 1, #menuVars.frameTimes do
+        local frameTime = menuVars.frameTimes[i]
+        local text = frameTime.time.." | "..frameTime.lanes[1]
+        for j = 2, #frameTime.lanes do
+            text = text..", "..frameTime.lanes[j]
+        end
+        text = text .." | "..frameTime.frame.." | "..frameTime.position
+        if imgui.Selectable(text, menuVars.selectedTimeIndex == i) then
+            menuVars.selectedTimeIndex = i
+        end
+    end
+    imgui.EndChild()
+end
 -- Displays note counts of frame notes for the animate menu
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
 function displayLaneNoteCounts(menuVars)
-    imgui.Text("Total # of keyframe notes in pool: "..#menuVars.frameNotes)
     local laneCountText = "Lane counts: {"
+    local totalNotes = 0
     for i = 1, #menuVars.laneCounts do
         laneCountText = laneCountText.." "..menuVars.laneCounts[i].." "
+        totalNotes = totalNotes + menuVars.laneCounts[i]
     end
     laneCountText = laneCountText.."}"
+    imgui.Text("Total # of frame notes in pool: "..totalNotes)
     imgui.Text(laneCountText)
 end
 -- Displays stats of measured SV
@@ -1176,6 +1289,37 @@ function displaySVStats(svStats)
     imgui.Text(svStats.avgSV.."x")
     helpMarker("Rounded to 3 decimal places")
     imgui.Columns(1)
+end
+-- Draws notes from the current selected frame for the animate menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function drawCurrentFrame(menuVars)
+    local mapKeyCount = map.GetKeyCount() 
+    local childHeight = 250
+    imgui.BeginChild("Frame", {ACTION_BUTTON_SIZE[1], childHeight}, true)
+    local drawlist = imgui.GetWindowDrawList()
+    local whiteColor = rgbaToUint(255, 255, 255, 255)
+    local blueColor = rgbaToUint(53, 200, 255, 255)
+    local noteWidth = 200 / mapKeyCount
+    local noteHeight = round(2 * noteWidth / 5, 0)
+    for _, frameTime in pairs(menuVars.frameTimes) do 
+        if frameTime.frame == menuVars.currentFrame then
+            for _, lane in pairs(frameTime.lanes) do
+                local x1 = 10 + (noteWidth + 5) * (lane - 1)
+                local y1 = (childHeight - 10) - (frameTime.position / 2)
+                local x2 = x1 + noteWidth
+                local y2 = y1 - noteHeight
+                local p1 = coordsRelativeToWindow(x1, y1)
+                local p2 = coordsRelativeToWindow(x2, y2)
+                local colorNum = lane
+                if mapKeyCount % 2 == 0 and colorNum > mapKeyCount / 2 then colorNum = lane + 1 end
+                local color = whiteColor
+                if colorNum % 2 == 0 then color = blueColor end
+                drawlist.AddRectFilled(p1, p2, color)
+            end
+        end
+    end
+    imgui.EndChild()
 end
 -- Gets the current "Place SV" menu's setting variables
 -- Parameters
@@ -1335,14 +1479,14 @@ function provideBezierWebsiteLink(settingVars)
                "coordinate values. Alternatively, enter 4 numbers and hit parse.")
     return coordinateParsed
 end
--- Resets frame notes for the animate menu
+-- Resets frame times for the animate menu
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 --    menuVars   : list of variables used for the current SV menu [Table]
-function resetFrameNotes(globalVars, menuVars)
-    menuVars.frameNotes = {}
+function resetFrameTimes(globalVars, menuVars)
+    menuVars.frameTimes = {}
     menuVars.laneCounts = zerosList(map.GetKeyCount())
-    menuVars.selectedNoteIndex = 1
+    menuVars.selectedTimeIndex = 1
 end
 -- Updates the final SV of the precalculated menu SVs
 -- Parameters
@@ -1869,7 +2013,12 @@ function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
         minimumNotes = 1
         actionThing = "at"
         onlyStartOffset = true
+    elseif actionName == "Begin animation" then    
+        minimumNotes = 1
+        actionThing = "at"
+        onlyStartOffset = true
     end
+    
     chooseStartEndOffsets(globalVars, onlyStartOffset)
     local enoughSelectedNotes = checkEnoughSelectedNotes(minimumNotes)
     local needToSelectNotes = not (globalVars.useManualOffsets or enoughSelectedNotes)
@@ -1990,14 +2139,14 @@ end
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function chooseConstantShift(settingVars)
+    local oldShift = settingVars.verticalShift
     if imgui.Button("Reset##verticalShift", SECONDARY_BUTTON_SIZE) then
         settingVars.verticalShift = 1
     end
-    local oldShift = settingVars.verticalShift
     imgui.SameLine(0, SAMELINE_SPACING)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
-    local _, newShift = imgui.InputFloat("Vertical Shift", oldShift, 0, 0, "%.2fx")
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    local _, newShift = imgui.InputFloat("Vertical Shift", settingVars.verticalShift, 0, 0, "%.3fx")
+    imgui.PopItemWidth()
     settingVars.verticalShift = newShift
     return oldShift ~= newShift
 end
@@ -2006,36 +2155,39 @@ end
 --    menuVars : list of variables used for the current menu [Table]
 function chooseCurrentFrame(menuVars)
     imgui.AlignTextToFramePadding()
-    imgui.Text("Current frame:")
+    imgui.Text("Previewing current frame:")
     imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(35)
     imgui.PushButtonRepeat(true)
     if imgui.ArrowButton("##leftFrame", imgui_dir.Left) then
         menuVars.currentFrame = menuVars.currentFrame - 1
     end
     imgui.SameLine(0, SAMELINE_SPACING)
+    _, menuVars.currentFrame = imgui.InputInt("##currentFrame", menuVars.currentFrame, 0, 0)
+    imgui.SameLine(0, SAMELINE_SPACING)
     if imgui.ArrowButton("##rightFrame", imgui_dir.Right) then
         menuVars.currentFrame = menuVars.currentFrame + 1
     end
     imgui.PopButtonRepeat()
-    imgui.SameLine(0, 2 * SAMELINE_SPACING)
-    imgui.Text(menuVars.currentFrame)
     menuVars.currentFrame = wrapToInterval(menuVars.currentFrame, 1, menuVars.numFrames)
+    imgui.PopItemWidth()
 end
 -- Lets you choose SV curve sharpness
 -- Returns whether or not the curve sharpness changed [Boolean]
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function chooseCurveSharpness(settingVars)
+    local oldSharpness = settingVars.curveSharpness
     if imgui.Button("Reset##curveSharpness", SECONDARY_BUTTON_SIZE) then
         settingVars.curveSharpness = 50
     end
-    local oldSharpness = settingVars.curveSharpness
     imgui.SameLine(0, SAMELINE_SPACING)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
-    local _, newSharpness = imgui.DragInt("Curve Sharpness", oldSharpness, 1, 1, 100, "%d%%")
+    local _, newSharpness = imgui.DragInt("Curve Sharpness", settingVars.curveSharpness, 1, 1,
+                                          100, "%d%%")
     newSharpness = clampToInterval(newSharpness, 1, 100)
     settingVars.curveSharpness = newSharpness
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.PopItemWidth()
     return oldSharpness ~= newSharpness
 end
 -- Lets you choose custom multipliers for custom SV
@@ -2117,6 +2269,7 @@ function chooseFinalSV(settingVars)
         imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.35)
         _, settingVars.customSV = imgui.InputFloat("SV", settingVars.customSV, 0, 0, "%.2fx")
         imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.PopItemWidth()
     else
         imgui.Indent(DEFAULT_WIDGET_WIDTH * 0.35 + 24)
     end
@@ -2127,7 +2280,7 @@ function chooseFinalSV(settingVars)
         imgui.Unindent(DEFAULT_WIDGET_WIDTH * 0.35 + 24)
     end
     settingVars.finalSVIndex = comboIndex + 1
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.PopItemWidth()
     return (oldIndex ~= settingVars.finalSVIndex) or (oldCustomSV ~= settingVars.customSV)
 end
 -- Lets you choose the first height/displacement for splitscroll
@@ -2192,6 +2345,16 @@ function chooseFrameDistance(menuVars)
     _, menuVars.frameDistance = imgui.InputFloat("Distance", menuVars.frameDistance, 0, 0, "%.0f msx")
     helpMarker("Distance between each consecutive frame")
     menuVars.frameDistance = clampToInterval(menuVars.frameDistance, 1000, 100000)
+end
+-- Lets you choose the numbers/data for a frame time
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseFrameTimeData(menuVars)
+    if #menuVars.frameTimes == 0 then return end
+    local frameTime = menuVars.frameTimes[menuVars.selectedTimeIndex]
+    _, frameTime.frame = imgui.InputInt("Frame #", frameTime.frame)
+    frameTime.frame = clampToInterval(frameTime.frame, 1, menuVars.numFrames)
+    _, frameTime.position = imgui.InputInt("Note height", frameTime.position)
 end
 -- Lets you choose the intensity of something from 1 to 100
 -- Returns whether or not the intensity changed [Boolean]
@@ -2439,6 +2602,7 @@ function chooseStillType(menuVars)
         _, menuVars.stillDistance = imgui.InputFloat("##still", menuVars.stillDistance, 0, 0,
                                                      "%.2f msx")
         imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.PopItemWidth()
     end
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.4)
     local comboIndex = menuVars.stillTypeIndex - 1
@@ -2453,7 +2617,7 @@ function chooseStillType(menuVars)
     if dontChooseDistance then
         imgui.Unindent(indentWidth)
     end
-    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
+    imgui.PopItemWidth()
 end
 -- Lets you choose the duration of the first stutter SV
 -- Returns whether or not the duration changed [Boolean]
@@ -2860,7 +3024,9 @@ function placeTeleportStutterSVs(globalVars, menuVars)
         local sv2 = thisMainSV
         local sv3 = thisMainSV + endDistance * endMultiplier
         table.insert(svsToAdd, utils.CreateScrollVelocity(startOffset, sv1))
-        table.insert(svsToAdd, utils.CreateScrollVelocity(startOffset + startDuration, sv2))
+        if sv2 ~= sv1 then
+            table.insert(svsToAdd, utils.CreateScrollVelocity(startOffset + startDuration, sv2))
+        end
         table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset - endDuration, sv3))
     end
     
@@ -3181,7 +3347,64 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 --    menuVars   : list of variables used for the current menu [Table]
 function placeAnimationSVs(globalVars, menuVars)
-    local capy = 0
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local distanceFromStartToEnd = menuVars.numFrames * menuVars.frameDistance
+    local startAnimationOffset = globalVars.startOffset
+    if not globalVars.useManualOffsets then
+        startAnimationOffset = uniqueSelectedNoteOffsets()[1]
+    end
+    local firstOffset = menuVars.frameTimes[1].time
+    local lastOffset = menuVars.frameTimes[#menuVars.frameTimes].time
+    if startAnimationOffset >= firstOffset then return end
+    
+    local startMultiplier = getUsableOffsetMultiplier(startAnimationOffset)
+    local startDuration = 1 / startMultiplier
+    local startMultiplier2 =  getUsableOffsetMultiplier(firstOffset)
+    local startDuration2 = 1 / startMultiplier2
+    local firstSV = (distanceFromStartToEnd + menuVars.frameDistance) * startMultiplier
+    local secondSV = ((menuVars.frameTimes[1].frame - 1) * menuVars.frameDistance + menuVars.frameTimes[1].position - distanceFromStartToEnd) * startMultiplier2
+    table.insert(svsToAdd, utils.CreateScrollVelocity(startAnimationOffset, firstSV))
+    table.insert(svsToAdd, utils.CreateScrollVelocity(startAnimationOffset + startDuration, 0))
+    table.insert(svsToAdd, utils.CreateScrollVelocity(firstOffset - startDuration2, secondSV))
+    
+    for i = 2, #menuVars.frameTimes do
+        local lastFrameTime = menuVars.frameTimes[i - 1]
+        local lastTime = lastFrameTime.time
+        local lastFrame = lastFrameTime.frame
+        local lastPosition = lastFrameTime.position
+        local toEndDifference = distanceFromStartToEnd - ((lastFrame - 1) * menuVars.frameDistance + lastPosition)
+        
+        local nextFrameTime = menuVars.frameTimes[i]
+        local nextTime = nextFrameTime.time
+        local nextFrame = nextFrameTime.frame
+        local nextPosition = nextFrameTime.position
+        local keyframeDifference = nextFrame - lastFrame
+        local positionDifference = nextPosition - lastPosition
+        local toNextDifference = keyframeDifference * menuVars.frameDistance + positionDifference
+        
+        local lastMultiplier = getUsableOffsetMultiplier(lastTime)
+        local lastDuration = 1 / lastMultiplier
+        local nextMultiplier = getUsableOffsetMultiplier(nextTime)
+        local nextDuration = 1 / nextMultiplier
+        
+        local sv1 = toEndDifference * lastMultiplier
+        local sv2 = 0
+        local sv3 = (toNextDifference - toEndDifference) * nextMultiplier
+        table.insert(svsToAdd, utils.CreateScrollVelocity(lastTime, sv1))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(lastTime + lastDuration, sv2))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(nextTime - nextDuration, sv3))
+        if i == #menuVars.frameTimes then
+            table.insert(svsToAdd, utils.CreateScrollVelocity(nextTime, -sv3))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(nextTime + nextDuration, 1))
+        end
+    end
+
+    local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if placeBehavior == "Replace old SVs" then
+        svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
+    end
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Adds selected note times to the splitscroll 2nd scroll speed list
 -- Parameters
