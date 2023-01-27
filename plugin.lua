@@ -1,4 +1,4 @@
--- amoguSV v5.2 capybara beta (24 Jan 2023)
+-- amoguSV v5.2 (27 Jan 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -49,6 +49,10 @@ MAX_ANIMATION_FRAMES = 999         -- maximum number of animation frames allowed
 
 -------------------------------------------------------------------------------------- Menu related
 
+ANIMATION_OPTIONS = {              -- ways to add note animation data
+    "Manualy Add",
+    "Import/Export"
+}
 COLOR_SCHEMES = {                  -- available color themes for the plugin
     "Classic",
     "Strawberry",
@@ -680,6 +684,7 @@ function linearSettingsMenu(settingVars)
     return settingsChanged
 end
 -- Creates the menu for exponential SV settings
+-- Returns whether settings have changed or not [Boolean]
 -- Parameters
 --    settingVars : list of setting variables for this exponential menu [Table]
 function exponentialSettingsMenu(settingVars)
@@ -692,6 +697,7 @@ function exponentialSettingsMenu(settingVars)
     return settingsChanged
 end
 -- Creates the menu for bezier SV settings
+-- Returns whether settings have changed or not [Boolean]
 -- Parameters
 --    settingVars : list of setting variables for this bezier menu [Table]
 function bezierSettingsMenu(settingVars)
@@ -704,6 +710,7 @@ function bezierSettingsMenu(settingVars)
     return settingsChanged
 end
 -- Creates the menu for sinusoidal SV settings
+-- Returns whether settings have changed or not [Boolean]
 -- Parameters
 --    settingVars : list of setting variables for this sinusoidal menu [Table]
 function sinusoidalSettingsMenu(settingVars)
@@ -719,6 +726,7 @@ function sinusoidalSettingsMenu(settingVars)
     return settingsChanged
 end
 -- Creates the menu for random SV settings
+-- Returns whether settings have changed or not [Boolean]
 -- Parameters
 --    settingVars : list of setting variables for this random menu [Table]
 function randomSettingsMenu(settingVars)
@@ -733,6 +741,7 @@ function randomSettingsMenu(settingVars)
     return settingsChanged
 end
 -- Creates the menu for custom SV settings
+-- Returns whether settings have changed or not [Boolean]
 -- Parameters
 --    settingVars : list of setting variables for this custom menu [Table]
 function customSettingsMenu(settingVars)
@@ -919,20 +928,30 @@ function animateMenu(globalVars)
         selectedTimeIndex = 1,
         currentFrame = 1,
         frameDistance = 2000,
-        noteInfoTextDump = "",
-        dumpInfo = false,
-        noteInfoImport = ""
+        addNoteDataIndex = 1,
+        exportText = "",
+        importText = ""
     }
     getVariables("animateMenu", menuVars)
     imgui.BeginTabBar("SV tabs")
     if imgui.BeginTabItem("Settings") then
         addPadding()
+        makeNoteMoverWindow(globalVars)
         chooseNumFrames(menuVars)
         chooseFrameDistance(menuVars)
+        chooseNoteAnimationData(menuVars)
         addSeparator()
-        displayLaneNoteCounts(menuVars)
-        addFrameTimes(menuVars)
-        button("Clear/Reset All Notes", ACTION_BUTTON_SIZE, resetFrameTimes, globalVars, menuVars)
+        local behavior = ANIMATION_OPTIONS[menuVars.addNoteDataIndex]
+        if behavior == "Manualy Add" then
+            displayLaneNoteCounts(menuVars)
+            addFrameTimes(menuVars)
+            button("Clear/Reset All Notes", ACTION_BUTTON_SIZE, resetFrameTimes,
+                   globalVars, menuVars)
+        elseif behavior == "Import/Export" then
+            importAnimationMenu(globalVars, menuVars)
+            addSeparator()
+            exportAnimationMenu(globalVars, menuVars)
+        end
         imgui.EndTabItem()
     end
     local frameTimesExist = #menuVars.frameTimes ~= 0
@@ -1220,12 +1239,13 @@ function displayFrameTimes(menuVars)
     addPadding()
     imgui.BeginChild("Times", {ACTION_BUTTON_SIZE[1], 200}, true)
     for i = 1, #menuVars.frameTimes do
+        local tempList = {}
         local frameTime = menuVars.frameTimes[i]
-        local text = frameTime.time.." | "..frameTime.lanes[1]
-        for j = 2, #frameTime.lanes do
-            text = text..", "..frameTime.lanes[j]
-        end
-        text = text .." | "..frameTime.frame.." | "..frameTime.position
+        tempList[1] = frameTime.time
+        tempList[2] = table.concat(frameTime.lanes, ", ")
+        tempList[3] = frameTime.frame
+        tempList[4] = frameTime.position
+        local text = table.concat(tempList, " | ")
         if imgui.Selectable(text, menuVars.selectedTimeIndex == i) then
             menuVars.selectedTimeIndex = i
         end
@@ -1236,13 +1256,15 @@ end
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
 function displayLaneNoteCounts(menuVars)
-    local laneCountText = "Lane counts: {"
+    local countText = {"Lane counts: { "}
     local totalNotes = 0
-    for i = 1, #menuVars.laneCounts do
-        laneCountText = laneCountText.." "..menuVars.laneCounts[i].." "
+    for i = 1,  #menuVars.laneCounts do
+        countText[2 * i] = menuVars.laneCounts[i]
+        countText[2 * i + 1] = " "
         totalNotes = totalNotes + menuVars.laneCounts[i]
     end
-    laneCountText = laneCountText.."}"
+    countText[#countText + 1] = "}"
+    local laneCountText = table.concat(countText)
     imgui.Text("Total # of frame notes in pool: "..totalNotes)
     imgui.Text(laneCountText)
 end
@@ -1321,6 +1343,39 @@ function drawCurrentFrame(menuVars)
     end
     imgui.EndChild()
 end
+-- Exports animation settings + frames, turning the data into a string
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars : list of variables used for the current SV menu [Table]
+function exportAnimationFrames(globalVars, menuVars)
+    local exportList = {}
+    for i = 1, #menuVars.frameTimes do
+        local tempList1 = {}
+        local frameTime = menuVars.frameTimes[i]
+        tempList1[1] = frameTime.time
+        tempList1[2] = table.concat(frameTime.lanes, ", ")
+        tempList1[3] = frameTime.frame
+        tempList1[4] = frameTime.position
+        local tempList2 = {}
+        tempList2[1] = "{ "
+        tempList2[2] = table.concat(tempList1, " | ")
+        tempList2[3] = " }\n"
+        exportList[i] = table.concat(tempList2)
+    end
+    menuVars.exportText = table.concat(exportList)
+end
+-- Menu that lets you export animation settings + frames
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars : list of variables used for the current SV menu [Table]
+function exportAnimationMenu(globalVars, menuVars)
+    if #menuVars.frameTimes == 0 then imgui.Text("No note/frame data to export") return end
+    imgui.Text("Copy exported data + paste somewhere safe")
+    imgui.InputTextMultiline("##animationExport", menuVars.exportText, #menuVars.exportText,
+                             {ACTION_BUTTON_SIZE[1], 50}, imgui_input_text_flags.ReadOnly)
+    button("Export Animation Data", ACTION_BUTTON_SIZE, exportAnimationFrames,
+           globalVars, menuVars)
+end
 -- Gets the current "Place SV" menu's setting variables
 -- Parameters
 --    svType : name of the current menu's type of SV [Table]
@@ -1388,6 +1443,40 @@ function getSettingVars(svType)
     getVariables(svType.."Settings", settingVars)
     return settingVars
 end
+-- Imports animation settings + frames from a string
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars : list of variables used for the current SV menu [Table]
+function importAnimationFrames(globalVars, menuVars)
+    resetFrameTimes(globalVars, menuVars)
+    local maxKeyframe = 1
+    for timeInfo in string.gmatch(menuVars.importText, "{.-}.-") do
+        local captures = {}
+        for capture, _ in string.gmatch(timeInfo, "%d+") do
+            table.insert(captures, tonumber(capture))
+        end
+        local lanes = {}
+        for i = 2, #captures - 2 do
+            local lane = captures[i]
+            lanes[i - 1] = lane
+            menuVars.laneCounts[lane] = menuVars.laneCounts[lane] + 1
+        end
+        table.insert(menuVars.frameTimes, createFrameTime(captures[1], lanes, captures[#captures - 1], captures[#captures]))
+        maxKeyframe = math.max(maxKeyframe, captures[#captures - 1])
+    end
+    menuVars.numFrames = maxKeyframe
+end
+-- Menu that lets you import animation settings + frames
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars : list of variables used for the current SV menu [Table]
+function importAnimationMenu(globalVars, menuVars)
+    imgui.Text("Paste exported note/frame data here")
+    _, menuVars.importText = imgui.InputTextMultiline("##animationImport", menuVars.importText,
+                                                      999999, {ACTION_BUTTON_SIZE[1], 50})
+    button("Import Animation Data", ACTION_BUTTON_SIZE, importAnimationFrames,
+           globalVars, menuVars)
+end
 -- Creates a button that lets you move notes
 -- Parameters
 --    milliseconds : how many milliseconds to move notes [String]
@@ -1418,6 +1507,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function makeNoteMoverWindow(globalVars)
     if not globalVars.showNoteMover then return end
+    initializeNextWindowNotCollapsed("noteMoverCollapsed")
     imgui.Begin("NoteMover", imgui_window_flags.AlwaysAutoResize)
     imgui.PushItemWidth(100)
     local menuVars = {
@@ -2366,6 +2456,14 @@ function chooseIntensity(settingVars)
     newIntensity = clampToInterval(newIntensity, 1, 100)
     settingVars.intensity = newIntensity
     return oldIntensity ~= newIntensity
+end
+-- Lets you choose the way to get note data for note animation
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseNoteAnimationData(menuVars)
+    local comboIndex = menuVars.addNoteDataIndex - 1
+    _, comboIndex = imgui.Combo("Notes/Frames data", comboIndex, ANIMATION_OPTIONS, #ANIMATION_OPTIONS)
+    menuVars.addNoteDataIndex = comboIndex + 1
 end
 -- Lets you choose the note spacing
 -- Parameters
