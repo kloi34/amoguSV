@@ -1,4 +1,4 @@
--- amoguSV v5.2 (27 Jan 2023)
+-- amoguSV v5.3 capybara beta (28 Jan 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -72,7 +72,8 @@ EDIT_SV_TOOLS = {                  -- tools for editing SVs
     "Flicker",
     "Measure",
     "Merge",
-    "Scale"
+    "Scale",
+    "Swap Notes"
 }
 EMOTICONS = {                      -- emoticons to visually clutter the plugin and confuse users
     "( - _ - )",
@@ -125,7 +126,7 @@ SPECIAL_SVS = {                    -- tools for placing special SVs
     "Splitscroll",
     "Animate"
 }
-STANDARD_SVS = {                   -- tools for placing standard SVs
+STANDARD_SVS = {                   -- types of standard SVs
     "Linear",
     "Exponential",
     "Bezier",
@@ -137,7 +138,8 @@ STILL_TYPES = {                    -- types of still displacements
     "No",
     "Start",
     "End",
-    "Auto"
+    "Auto",
+    "Capy"
 }
 STYLE_SCHEMES = {                  -- available style/appearance themes for the plugin
     "Rounded",
@@ -624,6 +626,8 @@ function editSVTab(globalVars)
     if toolName == "Measure"       then measureSVMenu(globalVars) end
     if toolName == "Merge"         then simpleActionMenu("Merge", mergeSVs, globalVars, nil) end
     if toolName == "Scale"         then scaleSVMenu(globalVars) end
+    if toolName == "Swap Notes"    then simpleActionMenu("Swap note", swapNoteSVs, globalVars,
+                                                         nil) end -- capy
 end
 -- Creates the "Delete SVs" tab
 -- Parameters
@@ -691,6 +695,7 @@ function exponentialSettingsMenu(settingVars)
     local settingsChanged = false
     settingsChanged = chooseExponentialBehavior(settingVars) or settingsChanged
     settingsChanged = chooseIntensity(settingVars) or settingsChanged
+    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     settingsChanged = chooseSVPoints(settingVars) or settingsChanged
     settingsChanged = chooseFinalSV(settingVars) or settingsChanged
@@ -704,6 +709,7 @@ function bezierSettingsMenu(settingVars)
     local settingsChanged = false
     settingsChanged = provideBezierWebsiteLink(settingVars) or settingsChanged
     settingsChanged = chooseBezierPoints(settingVars) or settingsChanged
+    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     settingsChanged = chooseSVPoints(settingVars) or settingsChanged
     settingsChanged = chooseFinalSV(settingVars) or settingsChanged
@@ -718,7 +724,7 @@ function sinusoidalSettingsMenu(settingVars)
     imgui.Text("Amplitude:")
     settingsChanged = chooseStartEndSVs(settingVars) or settingsChanged
     settingsChanged = chooseCurveSharpness(settingVars) or settingsChanged
-    settingsChanged = chooseConstantShift(settingVars) or settingsChanged
+    settingsChanged = chooseConstantShift(settingVars, 1) or settingsChanged
     settingsChanged = chooseNumPeriods(settingVars) or settingsChanged
     settingsChanged = choosePeriodShift(settingVars) or settingsChanged
     settingsChanged = chooseSVPerQuarterPeriod(settingVars) or settingsChanged
@@ -973,6 +979,12 @@ function animateMenu(globalVars)
     if frameTimesExist and imgui.BeginTabItem("Finish") then
         addPadding()
         imgui.TextWrapped("Select a time BEFORE ALL ANIMATION NOTES to begin the animation SVs")
+        local text = {}
+        text[1] = "After placing animation SVs, use Edit SVs --> Displace View to show frames "
+        text[2] = "before the animation SV begins. Use Place SVs --> Still --> Capy + skip final "
+        text[3] = "SV to show frames during the animation"
+        imgui.Text("")
+        helpMarker(table.concat(text))
         addSeparator()
         simpleActionMenu("Begin animation", placeAnimationSVs, globalVars, menuVars)
         imgui.EndTabItem()
@@ -989,6 +1001,7 @@ function placeStillSVMenu(globalVars)
         noteSpacing = 1,
         stillTypeIndex = 1,
         stillDistance = 200,
+        autoDistance = {},
         svMultipliers = {},
         svDistances = {},
         svStats = {
@@ -1393,6 +1406,7 @@ function getSettingVars(svType)
         settingVars = {
             behaviorIndex = 1,
             intensity = 30,
+            verticalShift = 0,
             avgSV = 1,
             svPoints = 16,
             finalSVIndex = 3,
@@ -1404,6 +1418,7 @@ function getSettingVars(svType)
             y1 = 0,
             x2 = 0,
             y2 = 1,
+            verticalShift = 0,
             avgSV = 1,
             svPoints = 16,
             finalSVIndex = 3,
@@ -1851,9 +1866,11 @@ end
 -- Parameters
 --    stillType        : type of still [String]
 --    stillDistance    : distance of the still according to the still type [Int/Float]
+--    autoDistance     : auto distances for "Capy" stills  [Int/Float]
 --    svDisplacements  : list of displacements of notes based on svs [Table]
 --    nsvDisplacements : list of displacements of notes based on notes only, no sv [Table]
-function calculateStillDisplacements(stillType, stillDistance, svDisplacements, nsvDisplacements)
+function calculateStillDisplacements(stillType, stillDistance, autoDistance, svDisplacements,
+                                     nsvDisplacements)
     local finalDisplacements = {}
     for i = 1, #svDisplacements do
         local difference = nsvDisplacements[i] - svDisplacements[i]
@@ -1866,6 +1883,11 @@ function calculateStillDisplacements(stillType, stillDistance, svDisplacements, 
     if stillType ~= "No" then
         for i = 1, #finalDisplacements do
             finalDisplacements[i] = finalDisplacements[i] + extraDisplacement
+        end
+    end
+    if stillType == "Capy" then
+        for i = 1, #finalDisplacements do
+            finalDisplacements[i] = autoDistance[i] + extraDisplacement - svDisplacements[i]
         end
     end
     return finalDisplacements
@@ -2107,6 +2129,8 @@ function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
         minimumNotes = 1
         actionThing = "at"
         onlyStartOffset = true
+    elseif actionName == "Swap note" then
+        actionThing = "at"
     end
     
     chooseStartEndOffsets(globalVars, onlyStartOffset)
@@ -2227,11 +2251,12 @@ end
 -- Lets you choose a constant amount to shift SVs
 -- Returns whether or not the shift amount changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current menu [Table]
-function chooseConstantShift(settingVars)
+--    settingVars  : list of variables used for the current menu [Table]
+--    defaultShift : default value for the shift when reset [Int/Float]
+function chooseConstantShift(settingVars, defaultShift)
     local oldShift = settingVars.verticalShift
     if imgui.Button("Reset##verticalShift", SECONDARY_BUTTON_SIZE) then
-        settingVars.verticalShift = 1
+        settingVars.verticalShift = defaultShift
     end
     imgui.SameLine(0, SAMELINE_SPACING)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
@@ -2334,6 +2359,7 @@ function chooseEditTool(globalVars)
     if currentTool == "Measure"       then toolTip("Get info/stats about SVs in a section") end
     if currentTool == "Merge"         then toolTip("Combine SVs that overlap") end
     if currentTool == "Scale"         then toolTip("Scale SV values to change note spacing") end
+    if currentTool == "Swap Notes"    then toolTip("Swaps positions of notes using SVs") end
     --if currentTool == "Vibe"          then toolTip("Make notes appear in two places at once") end
 end
 -- Lets you choose the behavior of the exponential SVs
@@ -2531,7 +2557,7 @@ function choosePlaceSVType(globalVars)
     _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPES, #PLACE_TYPES)
     globalVars.placeTypeIndex = comboIndex + 1
     local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
-    if placeType == "Still" then toolTip("Still makes notes keep the normal distance apart") end
+    if placeType == "Still"  then toolTip("Still makes notes keep the normal distance apart") end
 end
 -- Lets you choose the variability scale of randomness
 -- Returns whether or not the variability value changed [Boolean]
@@ -2711,6 +2737,7 @@ function chooseStillType(menuVars)
     if stillType == "Start" then toolTip("Use an inital starting displacement for the still") end
     if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
     if stillType == "Auto"  then toolTip("Use last displacement of a previous still to start") end
+    if stillType == "Capy"  then toolTip("Keeps original note displacements but uses new start") end
     
     if dontChooseDistance then
         imgui.Unindent(indentWidth)
@@ -2822,10 +2849,11 @@ function generateSVMultipliers(svType, settingVars)
     elseif svType == "Exponential" then
         local behavior = SV_BEHAVIORS[settingVars.behaviorIndex]
         multipliers = generateExponentialSet(behavior, settingVars.svPoints + 1, settingVars.avgSV,
-                                             settingVars.intensity)
+                                             settingVars.intensity, settingVars.verticalShift)
     elseif svType == "Bezier" then
         multipliers = generateBezierSet(settingVars.x1, settingVars.y1, settingVars.x2,
-                                        settingVars.y2, settingVars.avgSV, settingVars.svPoints + 1)
+                                        settingVars.y2, settingVars.avgSV, settingVars.svPoints + 1,
+                                        settingVars.verticalShift)
     elseif svType == "Sinusoidal" then
          multipliers = generateSinusoidalSet(settingVars.startSV, settingVars.endSV,
                                              settingVars.periods, settingVars.periodsShift,
@@ -2863,11 +2891,13 @@ function generateLinearSet(startValue, endValue, numValues)
 end
 -- Returns a set of exponential values [Table]
 -- Parameters
---    behavior  : behavior of the values (increase/speed up, or decrease/slow down) [String]
---    numValues : total number of values in the exponential set [Int]
---    avgValue  : average value of the set [Int/Float]
---    intensity : value determining sharpness/rapidness of exponential change [Int/Float]
-function generateExponentialSet(behavior, numValues, avgValue, intensity)
+--    behavior      : behavior of the values (increase/speed up, or decrease/slow down) [String]
+--    numValues     : total number of values in the exponential set [Int]
+--    avgValue      : average value of the set [Int/Float]
+--    intensity     : value determining sharpness/rapidness of exponential change [Int/Float]
+--    verticalShift : constant to add to each value in the set at very the end [Int/Float]
+function generateExponentialSet(behavior, numValues, avgValue, intensity, verticalShift)
+    avgValue = avgValue - verticalShift
     local exponentialIncrease = (behavior == "Speed up")
     local exponentialSet = {}
     -- reduce intensity scaling to produce more useful/practical values
@@ -2883,17 +2913,22 @@ function generateExponentialSet(behavior, numValues, avgValue, intensity)
         table.insert(exponentialSet, y)
     end
     normalizeValues(exponentialSet, avgValue, false)
+    for i = 1, #exponentialSet do
+        exponentialSet[i] = exponentialSet[i] + verticalShift
+    end
     return exponentialSet
 end
 -- Returns a set of bezier values [Table]
 -- Parameters
---    x1        : x-coordinate of the first (inputted) cubic bezier point [Int/Float]
---    y1        : y-coordinate of the first (inputted) cubic bezier point [Int/Float]
---    x2        : x-coordinate of the second (inputted) cubic bezier point [Int/Float]
---    y2        : y-coordinate of the second (inputted) cubic bezier point [Int/Float]
---    avgValue  : average value of the set [Int/Float]
---    numValues : total number of values in the bezier set [Int]
-function generateBezierSet(x1, y1, x2, y2, avgValue, numValues)
+--    x1            : x-coordinate of the first (inputted) cubic bezier point [Int/Float]
+--    y1            : y-coordinate of the first (inputted) cubic bezier point [Int/Float]
+--    x2            : x-coordinate of the second (inputted) cubic bezier point [Int/Float]
+--    y2            : y-coordinate of the second (inputted) cubic bezier point [Int/Float]
+--    avgValue      : average value of the set [Int/Float]
+--    numValues     : total number of values in the bezier set [Int]
+--    verticalShift : constant to add to each value in the set at very the end [Int/Float]
+function generateBezierSet(x1, y1, x2, y2, avgValue, numValues, verticalShift)
+    avgValue = avgValue - verticalShift
     local startingTimeGuess = 0.5
     local timeGuesses = {}
     local targetXPositions = {}
@@ -2924,6 +2959,9 @@ function generateBezierSet(x1, y1, x2, y2, avgValue, numValues)
         table.insert(bezierSet, slope)
     end
     normalizeValues(bezierSet, avgValue, false)
+    for i = 1, #bezierSet do
+        bezierSet[i] = bezierSet[i] + verticalShift
+    end
     return bezierSet
 end
 -- Returns a set of sinusoidal values [Table]
@@ -3178,6 +3216,12 @@ function placeSVs(globalVars, menuVars)
         svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
     end
     
+    local stillCapy = placingStillSVs and STILL_TYPES[menuVars.stillTypeIndex] == "Capy"
+    if stillCapy then 
+        local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
+        menuVars.autoDistance = calculateDisplacementsFromSVs(svsToRemove, noteOffsets)
+    end
+    
     removeAndAddSVs(svsToRemove, svsToAdd)
     if placingStillSVs then placeStillSVs(menuVars, firstOffset, lastOffset) end
 end
@@ -3206,7 +3250,8 @@ function placeStillSVs(menuVars, firstOffset, lastOffset)
             stillDistance = lastSV.Multiplier * time
         end
     end
-    local finalDisplacements = calculateStillDisplacements(stillType, stillDistance,
+    local autoD = menuVars.autoDistance
+    local finalDisplacements = calculateStillDisplacements(stillType, stillDistance, autoD,
                                                            svDisplacements, nsvDisplacements)
     for i = 1, #noteOffsets do
         local noteOffset = noteOffsets[i]
@@ -3650,6 +3695,59 @@ end
 --    menuVars   : list of variables used for the current menu [Table]
 function scaleSVs(globalVars, menuVars)
     editSVs(globalVars, menuVars, getSVsToScale, true)
+end
+-- Swap note positions with SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function swapNoteSVs(globalVars, menuVars)
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local svTimeIsAdded = {}
+    local offsets
+    if globalVars.useManualOffsets then
+        offsets = uniqueNoteOffsets(globalVars.startOffset, globalVars.endOffset)
+    else
+        offsets = uniqueSelectedNoteOffsets()
+    end
+    local startOffset = offsets[1]
+    local endOffset = offsets[#offsets]
+    local svsBetweenOffsets = getSVsBetweenOffsets(startOffset, endOffset)
+    if #svsBetweenOffsets == 0 or svsBetweenOffsets[1].StartTime ~= startOffset then
+        local newStartSV = utils.CreateScrollVelocity(startOffset, getSVMultiplierAt(startOffset))
+        table.insert(svsBetweenOffsets, 1, newStartSV)
+    end
+    local oldSVDisplacements = calculateDisplacementsFromSVs(svsBetweenOffsets, offsets)
+    local newSVDisplacements = {}
+    for i = 1, #oldSVDisplacements do
+        local index = i + 1
+        if i == #oldSVDisplacements then index = 1 end
+        newSVDisplacements[i] = oldSVDisplacements[index] - oldSVDisplacements[i]
+    end
+    for i = 1, #offsets do
+        local noteOffset = offsets[i]
+        local multiplier = getUsableOffsetMultiplier(noteOffset)
+        local duration = 1 / multiplier
+        local timeBefore = noteOffset - duration
+        local timeAt = noteOffset
+        local timeAfter = noteOffset + duration
+        svTimeIsAdded[timeBefore] = true
+        svTimeIsAdded[timeAt] = true
+        svTimeIsAdded[timeAfter] = true
+        local svMultiplierBefore = getSVMultiplierAt(timeBefore)
+        local svMultiplierAt = getSVMultiplierAt(timeAt)
+        local svMultiplierAfter = getSVMultiplierAt(timeAfter)
+        local newMultiplierBefore = newSVDisplacements[i] * multiplier
+        local newMultiplierAt = -newSVDisplacements[i] * multiplier
+        local newMultiplierAfter = svMultiplierAfter
+        newMultiplierBefore = newMultiplierBefore + svMultiplierBefore
+        newMultiplierAt = newMultiplierAt + svMultiplierAt
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, newMultiplierBefore))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
+    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Adds SVs that displace how high the notes are hit on the screen
 -- Parameters
