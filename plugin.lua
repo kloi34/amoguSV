@@ -1,4 +1,4 @@
--- amoguSV v5.3 capybara beta (28 Jan 2023)
+-- amoguSV v5.3 (1 Feb 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -50,7 +50,7 @@ MAX_ANIMATION_FRAMES = 999         -- maximum number of animation frames allowed
 -------------------------------------------------------------------------------------- Menu related
 
 ANIMATION_OPTIONS = {              -- ways to add note animation data
-    "Manualy Add",
+    "Manually Add",
     "Import/Export"
 }
 COLOR_SCHEMES = {                  -- available color themes for the plugin
@@ -213,7 +213,7 @@ function setPluginAppearanceStyles(styleScheme)
     imgui.PushStyleVar( imgui_style_var.ScrollbarRounding,  cornerRoundnessValue )
     imgui.PushStyleVar( imgui_style_var.TabRounding,        cornerRoundnessValue )
     
-    -- not working? TabBorderSize doesn't exist? But it's changable in the style editor demo?
+    -- not working? TabBorderSize doesn't exist? But it's changeable in the style editor demo?
     -- imgui.PushStyleVar( imgui_style_var.TabBorderSize,      borderSize           ) 
 end
 -- Configures the plugin GUI colors
@@ -566,7 +566,7 @@ function showShortcuts()
     toolTip("Useful if you click off the plugin but want to quickly change an input value")
     addSeparator()
     imgui.BulletText("T = activate the big button doing SV stuff")
-    toolTip("Use this everytime for quick workflow")
+    toolTip("Use this every time for quick workflow")
     addPadding()
     imgui.Unindent(indentWidth)
 end
@@ -627,7 +627,7 @@ function editSVTab(globalVars)
     if toolName == "Merge"         then simpleActionMenu("Merge", mergeSVs, globalVars, nil) end
     if toolName == "Scale"         then scaleSVMenu(globalVars) end
     if toolName == "Swap Notes"    then simpleActionMenu("Swap note", swapNoteSVs, globalVars,
-                                                         nil) end -- capy
+                                                         nil) end
 end
 -- Creates the "Delete SVs" tab
 -- Parameters
@@ -895,17 +895,50 @@ function splitScrollMenu(globalVars)
         height1 = 0,
         scrollSpeed2 = -0.9,
         height2 = 400,
-        msPerFrame = 16,
         distanceBack = 1000000,
-        noteTimes2 = {}
+        msPerFrame = 16,
+        noteTimes2 = {},
+        svsInScroll2 = {}
     }
     getVariables("splitScrollMenu", menuVars)
     makeNoteMoverWindow(globalVars)
-    chooseFirstScrollSpeed(menuVars)
-    chooseFirstHeight(menuVars)
-    chooseSecondScrollSpeed(menuVars)
-    chooseSecondHeight(menuVars)
-    chooseMSPF(menuVars)
+    imgui.BeginTabBar("Splitscroll tabs")
+    if imgui.BeginTabItem("Basic splitscroll") then
+        menuVars.svsInScroll2 = {}
+        menuVars.distanceBack = 1000000
+        addPadding()
+        chooseFirstScrollSpeed(menuVars)
+        chooseFirstHeight(menuVars)
+        chooseSecondScrollSpeed(menuVars)
+        chooseSecondHeight(menuVars)
+        chooseMSPF(menuVars)
+        imgui.EndTabItem()
+    end
+    if imgui.BeginTabItem("Advanced splitscroll") then
+        local noSVsInitially = #menuVars.svsInScroll2 == 0
+        addPadding()
+        chooseDistanceBack(menuVars)
+        chooseMSPF(menuVars)
+        addSeparator()
+        imgui.Text(#menuVars.svsInScroll2.." SVs added for 2nd scroll")
+        helpMarker("Steps to setup: place SVs for 2nd scroll --> add SVs to 2nd scroll with the "..
+                   "button--> delete SVs for 2nd scroll --> place SVs for 1st scroll --> place splitscroll SVs")
+        if imgui.Button("Add SVs between selected notes for 2nd scroll", ACTION_BUTTON_SIZE) then
+            local offsets = uniqueSelectedNoteOffsets()
+            menuVars.svsInScroll2 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
+        end
+        if (not noSVsInitially) and imgui.Button("Clear all 2nd scroll SVs", ACTION_BUTTON_SIZE) then
+            menuVars.svsInScroll2 = {}
+        end
+        imgui.EndTabItem()
+        
+        if noSVsInitially then
+            imgui.EndTabBar()
+            saveVariables("splitScrollMenu", menuVars)
+            return 
+        end
+    end
+    imgui.EndTabBar()
     addSeparator()
     local noNoteTimesInitially = #menuVars.noteTimes2 == 0
     imgui.Text(#menuVars.noteTimes2.." note times added for 2nd scroll")
@@ -917,6 +950,7 @@ function splitScrollMenu(globalVars)
                                                    ACTION_BUTTON_SIZE) then
         menuVars.noteTimes2 = {}
     end
+    
     saveVariables("splitScrollMenu", menuVars)
     if noNoteTimesInitially then return end
     
@@ -948,7 +982,7 @@ function animateMenu(globalVars)
         chooseNoteAnimationData(menuVars)
         addSeparator()
         local behavior = ANIMATION_OPTIONS[menuVars.addNoteDataIndex]
-        if behavior == "Manualy Add" then
+        if behavior == "Manually Add" then
             displayLaneNoteCounts(menuVars)
             addFrameTimes(menuVars)
             button("Clear/Reset All Notes", ACTION_BUTTON_SIZE, resetFrameTimes,
@@ -983,7 +1017,7 @@ function animateMenu(globalVars)
         text[1] = "After placing animation SVs, use Edit SVs --> Displace View to show frames "
         text[2] = "before the animation SV begins. Use Place SVs --> Still --> Capy + skip final "
         text[3] = "SV to show frames during the animation"
-        imgui.Text("")
+        imgui.TextWrapped("A bad explanation of animation SV steps:")
         helpMarker(table.concat(text))
         addSeparator()
         simpleActionMenu("Begin animation", placeAnimationSVs, globalVars, menuVars)
@@ -1359,7 +1393,7 @@ end
 -- Exports animation settings + frames, turning the data into a string
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
---    menuVars : list of variables used for the current SV menu [Table]
+--    menuVars   : list of variables used for the current SV menu [Table]
 function exportAnimationFrames(globalVars, menuVars)
     local exportList = {}
     for i = 1, #menuVars.frameTimes do
@@ -1380,7 +1414,7 @@ end
 -- Menu that lets you export animation settings + frames
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
---    menuVars : list of variables used for the current SV menu [Table]
+--    menuVars   : list of variables used for the current SV menu [Table]
 function exportAnimationMenu(globalVars, menuVars)
     if #menuVars.frameTimes == 0 then imgui.Text("No note/frame data to export") return end
     imgui.Text("Copy exported data + paste somewhere safe")
@@ -1461,7 +1495,7 @@ end
 -- Imports animation settings + frames from a string
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
---    menuVars : list of variables used for the current SV menu [Table]
+--    menuVars   : list of variables used for the current SV menu [Table]
 function importAnimationFrames(globalVars, menuVars)
     resetFrameTimes(globalVars, menuVars)
     local maxKeyframe = 1
@@ -1479,12 +1513,15 @@ function importAnimationFrames(globalVars, menuVars)
         table.insert(menuVars.frameTimes, createFrameTime(captures[1], lanes, captures[#captures - 1], captures[#captures]))
         maxKeyframe = math.max(maxKeyframe, captures[#captures - 1])
     end
-    menuVars.numFrames = maxKeyframe
+    if maxKeyframe > 1 then
+        menuVars.numFrames = maxKeyframe
+    end
+    menuVars.importText = ""
 end
 -- Menu that lets you import animation settings + frames
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
---    menuVars : list of variables used for the current SV menu [Table]
+--    menuVars   : list of variables used for the current SV menu [Table]
 function importAnimationMenu(globalVars, menuVars)
     imgui.Text("Paste exported note/frame data here")
     _, menuVars.importText = imgui.InputTextMultiline("##animationImport", menuVars.importText,
@@ -2146,7 +2183,7 @@ function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
     ifKeyPressedThenExecute(keys.T, actionfunc, globalVars, menuVars)
 end
 -- Checks to see if enough notes are selected
--- Returns whether or not there are enought notes [Boolean]
+-- Returns whether or not there are enough notes [Boolean]
 -- Parameters
 --    minimumNotes : minimum number of notes needed to select [Int]
 function checkEnoughSelectedNotes(minimumNotes)
@@ -2340,6 +2377,14 @@ end
 function chooseDistance(menuVars)
     _, menuVars.distance = imgui.InputFloat("Distance##stand", menuVars.distance, 0, 0, "%.3f msx")
 end
+-- Lets you choose the distance back for splitscroll
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseDistanceBack(menuVars)
+    _, menuVars.distanceBack = imgui.InputFloat("Split Distance", menuVars.distanceBack,
+                                                0, 0, "%.3f msx")
+    helpMarker("Splitscroll distance to separate the two scrolls          (1,000,000 = default)")
+end
 -- Lets you choose which edit tool to use
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -2360,7 +2405,6 @@ function chooseEditTool(globalVars)
     if currentTool == "Merge"         then toolTip("Combine SVs that overlap") end
     if currentTool == "Scale"         then toolTip("Scale SV values to change note spacing") end
     if currentTool == "Swap Notes"    then toolTip("Swaps positions of notes using SVs") end
-    --if currentTool == "Vibe"          then toolTip("Make notes appear in two places at once") end
 end
 -- Lets you choose the behavior of the exponential SVs
 -- Returns whether or not the behavior changed [Boolean]
@@ -2433,7 +2477,7 @@ function chooseMSPF(menuVars)
     newMSPF = forceHalf(newMSPF)
     newMSPF = clampToInterval(newMSPF, 4, 1000)
     menuVars.msPerFrame = newMSPF
-    helpMarker("Number of milliseconds the splitscroll will display one scroll speed at before "..
+    helpMarker("Number of milliseconds the splitscroll will display a scroll speed for before "..
                "jumping to the next scroll speed")
 end
 -- Lets you choose whether or not to linearly change something
@@ -2488,7 +2532,7 @@ end
 --    menuVars : list of variables used for the current menu [Table]
 function chooseNoteAnimationData(menuVars)
     local comboIndex = menuVars.addNoteDataIndex - 1
-    _, comboIndex = imgui.Combo("Notes/Frames data", comboIndex, ANIMATION_OPTIONS, #ANIMATION_OPTIONS)
+    _, comboIndex = imgui.Combo("Notes/Frames", comboIndex, ANIMATION_OPTIONS, #ANIMATION_OPTIONS)
     menuVars.addNoteDataIndex = comboIndex + 1
 end
 -- Lets you choose the note spacing
@@ -2557,7 +2601,7 @@ function choosePlaceSVType(globalVars)
     _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPES, #PLACE_TYPES)
     globalVars.placeTypeIndex = comboIndex + 1
     local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
-    if placeType == "Still"  then toolTip("Still makes notes keep the normal distance apart") end
+    if placeType == "Still" then toolTip("Still makes notes keep the normal distance apart") end
 end
 -- Lets you choose the variability scale of randomness
 -- Returns whether or not the variability value changed [Boolean]
@@ -2733,8 +2777,8 @@ function chooseStillType(menuVars)
     _, comboIndex = imgui.Combo("Displacement", comboIndex, STILL_TYPES, #STILL_TYPES)
     menuVars.stillTypeIndex = comboIndex + 1
     
-    if stillType == "No"    then toolTip("Don't use an inital or end displacement") end
-    if stillType == "Start" then toolTip("Use an inital starting displacement for the still") end
+    if stillType == "No"    then toolTip("Don't use an initial or end displacement") end
+    if stillType == "Start" then toolTip("Use an initial starting displacement for the still") end
     if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
     if stillType == "Auto"  then toolTip("Use last displacement of a previous still to start") end
     if stillType == "Capy"  then toolTip("Keeps original note displacements but uses new start") end
@@ -3048,7 +3092,7 @@ end
 --    svsToRemove   : list of SVs to remove [Table]
 --    svTimeIsAdded : list of SVs times added [Table]
 --    startOffset   : starting offset to remove after [Int]
---    endOffset     : endd offset to remove before [Int]
+--    endOffset     : end offset to remove before [Int]
 function getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
     for _, sv in pairs(map.ScrollVelocities) do
         local svIsInRange = sv.StartTime >= startOffset - 1 and sv.StartTime <= endOffset + 1
@@ -3327,6 +3371,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 --    menuVars   : list of variables used for the current menu [Table]
 function placeSplitScrollSVs(globalVars, menuVars)
+    if #menuVars.svsInScroll2 > 0 then placeAdvancedSplitScrollSVs(globalVars, menuVars) return end
     local svsToAdd = {}
     local svsToRemove = {}
     local isNoteOffsetFor2nd = {}
@@ -3347,21 +3392,23 @@ function placeSplitScrollSVs(globalVars, menuVars)
     local scrollSpeed2 = menuVars.scrollSpeed2
     local height2 = menuVars.height2
     local initialDistance = menuVars.distanceBack
+    local scrollDifference = scrollSpeed1 - scrollSpeed2
     local millisecondsPerFrame = menuVars.msPerFrame
     local numFrames = math.floor((totalTime - 1) / millisecondsPerFrame)
     local noteIndex = 2
     local goingFrom1To2 = false
     local currentScrollSpeed = scrollSpeed2
     local nextScrollSpeed = scrollSpeed1
-    for i = 0, numFrames do
+    for i = 0, (numFrames + 1) do
         local timePassed = i * millisecondsPerFrame
+        if i == numFrames + 1 then timePassed = totalTime end
+        local tpDistance = initialDistance + timePassed * scrollDifference
+        if i == 0 then tpDistance = 0 end
         local timeAt = firstOffset + timePassed
         local multiplier = getUsableOffsetMultiplier(timeAt)
         local duration = 1 / multiplier
         local timeBefore = timeAt - duration
         local timeAfter = timeAt + duration
-        local tpDistance = initialDistance + timePassed * (scrollSpeed1 - scrollSpeed2)
-        if i == 0 then tpDistance = 0 end
         local currentHeight = height2
         if goingFrom1To2 then
             tpDistance = -tpDistance
@@ -3372,7 +3419,9 @@ function placeSplitScrollSVs(globalVars, menuVars)
             currentScrollSpeed = scrollSpeed2
             nextScrollSpeed = scrollSpeed1
         end
-        
+        if i == numFrames + 1 then
+            nextScrollSpeed = scrollSpeed1
+        end
         local noteOffset = noteOffsets[noteIndex]
         while noteOffset < timeAt do
             local noteMultiplier = getUsableOffsetMultiplier(noteOffset)
@@ -3388,7 +3437,7 @@ function placeSplitScrollSVs(globalVars, menuVars)
             end
             local extraDisplacement = 0
             if noteInOtherScroll then
-                extraDisplacement = initialDistance + (noteOffset - firstOffset) * (scrollSpeed1 - scrollSpeed2)
+                extraDisplacement = initialDistance + (noteOffset - firstOffset) * scrollDifference
             end
             if goingFrom1To2 then
                 extraDisplacement = -extraDisplacement
@@ -3402,6 +3451,7 @@ function placeSplitScrollSVs(globalVars, menuVars)
             noteIndex = noteIndex + 1
             noteOffset = noteOffsets[noteIndex]
         end
+        local sv2 = nextScrollSpeed + tpDistance * multiplier
         if noteOffset == timeAt then
             local thisHeight = height1
             if isNoteOffsetFor2nd[noteOffset] then
@@ -3409,76 +3459,282 @@ function placeSplitScrollSVs(globalVars, menuVars)
             end
             local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
                                       (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
+            local sv1 = currentScrollSpeed + thisHeight * multiplier
+            sv2 = nextScrollSpeed - thisHeight * multiplier
             if noteInOtherScroll then
-                table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, currentScrollSpeed + (tpDistance + thisHeight) * multiplier))
-                table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, nextScrollSpeed - thisHeight * multiplier))
-                table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, nextScrollSpeed))
+                sv1 = sv1 + tpDistance * multiplier
+                if i == numFrames + 1 and isNoteOffsetFor2nd[noteOffset] then
+                    sv2 = sv2 - tpDistance * multiplier
+                end
             else
-                table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, currentScrollSpeed + thisHeight * multiplier))
-                table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, nextScrollSpeed + (tpDistance - thisHeight) * multiplier))
-                table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, nextScrollSpeed))
+                if i ~= numFrames + 1 or isNoteOffsetFor2nd[noteOffset] then
+                    sv2 = sv2 + tpDistance * multiplier
+                end
             end
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, sv1))
             noteIndex = noteIndex + 1
-        else
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, nextScrollSpeed + tpDistance * multiplier))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, nextScrollSpeed))
         end
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, sv2))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, nextScrollSpeed))
         goingFrom1To2 = not goingFrom1To2
     end
     
-    local noteOffset = noteOffsets[noteIndex]
-    while noteOffset < lastOffset do
-        local multiplier = getUsableOffsetMultiplier(noteOffset)
+    local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
+    if placeBehavior == "Replace old SVs" then
+        svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
+    end
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Places advanced split scroll SVs 
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function placeAdvancedSplitScrollSVs(globalVars, menuVars)
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local isNoteOffsetFor2nd = {}
+    local offsets = getSelectedOffsets(globalVars)
+    for _, offset in pairs(menuVars.noteTimes2) do
+        table.insert(offsets, offset)
+    end
+    offsets = table.sort(offsets, function(a, b) return a < b end)
+    local firstOffset = offsets[1]
+    local lastOffset = offsets[#offsets]
+    local totalTime = lastOffset - firstOffset
+    local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
+    for _, noteOffset in pairs(menuVars.noteTimes2) do
+        isNoteOffsetFor2nd[noteOffset] = true
+    end
+    local initialDistance = menuVars.distanceBack
+    local millisecondsPerFrame = menuVars.msPerFrame
+    local numFrames = math.floor((totalTime - 1) / millisecondsPerFrame)
+    local noteIndex = 2
+    local sv1Index = 1
+    local sv2Index = 1
+    local svsIn1 = getSVsBetweenOffsets(firstOffset, lastOffset)
+    local svsIn2 = menuVars.svsInScroll2
+    if #svsIn1 == 0 or svsIn1[1].StartTime ~= firstOffset then
+        local newStartSV = utils.CreateScrollVelocity(firstOffset, getSVMultiplierAt(firstOffset))
+        table.insert(svsIn1, 1, newStartSV)
+    end
+    if #svsIn2 == 0 or svsIn2[1].StartTime ~= firstOffset then
+        local newStartSV = utils.CreateScrollVelocity(firstOffset, getSVMultiplierAt(firstOffset))
+        table.insert(svsIn2, 1, newStartSV)
+    end
+    local splitscrollOffsets = {}
+    for i = 0, numFrames do
+        local timePassed = i * millisecondsPerFrame
+        table.insert(splitscrollOffsets, timePassed + firstOffset)
+    end
+    table.insert(splitscrollOffsets, lastOffset)
+    local distancesIn1 = calculateDisplacementsFromSVs(svsIn1, splitscrollOffsets)
+    local distancesIn2 = calculateDisplacementsFromSVs(svsIn2, splitscrollOffsets)
+    local splitscrollDistances = {}
+    for i = 1, #distancesIn1 do
+        splitscrollDistances[i] = distancesIn1[i] - distancesIn2[i] + initialDistance
+        if i % 2 == 0 then splitscrollDistances[i] = -splitscrollDistances[i] end
+    end
+    splitscrollDistances[1] = 0
+    local goingFrom1To2 = false
+    local noteDistancesIn1 = calculateDisplacementsFromSVs(svsIn1, noteOffsets)
+    local noteDistancesIn2 = calculateDisplacementsFromSVs(svsIn2, noteOffsets)
+    local noteDistances = {}
+    for i = 1, #noteDistancesIn1 do
+        noteDistances[i] = noteDistancesIn1[i] - noteDistancesIn2[i] + initialDistance
+    end
+    for i = 0, numFrames + 1 do
+        local timeAt = splitscrollOffsets[i + 1]
+        local multiplier = getUsableOffsetMultiplier(timeAt)
         local duration = 1 / multiplier
-        local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
-                                  (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
-        local noteTimeBefore = noteOffset - duration
-        local noteTimeAt = noteOffset
-        local noteTimeAfter = noteOffset + duration
-        local thisHeight = height1
-        if isNoteOffsetFor2nd[noteOffset] then
-            thisHeight = height2
+        local timeBefore = timeAt - duration
+        local timeAfter = timeAt + duration
+        local noteOffset = noteOffsets[noteIndex]
+        while noteOffset < timeAt do
+            local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
+                                      (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
+            local noteMultiplier = getUsableOffsetMultiplier(noteOffset)
+            local noteDuration = 1 / noteMultiplier
+            local noteTimeBefore = noteOffset - noteDuration
+            local noteTimeAt = noteOffset
+            local noteTimeAfter = noteOffset + noteDuration
+            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime < noteTimeBefore do
+                if goingFrom1To2 then
+                    table.insert(svsToAdd, svsIn1[sv1Index])
+                end
+                sv1Index = sv1Index + 1
+            end
+            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime < noteTimeBefore do
+                if not goingFrom1To2 then
+                    table.insert(svsToAdd, svsIn2[sv2Index])
+                end
+                sv2Index = sv2Index + 1
+            end
+            if noteInOtherScroll then
+                local sv1 = svsIn2[sv2Index - 1]
+                local sv2 = svsIn2[sv2Index - 1]
+                local sv3 = svsIn2[sv2Index - 1]
+                if goingFrom1To2 then
+                    sv1 = svsIn1[sv1Index - 1]
+                    sv2 = svsIn1[sv1Index - 1]
+                    sv3 = svsIn1[sv1Index - 1]
+                end
+                while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= noteTimeAfter do
+                    if goingFrom1To2 then
+                        local svTime = svsIn1[sv1Index].StartTime 
+                        if svTime <= noteTimeBefore then
+                            sv1 = svsIn1[sv1Index]
+                        end
+                        if svTime <= noteTimeAt then
+                            sv2 = svsIn1[sv1Index]
+                        end
+                        if svTime <= noteTimeAfter then
+                            sv3 = svsIn1[sv1Index]
+                        end
+                    end
+                    sv1Index = sv1Index + 1
+                end
+                while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= noteTimeAfter do
+                    if not goingFrom1To2 then
+                        local svTime = svsIn2[sv2Index].StartTime 
+                        if svTime <= noteTimeBefore then
+                            sv1 = svsIn2[sv2Index]
+                        end
+                        if svTime <= noteTimeAt then
+                            sv2 = svsIn2[sv2Index]
+                        end
+                        if svTime <= noteTimeAfter then
+                            sv3 = svsIn2[sv2Index]
+                        end
+                    end
+                    sv2Index = sv2Index + 1
+                end
+                local noteDistance = noteDistances[noteIndex]
+                if goingFrom1To2 then noteDistance = -noteDistance end
+                local svBefore = sv1.Multiplier + noteDistance * noteMultiplier
+                local svAt = sv2.Multiplier - noteDistance * noteMultiplier
+                local svAfter = sv3.Multiplier
+                table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeBefore, svBefore))
+                table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAt, svAt))
+                table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAfter, svAfter))
+            else
+                while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= noteTimeAfter do
+                    if goingFrom1To2 then
+                        table.insert(svsToAdd, svsIn1[sv1Index])
+                    end
+                    sv1Index = sv1Index + 1
+                end
+                while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= noteTimeAfter do
+                    if not goingFrom1To2 then
+                        table.insert(svsToAdd, svsIn2[sv2Index])
+                    end
+                    sv2Index = sv2Index + 1
+                end
+            end
+            noteIndex = noteIndex + 1
+            noteOffset = noteOffsets[noteIndex]
         end
-        local extraDisplacement = 0
-        if noteInOtherScroll then
-            extraDisplacement = initialDistance + (noteOffset - firstOffset) * (scrollSpeed1 - scrollSpeed2)
+        while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime < timeBefore do
+            if goingFrom1To2 then
+                table.insert(svsToAdd, svsIn1[sv1Index])
+            end
+            sv1Index = sv1Index + 1
         end
-        if goingFrom1To2 then
-            extraDisplacement = -extraDisplacement
+        while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime < timeBefore do
+            if not goingFrom1To2 then
+                table.insert(svsToAdd, svsIn2[sv2Index])
+            end
+            sv2Index = sv2Index + 1
         end
-        local svBefore = nextScrollSpeed + (thisHeight + extraDisplacement) * multiplier
-        local svAt = nextScrollSpeed - (thisHeight + extraDisplacement) * multiplier
-        local svAfter = nextScrollSpeed
-        table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeBefore, svBefore))
-        table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAt, svAt))
-        table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAfter, svAfter))
-        noteIndex = noteIndex + 1
-        noteOffset = noteOffsets[noteIndex]
-    end
-    
-    local multiplier = getUsableOffsetMultiplier(lastOffset)
-    local duration = 1 / multiplier
-    local tpDistance = initialDistance + totalTime * (scrollSpeed1 - scrollSpeed2)
-    local noteInOtherScroll = (isNoteOffsetFor2nd[lastOffset] and goingFrom1To2) or
-                              (not isNoteOffsetFor2nd[lastOffset] and not goingFrom1To2)
-    if not goingFrom1To2 then
-        if isNoteOffsetFor2nd[lastOffset] then
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset - duration, height2 * multiplier + scrollSpeed2))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, (tpDistance - height2) * multiplier + scrollSpeed1))
+        if noteOffset == timeAt then
+            local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
+                                      (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
+            local sv1in1 = svsIn1[sv1Index - 1]
+            local sv2in1 = svsIn1[sv1Index - 1]
+            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= timeAfter do
+                if svsIn1[sv1Index].StartTime <= timeBefore then sv1in1 = svsIn1[sv1Index] end
+                if svsIn1[sv1Index].StartTime <= timeAt then sv2in1 = svsIn1[sv1Index] end
+                sv1Index = sv1Index + 1
+            end
+            local sv3in1 = svsIn1[sv1Index - 1]
+            local sv1in2 = svsIn2[sv2Index - 1]
+            local sv2in2 = svsIn2[sv2Index - 1]
+            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= timeAfter do
+                if svsIn2[sv2Index].StartTime <= timeBefore then sv1in2 = svsIn2[sv2Index] end
+                if svsIn2[sv2Index].StartTime <= timeAt then sv2in2 = svsIn2[sv2Index] end
+                sv2Index = sv2Index + 1
+            end
+            local sv3in2 = svsIn2[sv2Index - 1]
+            local svBefore = 0
+            local svAt = 0
+            local svAfter = 0
+            if noteInOtherScroll then
+                svBefore = svBefore + splitscrollDistances[i + 1] * multiplier
+                if i == numFrames + 1 and isNoteOffsetFor2nd[noteOffset] then
+                    svAt = svAt - splitscrollDistances[i + 1] * multiplier
+                end
+            else
+                svAt = svAt + splitscrollDistances[i + 1] * multiplier
+                if i == numFrames + 1 and not isNoteOffsetFor2nd[noteOffset] then
+                    svAt = svAt - splitscrollDistances[i + 1] * multiplier
+                end
+            end
+            if goingFrom1To2 then
+                svBefore = svBefore + sv1in1.Multiplier
+                svAt = svAt + sv2in2.Multiplier
+                svAfter = sv3in2.Multiplier
+            else
+                svBefore = svBefore + sv1in2.Multiplier
+                svAt = svAt + sv2in1.Multiplier
+                svAfter = sv3in1.Multiplier
+            end
+            if i == numFrames + 1 then 
+                svAfter = 1
+            end
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, svBefore))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, svAt))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, svAfter))
+            noteIndex = noteIndex + 1
         else
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset - duration, (height1 + tpDistance) * multiplier + scrollSpeed2))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, -height1 * multiplier + scrollSpeed1))
+            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime < timeAt do
+                if goingFrom1To2 then
+                    table.insert(svsToAdd, svsIn1[sv1Index])
+                end
+                sv1Index = sv1Index + 1
+            end
+            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime < timeAt do
+                if not goingFrom1To2 then
+                    table.insert(svsToAdd, svsIn2[sv2Index])
+                end
+                sv2Index = sv2Index + 1
+            end
+            
+            local sv1 = svsIn1[sv1Index - 1]
+            if goingFrom1To2 then
+                sv1 = svsIn2[sv2Index - 1]
+            end
+            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= timeAfter do
+                if not goingFrom1To2 and svsIn1[sv1Index].StartTime <= timeAt then
+                    sv1 = svsIn1[sv1Index]
+                end
+                sv1Index = sv1Index + 1
+            end
+            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= timeAfter do
+                if goingFrom1To2 and svsIn2[sv2Index].StartTime <= timeAt then
+                    sv1 = svsIn2[sv2Index]
+                end
+                sv2Index = sv2Index + 1
+            end
+            local sv2 = svsIn1[sv1Index - 1]
+            if goingFrom1To2 then
+                sv2 = svsIn2[sv2Index - 1]
+            end
+            local svMultiplierAt = sv1.Multiplier + splitscrollDistances[i + 1] * multiplier
+            local svMultiplierAfter = sv2.Multiplier
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, svMultiplierAt))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, svMultiplierAfter))
         end
-    else
-        if isNoteOffsetFor2nd[lastOffset] then
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset - duration, (-tpDistance + height2) * multiplier + scrollSpeed1))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, (tpDistance - height2) * multiplier + scrollSpeed1))
-        else
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset - duration, height1 * multiplier + scrollSpeed1))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, -height1 * multiplier + scrollSpeed1))
-        end
+        goingFrom1To2 = not goingFrom1To2
     end
-    table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset + duration, scrollSpeed1))
     local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
     if placeBehavior == "Replace old SVs" then
         svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
