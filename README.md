@@ -44,6 +44,7 @@ Special types of SVs:
 * Measure
 * Merge
 * Scale
+* Swap Notes
 
 ### Delete SVs
 Remove SVs between notes.
