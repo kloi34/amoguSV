@@ -1,4 +1,4 @@
--- amoguSV v5.3 (1 Feb 2023)
+-- amoguSV v5.3.1 (9 Feb 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -922,7 +922,8 @@ function splitScrollMenu(globalVars)
         addSeparator()
         imgui.Text(#menuVars.svsInScroll2.." SVs added for 2nd scroll")
         helpMarker("Steps to setup: place SVs for 2nd scroll --> add SVs to 2nd scroll with the "..
-                   "button--> delete SVs for 2nd scroll --> place SVs for 1st scroll --> place splitscroll SVs")
+                   "button--> delete SVs for 2nd scroll --> place SVs for 1st scroll --> "..
+                   "place splitscroll SVs")
         if imgui.Button("Add SVs between selected notes for 2nd scroll", ACTION_BUTTON_SIZE) then
             local offsets = uniqueSelectedNoteOffsets()
             menuVars.svsInScroll2 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
@@ -1510,7 +1511,10 @@ function importAnimationFrames(globalVars, menuVars)
             lanes[i - 1] = lane
             menuVars.laneCounts[lane] = menuVars.laneCounts[lane] + 1
         end
-        table.insert(menuVars.frameTimes, createFrameTime(captures[1], lanes, captures[#captures - 1], captures[#captures]))
+        local time = captures[1]
+        local frame = captures[#captures - 1]
+        local position = captures[#captures]
+        table.insert(menuVars.frameTimes, createFrameTime(time, lanes, frame, position))
         maxKeyframe = math.max(maxKeyframe, captures[#captures - 1])
     end
     if maxKeyframe > 1 then
@@ -2502,7 +2506,8 @@ end
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
 function chooseFrameDistance(menuVars)
-    _, menuVars.frameDistance = imgui.InputFloat("Distance", menuVars.frameDistance, 0, 0, "%.0f msx")
+    _, menuVars.frameDistance = imgui.InputFloat("Distance", menuVars.frameDistance, 0, 0,
+                                                 "%.0f msx")
     helpMarker("Distance between each consecutive frame")
     menuVars.frameDistance = clampToInterval(menuVars.frameDistance, 1000, 100000)
 end
@@ -2754,7 +2759,8 @@ function chooseStartSVPercent(menuVars)
     if menuVars.linearlyChange then text = text.." (start)" end
     _, menuVars.svPercent = imgui.InputFloat(text, menuVars.svPercent, 1, 1, "%.2f%%")
     if not menuVars.linearlyChange then helpMarker("%% distance between notes") return end
-    _, menuVars.svPercent2 = imgui.InputFloat("Start SV % (end)", menuVars.svPercent2, 1, 1, "%.2f%%")
+    _, menuVars.svPercent2 = imgui.InputFloat("Start SV % (end)", menuVars.svPercent2, 1, 1,
+                                              "%.2f%%")
 end
 -- Lets you choose the still type
 -- Parameters
@@ -3180,7 +3186,7 @@ function placeTeleportStutterSVs(globalVars, menuVars)
     local lastSVPercent = svPercent
     local lastMainSV = menuVars.mainSV
     if menuVars.linearlyChange then 
-        lastSVPercent = menuVars.svPercent / 100
+        lastSVPercent = menuVars.svPercent2 / 100
         lastMainSV = menuVars.mainSV2
     end
     local svPercents = generateLinearSet(svPercent, lastSVPercent, #offsets - 1)
@@ -3753,16 +3759,18 @@ function placeAnimationSVs(globalVars, menuVars)
     if not globalVars.useManualOffsets then
         startAnimationOffset = uniqueSelectedNoteOffsets()[1]
     end
-    local firstOffset = menuVars.frameTimes[1].time
+    local frameTime1 = menuVars.frameTimes[1]
+    local firstOffset = frameTime1.time
     local lastOffset = menuVars.frameTimes[#menuVars.frameTimes].time
     if startAnimationOffset >= firstOffset then return end
     
+    local firstDistance = (frameTime1.frame - 1) * menuVars.frameDistance + frameTime1.position
     local startMultiplier = getUsableOffsetMultiplier(startAnimationOffset)
     local startDuration = 1 / startMultiplier
     local startMultiplier2 =  getUsableOffsetMultiplier(firstOffset)
     local startDuration2 = 1 / startMultiplier2
     local firstSV = (distanceFromStartToEnd + menuVars.frameDistance) * startMultiplier
-    local secondSV = ((menuVars.frameTimes[1].frame - 1) * menuVars.frameDistance + menuVars.frameTimes[1].position - distanceFromStartToEnd) * startMultiplier2
+    local secondSV = (firstDistance - distanceFromStartToEnd) * startMultiplier2
     table.insert(svsToAdd, utils.CreateScrollVelocity(startAnimationOffset, firstSV))
     table.insert(svsToAdd, utils.CreateScrollVelocity(startAnimationOffset + startDuration, 0))
     table.insert(svsToAdd, utils.CreateScrollVelocity(firstOffset - startDuration2, secondSV))
@@ -3772,7 +3780,8 @@ function placeAnimationSVs(globalVars, menuVars)
         local lastTime = lastFrameTime.time
         local lastFrame = lastFrameTime.frame
         local lastPosition = lastFrameTime.position
-        local toEndDifference = distanceFromStartToEnd - ((lastFrame - 1) * menuVars.frameDistance + lastPosition)
+        local distanceFromStartFrame = (lastFrame - 1) * menuVars.frameDistance + lastPosition
+        local toEndDifference = distanceFromStartToEnd - distanceFromStartFrame
         
         local nextFrameTime = menuVars.frameTimes[i]
         local nextTime = nextFrameTime.time
