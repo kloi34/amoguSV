@@ -1,4 +1,4 @@
--- amoguSV v5.3.1 (9 Feb 2023)
+-- amoguSV v5.4 (27 Feb 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -79,7 +79,9 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
     "( - _ - )",
     "( e . e )",
     "( * o * )",
+    "( h . m )",
     "( ~ _ ~ )",
+    "( C | D )",
     "( w . w )",
     "( ^ w ^ )",
     "( o _ 0 )",
@@ -130,7 +132,9 @@ STANDARD_SVS = {                   -- types of standard SVs
     "Linear",
     "Exponential",
     "Bezier",
+    "Hermite",
     "Sinusoidal",
+    "Circular",
     "Random",
     "Custom"
 }
@@ -168,6 +172,40 @@ TAB_MENUS = {                      -- tab names for different SV menus
 --    y : y coordinate relative to the plugin window [Int]
 function coordsRelativeToWindow(x, y)
     return {x + imgui.GetWindowPos()[1], y + imgui.GetWindowPos()[2]}
+end
+-- Draws a capybara on the bottom right of the screen
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function drawCapybara(globalVars)
+    if not globalVars.drawCapybara then return end
+    local o = imgui.GetOverlayDrawList()
+    --local m = imgui.GetMousePos()
+    --local t = imgui.GetTime()
+    local sz = state.WindowSize
+    local headWidth = 50
+    local headHeight = 20
+    local eyeWidth = 10
+    local eyeHeight = 3
+    local head1 = {sz[1] - 100, sz[2] - 100}
+    local head2 = {head1[1] - headWidth, head1[2]}
+    local eye1 = {head1[1] - 10, head1[2] - 10}
+    local eye2 = {eye1[1] - eyeWidth, eye1[2]}
+    local ear = {head1[1] + 12, head1[2] - headHeight + 5}
+    local capyBrown = rgbaToUint(220, 150, 80, 255)
+    local capyBlack = rgbaToUint(30, 20, 35, 255)
+    local capyEar = rgbaToUint(150, 100, 50, 255)
+    o.AddCircleFilled(ear, 12, capyEar)
+    o.AddCircleFilled(head1, headHeight, capyBrown, 12)
+    o.AddCircleFilled(head2, headHeight, capyBrown, 12)
+    o.AddRectFilled({head1[1], head1[2] + headHeight}, {head2[1], head2[2] - headHeight}, capyBrown)
+    o.AddCircleFilled(eye1, eyeHeight, capyBlack, 12)
+    o.AddCircleFilled(eye2, eyeHeight, capyBlack, 12)
+    o.AddRectFilled({eye1[1], eye1[2] + eyeHeight}, {eye2[1], eye2[2] - eyeHeight}, capyBlack)
+    local p1 = sz
+    local p2 = {head1[1], sz[2]}
+    local p3 = {head1[1], head1[2]}
+    local p4 = {sz[1], head1[2]}
+    o.AddQuadFilled(p1, p2, p3, p4, capyBrown)
 end
 -- Converts an RGBA color value into uint (unsigned integer) and returns the converted value [Int]
 -- Parameters
@@ -480,6 +518,7 @@ function draw()
         green = 1,
         blue = 1,
         rgbPaused = false,
+        drawCapybara = false,
         showNoteMover = false,
         editToolIndex = 1,
         placeTypeIndex = 1,
@@ -489,7 +528,7 @@ function draw()
     setPluginAppearance(globalVars)
     setWindowFocusIfHotkeysPressed()
     initializeNextWindowNotCollapsed("mainCollapsed")
-    
+    drawCapybara(globalVars)
     imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
     centerWindowIfHotkeysPressed()
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
@@ -590,6 +629,7 @@ function choosePluginSettings(globalVars)
     chooseStyleScheme(globalVars)
     chooseColorScheme(globalVars)
     chooseRGBPause(globalVars)
+    chooseDrawCapybara(globalVars)
     addSeparator()
     imgui.TextDisabled("How to permanently change default settings?")
     if not imgui.IsItemHovered() then return end
@@ -654,23 +694,26 @@ function placeStandardSVMenu(globalVars)
             minSV = 0,
             maxSV = 0,
             avgSV = 0
-        }
+        },
+        interlace = false,
+        interlaceRatio = -0.5
     }
     getVariables("placeStandardMenu", menuVars)
     local needSVUpdate =  #menuVars.svMultipliers == 0
     
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
     addSeparator()
-    
     local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
     local settingVars = getSettingVars(currentSVType)
     local menuFunctionName = string.lower(currentSVType).."SettingsMenu"
     needSVUpdate = _G[menuFunctionName](settingVars) or needSVUpdate
     
+    addSeparator()
+    needSVUpdate = chooseInterlace(menuVars) or needSVUpdate
     if needSVUpdate then updateMenuSVs(currentSVType, menuVars, settingVars) end
-    
     initializeNextWindowNotCollapsed("infoCollapsed")
     makeSVInfoWindow("SV Info", menuVars.svStats, menuVars.svDistances, menuVars.svMultipliers, nil)
+    
     addSeparator()
     simpleActionMenu("Place", placeSVs, globalVars, menuVars)
     saveVariables(currentSVType.."Settings", settingVars)
@@ -715,6 +758,21 @@ function bezierSettingsMenu(settingVars)
     settingsChanged = chooseFinalSV(settingVars) or settingsChanged
     return settingsChanged
 end
+-- Creates the menu for hermite SV settings
+-- Returns whether settings have changed or not [Boolean]
+-- Parameters
+--    settingVars : list of setting variables for this bezier menu [Table]
+function hermiteSettingsMenu(settingVars)
+    local settingsChanged = false
+    settingsChanged = chooseStartEndSVs(settingVars) or settingsChanged
+    helpMarker("Target Start/End SVs. If you increase the number of SV points or manually "..
+               "adjust vertical shift, you can get closer to those targets")
+    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
+    settingsChanged = chooseAverageSV(settingVars) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    return settingsChanged
+end
 -- Creates the menu for sinusoidal SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
@@ -729,6 +787,20 @@ function sinusoidalSettingsMenu(settingVars)
     settingsChanged = choosePeriodShift(settingVars) or settingsChanged
     settingsChanged = chooseSVPerQuarterPeriod(settingVars) or settingsChanged
     settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    return settingsChanged
+end
+-- Creates the menu for circular SV settings
+-- Returns whether settings have changed or not [Boolean]
+-- Parameters
+--    settingVars : list of setting variables for this sinusoidal menu [Table]
+function circularSettingsMenu(settingVars)
+    local settingsChanged = false
+    settingsChanged = chooseArcPercent(settingVars) or settingsChanged
+    settingsChanged = chooseAverageSV(settingVars) or settingsChanged
+    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseNoNormalize(settingVars) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for random SV settings
@@ -1047,7 +1119,9 @@ function placeStillSVMenu(globalVars)
             minSV = 0,
             maxSV = 0,
             avgSV = 0
-        }
+        },
+        interlace = false,
+        interlaceRatio = -0.5
     }
     getVariables("placeStillMenu", menuVars)
     local needSVUpdate =  #menuVars.svMultipliers == 0
@@ -1064,10 +1138,12 @@ function placeStillSVMenu(globalVars)
     local menuFunctionName = string.lower(currentSVType).."SettingsMenu"
     needSVUpdate = _G[menuFunctionName](settingVars) or needSVUpdate
     
+    addSeparator()
+    needSVUpdate = chooseInterlace(menuVars) or needSVUpdate
     if needSVUpdate then updateMenuSVs(currentSVType, menuVars, settingVars) end
-    
     initializeNextWindowNotCollapsed("infoCollapsed")
     makeSVInfoWindow("SV Info", menuVars.svStats, menuVars.svDistances, menuVars.svMultipliers, nil)
+    
     addSeparator()
     simpleActionMenu("Place", placeSVs, globalVars, menuVars)
     saveVariables(currentSVType.."Settings", settingVars)
@@ -1459,6 +1535,16 @@ function getSettingVars(svType)
             finalSVIndex = 3,
             customSV = 1
         }
+    elseif svType == "Hermite" then
+        settingVars = {
+            startSV = 0,
+            endSV = 0,
+            verticalShift = 0,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 3,
+            customSV = 1
+        }
     elseif svType == "Sinusoidal" then
         settingVars = {
             startSV = 2,
@@ -1471,6 +1557,16 @@ function getSettingVars(svType)
             svPoints = 16,
             finalSVIndex = 3,
             customSV = 1
+        }
+    elseif svType == "Circular" then
+        settingVars = {
+            arcPercent = 50,
+            avgSV = 1,
+            verticalShift = 0,
+            svPoints = 16,
+            finalSVIndex = 3,
+            customSV = 1,
+            dontNormalize = false
         }
     elseif svType == "Random" then
         settingVars = {
@@ -1652,8 +1748,9 @@ end
 --    menuVars      : list of variables used for the place SV menu [Table]
 --    settingVars   : list of variables used for the current SV menu [Table]
 function updateMenuSVs(currentSVType, menuVars, settingVars)
-    menuVars.svMultipliers = generateSVMultipliers(currentSVType, settingVars)
-    
+    local interlaceMultiplier = nil
+    if menuVars.interlace then interlaceMultiplier = menuVars.interlaceRatio end
+    menuVars.svMultipliers = generateSVMultipliers(currentSVType, settingVars, interlaceMultiplier)
     local svMultipliersNoEndSV = makeDuplicateList(menuVars.svMultipliers)
     table.remove(svMultipliersNoEndSV)
     menuVars.svDistances = calculateDistanceVsTime(svMultipliersNoEndSV)
@@ -1666,11 +1763,11 @@ end
 -- Parameters
 --    menuVars : list of variables used for the current SV menu [Table]
 function updateStutterMenuSVs(menuVars)
-    menuVars.svMultipliers = generateSVMultipliers("Stutter1", menuVars)
+    menuVars.svMultipliers = generateSVMultipliers("Stutter1", menuVars, nil)
     local svMultipliersNoEndSV = makeDuplicateList(menuVars.svMultipliers)
     table.remove(svMultipliersNoEndSV)
     
-    menuVars.svMultipliers2 = generateSVMultipliers("Stutter2", menuVars)
+    menuVars.svMultipliers2 = generateSVMultipliers("Stutter2", menuVars, nil)
     local svMultipliersNoEndSV2 = makeDuplicateList(menuVars.svMultipliers2)
     table.remove(svMultipliersNoEndSV2)
     
@@ -1988,6 +2085,7 @@ end
 --    includeLastValueInAverage : whether or not to include the last value in the average [Boolean]
 function normalizeValues(values, targetAverage, includeLastValueInAverage)
     local valuesAverage = calculateAverage(values, includeLastValueInAverage)
+    if valuesAverage == 0 then return end
     for i = 1, #values do
         values[i] = (values[i] * targetAverage) / valuesAverage
     end
@@ -2002,7 +2100,7 @@ function round(number, decimalPlaces)
     return math.floor(number * multiplier + 0.5) / multiplier
 end
 -- Evaluates a simplified one-dimensional cubic bezier expression for SV purposes
--- Returns the result of the bezier evaluation
+-- Returns the result of the bezier evaluation [Int/Float]
 -- Parameters
 --    p2 : second coordinate of the actual cubic bezier, first for the SV plugin input [Int/Float]
 --    p3 : third coordinate of the actual cubic bezier, second for the SV plugin input [Int/Float]
@@ -2011,6 +2109,19 @@ function simplifiedOneDimensionalBezier(p2, p3, t)
     -- this simplified 1-D cubic bezier has points (0, p2, p3, 1) rather than (p1, p2, p3, p4)
     -- this plugin evaluates those points for both x and y: (0, x1, x2, 1), (0, y1, y2, 1)
     return 3*t*(1-t)^2*p2 + 3*t^2*(1-t)*p3 + t^3
+end
+-- Evaluates a simplified one-dimensional hermite related (?) spline for SV purposes
+-- Returns the result of the hermite evaluation [Int/Float]
+-- Parameters
+--    m1 : slope at first point [Int/Float]
+--    m2 : slope at second point [Int/Float]
+--    y2 : y coordinate of second point [Int/Float]
+--    t  : time to evaluate the hermite spline at [Int/Float]
+function simplifiedOneDimensionalHermite(m1, m2, y2, t)
+    local a = m1 + m2 - 2 * y2
+    local b = 3 * y2 - 2 * m1 - m2
+    local c = m1
+    return a * t^3 + b * t^2 + c * t 
 end
 -- Restricts a number to be within a closed interval that wraps around
 -- Returns the result of the restriction [Int/Float]
@@ -2249,6 +2360,17 @@ end
 -- Choose Functions (Sorted Alphabetically) -------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 
+-- Lets you choose the arc percent
+-- Returns whether or not the percent changed [Boolean]
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseArcPercent(settingVars) 
+    local oldPercent = settingVars.arcPercent
+    local _, newPercent = imgui.SliderInt("Arc Percent", oldPercent, 1, 99, oldPercent.."%%")
+    newPercent = clampToInterval(newPercent, 1, 99)
+    settingVars.arcPercent = newPercent 
+    return oldPercent ~= newPercent 
+end
 -- Lets you choose the average SV
 -- Returns whether or not the average SV changed [Boolean]
 -- Parameters
@@ -2389,6 +2511,14 @@ function chooseDistanceBack(menuVars)
                                                 0, 0, "%.3f msx")
     helpMarker("Splitscroll distance to separate the two scrolls          (1,000,000 = default)")
 end
+-- Lets you choose whether or not to draw a capybara on screen
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseDrawCapybara(globalVars)
+    addPadding()
+    _, globalVars.drawCapybara = imgui.Checkbox("Capybara", globalVars.drawCapybara)
+    helpMarker("Draws a capybara on bottom right screen")
+end
 -- Lets you choose which edit tool to use
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -2460,6 +2590,22 @@ end
 function chooseFirstScrollSpeed(menuVars)
     local text = "1st Scroll Speed"
     _, menuVars.scrollSpeed1 = imgui.InputFloat(text, menuVars.scrollSpeed1, 0, 0, "%.2fx")
+end
+-- Lets you choose the interlace
+-- Returns whether or not the interlace settings changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function chooseInterlace(menuVars)
+    local oldInterlace = menuVars.interlace
+    _, menuVars.interlace = imgui.Checkbox("Interlace", menuVars.interlace)
+    if not menuVars.interlace then return oldInterlace ~= menuVars.interlace end
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.5)
+    local oldRatio = menuVars.interlaceRatio
+    _, menuVars.interlaceRatio = imgui.InputFloat("Ratio##interlace", menuVars.interlaceRatio,
+                                                  0, 0, "%.2f")
+    imgui.PopItemWidth()
+    return oldInterlace ~= menuVars.interlace or oldRatio ~= menuVars.interlaceRatio
 end
 -- Lets you choose the main SV multiplier of a teleport stutter
 -- Parameters
@@ -2539,6 +2685,17 @@ function chooseNoteAnimationData(menuVars)
     local comboIndex = menuVars.addNoteDataIndex - 1
     _, comboIndex = imgui.Combo("Notes/Frames", comboIndex, ANIMATION_OPTIONS, #ANIMATION_OPTIONS)
     menuVars.addNoteDataIndex = comboIndex + 1
+end
+-- Lets you choose to not normalize values
+-- Returns whether or not the setting changed [Boolean]
+-- Parameters
+--    settingVars : list of variables used for the current SV menu [Table]
+function chooseNoNormalize(settingVars)
+    addPadding()
+    local oldChoice = settingVars.dontNormalize
+    local _, newChoice = imgui.Checkbox("Don't normalize to average", oldChoice)
+    settingVars.dontNormalize = newChoice
+    return oldChoice ~= newChoice
 end
 -- Lets you choose the note spacing
 -- Parameters
@@ -2889,9 +3046,10 @@ end
 
 -- Returns generated sv multipliers [Table]
 -- Parameters
---    svType      : type of SV to generate [String]
---    settingVars : list of variables used for the current menu [Table]
-function generateSVMultipliers(svType, settingVars)
+--    svType              : type of SV to generate [String]
+--    settingVars         : list of variables used for the current menu [Table]
+--    interlaceMultiplier : interlace multiplier
+function generateSVMultipliers(svType, settingVars, interlaceMultiplier)
     local multipliers = {727, 69}
     if svType == "Linear" then
         multipliers = generateLinearSet(settingVars.startSV, settingVars.endSV, 
@@ -2904,11 +3062,19 @@ function generateSVMultipliers(svType, settingVars)
         multipliers = generateBezierSet(settingVars.x1, settingVars.y1, settingVars.x2,
                                         settingVars.y2, settingVars.avgSV, settingVars.svPoints + 1,
                                         settingVars.verticalShift)
+    elseif svType == "Hermite" then
+        multipliers = generateHermiteSet(settingVars.startSV, settingVars.endSV,
+                                         settingVars.verticalShift, settingVars.avgSV, 
+                                         settingVars.svPoints + 1)
     elseif svType == "Sinusoidal" then
-         multipliers = generateSinusoidalSet(settingVars.startSV, settingVars.endSV,
-                                             settingVars.periods, settingVars.periodsShift,
-                                             settingVars.svsPerQuarterPeriod,
-                                             settingVars.verticalShift, settingVars.curveSharpness)
+        multipliers = generateSinusoidalSet(settingVars.startSV, settingVars.endSV,
+                                            settingVars.periods, settingVars.periodsShift,
+                                            settingVars.svsPerQuarterPeriod,
+                                            settingVars.verticalShift, settingVars.curveSharpness)
+    elseif svType == "Circular" then
+        multipliers = generateCircularSet(settingVars.arcPercent, settingVars.avgSV, 
+                                          settingVars.verticalShift, settingVars.svPoints + 1,
+                                          settingVars.dontNormalize)
     elseif svType == "Random" then
         local randomType = RANDOM_TYPES[settingVars.randomTypeIndex]
         multipliers = generateRandomSet(settingVars.avgSV, settingVars.svPoints + 1, randomType,
@@ -2921,6 +3087,17 @@ function generateSVMultipliers(svType, settingVars)
     elseif svType == "Stutter2" then
         multipliers = generateStutterSet(settingVars.endSV, settingVars.stutterDuration,
                                          settingVars.avgSV)
+    end
+    if interlaceMultiplier then
+        local newMultipliers = {}
+        for i = 1 , #multipliers do
+            table.insert(newMultipliers, multipliers[i])
+            table.insert(newMultipliers, multipliers[i] * interlaceMultiplier)
+        end
+        if settingVars.avgSV then
+            normalizeValues(newMultipliers, settingVars.avgSV, false)
+        end
+        multipliers = newMultipliers
     end
     return multipliers
 end
@@ -3014,6 +3191,33 @@ function generateBezierSet(x1, y1, x2, y2, avgValue, numValues, verticalShift)
     end
     return bezierSet
 end
+-- Returns a set of hermite spline related (?) values [Table]
+-- Parameters
+--    startValue    : intended first value of the set [Int/Float]
+--    endValue      : intended last value of the set [Int/Float]
+--    verticalShift : constant to add to each value in the set at very the end [Int/Float]
+--    avgValue      : average value of the set [Int/Float]
+--    numValues     : total number of values in the bezier set [Int]
+function generateHermiteSet(startValue, endValue, verticalShift, avgValue, numValues)
+    avgValue = avgValue - verticalShift
+    local xCoords = generateLinearSet(0, 1, numValues)
+    local yCoords = {}
+    for i = 1, #xCoords do
+        yCoords[i] = simplifiedOneDimensionalHermite(startValue, endValue, avgValue, xCoords[i])
+    end
+    local hermiteSet = {}
+    for i = 1, #yCoords - 1 do
+        local startY = yCoords[i]
+        local endY = yCoords[i + 1]
+        hermiteSet[i] = (endY - startY) * (numValues - 1)
+    end
+    --  normalizeValues(hermiteSet, avgValue, false)
+    for i = 1, #hermiteSet do
+        hermiteSet[i] = hermiteSet[i] + verticalShift
+    end
+    table.insert(hermiteSet, avgValue)
+    return hermiteSet
+end
 -- Returns a set of sinusoidal values [Table]
 -- Parameters
 --    startAmplitude         : starting amplitude of the sinusoidal wave [Int/Float]
@@ -3043,6 +3247,32 @@ function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShi
         table.insert(sinusoidalSet, value)
     end
     return sinusoidalSet
+end
+-- Returns a set of sinusoidal values [Table]
+-- Parameters
+--    capybara
+function generateCircularSet(arcPercent, avgValue, verticalShift, numValues, dontNormalize)
+    avgValue = avgValue - verticalShift
+    local startingAngle = math.pi * (arcPercent / 100)
+    local angles = generateLinearSet(startingAngle, 0, numValues)
+    local yCoords = {}
+    for i = 1, #angles do
+        local angle = round(angles[i], 8)
+        local x = math.cos(angle)
+        yCoords[i] = -avgValue * math.sqrt(1 - x^2)
+    end
+    local circularSet = {}
+    for i = 1, #yCoords - 1 do
+        local startY = yCoords[i]
+        local endY = yCoords[i + 1]
+        circularSet[i] = (endY - startY) * (numValues - 1)
+    end
+    if not dontNormalize then normalizeValues(circularSet, avgValue, true) end
+    for i = 1, #circularSet do
+        circularSet[i] = circularSet[i] + verticalShift
+    end
+    table.insert(circularSet, avgValue)
+    return circularSet
 end
 -- Returns a set of random values [Table]
 -- Parameters
