@@ -24,7 +24,9 @@ Standard or "still" sets SV of different shapes:
 * Linear
 * Exponential
 * Bezier
+* Hermite
 * Sinusoidal
+* Circular
 * Random
 * Custom
 
