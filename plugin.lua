@@ -1,4 +1,4 @@
--- amoguSV v5.5 (16 June 2023)
+-- amoguSV v6.0 beta (20 June 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -999,17 +999,11 @@ function stutterMenu(globalVars)
     getVariables("stutterMenu", menuVars)
     
     local settingsChanged = #menuVars.svMultipliers == 0
-    if menuVars.controlLastSV then
-        imgui.Text("Last SV:")
-        settingsChanged = chooseStartEndSVs(menuVars) or settingsChanged
-        addPadding()
-        imgui.Text("First SV:")
-        settingsChanged = chooseStutterDuration(menuVars) or settingsChanged
-    else
-        imgui.Text("First SV:")
-        settingsChanged = chooseStartEndSVs(menuVars) or settingsChanged
-        settingsChanged = chooseStutterDuration(menuVars) or settingsChanged
-    end
+    local svText = "First SV:"
+    if menuVars.controlLastSV then svText = "Last SV:" end
+    imgui.Text(svText)
+    settingsChanged = chooseStartEndSVs(menuVars) or settingsChanged
+    settingsChanged = chooseStutterDuration(menuVars) or settingsChanged
     
     addSeparator()
     settingsChanged = chooseStuttersPerSection(menuVars) or settingsChanged
@@ -2638,7 +2632,9 @@ function chooseControlLastSV(menuVars)
     local oldChoice = menuVars.controlLastSV
     local _, newChoice = imgui.Checkbox("Control last SV instead", oldChoice)
     menuVars.controlLastSV = newChoice
-    return oldChoice ~= newChoice
+    local choiceChanged = oldChoice ~= newChoice 
+    if choiceChanged then menuVars.stutterDuration = 100 - menuVars.stutterDuration end
+    return choiceChanged
 end
 -- Lets you choose the current frame
 -- Parameters
@@ -3178,10 +3174,12 @@ end
 --    menuVars : list of variables used for the current menu [Table]
 function chooseStutterDuration(menuVars)
     local oldDuration = menuVars.stutterDuration
+    if menuVars.controlLastSV then oldDuration = 100 - oldDuration end
     local _, newDuration = imgui.SliderInt("Duration", oldDuration, 1, 99, oldDuration.."%%")
     newDuration = clampToInterval(newDuration, 1, 99)
-    menuVars.stutterDuration = newDuration 
-    return oldDuration ~= newDuration 
+    if menuVars.controlLastSV then newDuration = 100 - newDuration end
+    menuVars.stutterDuration = newDuration
+    return oldDuration ~= newDuration
 end
 -- Lets you choose the number of stutters per section
 -- Returns whether or not the number of stutters changed [Boolean]
