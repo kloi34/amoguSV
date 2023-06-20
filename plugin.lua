@@ -56,6 +56,7 @@ ANIMATION_OPTIONS = {              -- ways to add note animation data
 COLOR_SCHEMES = {                  -- available color themes for the plugin
     "Classic",
     "Strawberry",
+    "Incognito",
     "Glass",
     "Glass + RGB",
     "RGB Gamer Mode"
@@ -426,6 +427,37 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.50, 0.31, 0.38, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.60, 0.41, 0.48, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.70, 0.51, 0.58, 1.00 } )
+    elseif colorScheme == "Incognito" then
+        local black = {0.00, 0.00, 0.00, 1.00}
+        local white = {1.00, 1.00, 1.00, 1.00}
+        local grey = {0.20, 0.20, 0.20, 1.00}
+        local whiteTint = {1.00, 1.00, 1.00, 0.40}
+        
+        imgui.PushStyleColor( imgui_col.WindowBg,               black     )
+        imgui.PushStyleColor( imgui_col.Border,                 whiteTint )
+        imgui.PushStyleColor( imgui_col.FrameBg,                grey      )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         whiteTint )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          whiteTint )
+        imgui.PushStyleColor( imgui_col.TitleBg,                grey      )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          grey      )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       black     )
+        imgui.PushStyleColor( imgui_col.CheckMark,              white     )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             grey      )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       whiteTint )
+        imgui.PushStyleColor( imgui_col.Button,                 grey      )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          whiteTint )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           whiteTint )
+        imgui.PushStyleColor( imgui_col.Tab,                    grey      )
+        imgui.PushStyleColor( imgui_col.TabHovered,             whiteTint )
+        imgui.PushStyleColor( imgui_col.TabActive,              whiteTint )
+        imgui.PushStyleColor( imgui_col.Header,                 grey      )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           whiteTint )
+        imgui.PushStyleColor( imgui_col.Separator,              whiteTint )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         whiteTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white     )
     elseif colorScheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
