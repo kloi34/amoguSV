@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (20 June 2023)
+-- amoguSV v6.0 beta (28 June 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -6,7 +6,7 @@
 ---------------------------------------------------------------------------------------------------
 --    Plugin        Creator                Link                                                
 ---------------------------------------------------------------------------------------------------
---    iceSV         IceDynamix             @ https://github.com/IceDynamix/iceSV
+--    iceSV         IceDynamix             @ https://githxub.com/IceDynamix/iceSV
 --    KeepStill     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/KeepStill
 --    Vibrato       Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Vibrato
 --    Displacer     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Displacer
@@ -253,8 +253,9 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
     local cursorRadius = 50
     
     local function generateRandomGlare(cursorRadius, t)
-        local randomXNearCursor = m[1] + cursorRadius * math.cos(2 * math.pi * math.random())
-        local randomYNearCursor = m[2] + cursorRadius * math.sin(2 * math.pi * math.random())
+        local randomCoordAngle = 2 * math.pi * math.random()
+        local randomXNearCursor = m[1] + cursorRadius * math.cos(randomCoordAngle)
+        local randomYNearCursor = m[2] + cursorRadius * math.sin(randomCoordAngle)
         local randomCoordNearCursor = {randomXNearCursor, randomYNearCursor}
         local randomAngle = (math.pi / 2) * math.random()
         local randomStartTime = t + math.random() / 4
@@ -284,7 +285,7 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
         local phaseTime = timeSpeed * timeElapsed
         if phaseTime >= 2 and effectResetAvailable then
             glareInfo[i] = generateRandomGlare(cursorRadius, t)
-        elseif phaseTime >= 0 and phaseTime < 2 then
+        elseif phaseTime >= 0 then
             local white = rgbaToUint(255, 255, 255, 255)
             local yellowTint = rgbaToUint(255, 255, 100, 30)
             local innerMaxRadius = 3
@@ -4767,7 +4768,7 @@ function displaceViewSVs(globalVars, menuVars)
     local sv = map.GetScrollVelocityAt(endOffset) 
     local svExistsAtEndOffset = sv and (sv.StartTime == endOffset)
     if not svExistsAtEndOffset then
-        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, 1))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, getSVMultiplierAt(endOffset)))
     end
     getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
     removeAndAddSVs(svsToRemove, svsToAdd)
