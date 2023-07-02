@@ -1044,7 +1044,6 @@ function stutterMenu(globalVars)
     settingsChanged = chooseFinalSV(menuVars) or settingsChanged
     settingsChanged = chooseLinearlyChange(menuVars) or settingsChanged
     settingsChanged = chooseControlLastSV(menuVars) or settingsChanged
-    imgui.Text(settingsChanged)
     if settingsChanged then updateStutterMenuSVs(menuVars) end
     displayStutterSVWindows(menuVars)
     
