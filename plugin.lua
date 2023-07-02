@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (28 June 2023)
+-- amoguSV v6.0 beta (2 July 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -6,7 +6,7 @@
 ---------------------------------------------------------------------------------------------------
 --    Plugin        Creator                Link                                                
 ---------------------------------------------------------------------------------------------------
---    iceSV         IceDynamix             @ https://githxub.com/IceDynamix/iceSV
+--    iceSV         IceDynamix             @ https://github.com/IceDynamix/iceSV
 --    KeepStill     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/KeepStill
 --    Vibrato       Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Vibrato
 --    Displacer     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Displacer
@@ -1044,6 +1044,7 @@ function stutterMenu(globalVars)
     settingsChanged = chooseFinalSV(menuVars) or settingsChanged
     settingsChanged = chooseLinearlyChange(menuVars) or settingsChanged
     settingsChanged = chooseControlLastSV(menuVars) or settingsChanged
+    imgui.Text(settingsChanged)
     if settingsChanged then updateStutterMenuSVs(menuVars) end
     displayStutterSVWindows(menuVars)
     
@@ -1246,7 +1247,7 @@ function placeStillSVMenu(globalVars)
         interlaceRatio = -0.5
     }
     getVariables("placeStillMenu", menuVars)
-    local needSVUpdate =  #menuVars.svMultipliers == 0
+    local needSVUpdate = #menuVars.svMultipliers == 0
     
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
     addPadding()
@@ -2665,7 +2666,7 @@ function chooseControlLastSV(menuVars)
     local oldChoice = menuVars.controlLastSV
     local _, newChoice = imgui.Checkbox("Control last SV instead", oldChoice)
     menuVars.controlLastSV = newChoice
-    local choiceChanged = oldChoice ~= newChoice 
+    local choiceChanged = oldChoice ~= newChoice
     if choiceChanged then menuVars.stutterDuration = 100 - menuVars.stutterDuration end
     return choiceChanged
 end
@@ -3210,9 +3211,10 @@ function chooseStutterDuration(menuVars)
     if menuVars.controlLastSV then oldDuration = 100 - oldDuration end
     local _, newDuration = imgui.SliderInt("Duration", oldDuration, 1, 99, oldDuration.."%%")
     newDuration = clampToInterval(newDuration, 1, 99)
+    local durationChanged = oldDuration ~= newDuration
     if menuVars.controlLastSV then newDuration = 100 - newDuration end
     menuVars.stutterDuration = newDuration
-    return oldDuration ~= newDuration
+    return durationChanged
 end
 -- Lets you choose the number of stutters per section
 -- Returns whether or not the number of stutters changed [Boolean]
