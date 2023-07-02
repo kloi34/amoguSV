@@ -4611,7 +4611,7 @@ function scaleDisplaceSVs(globalVars, menuVars)
     local sv = map.GetScrollVelocityAt(endOffset) 
     local svExistsAtEndOffset = sv and (sv.StartTime == endOffset)
     if not svExistsAtEndOffset then
-        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, 1))
+        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, getSVMultiplierAt(endOffset)))
     end
     getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
     removeAndAddSVs(svsToRemove, svsToAdd)
