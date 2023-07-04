@@ -64,6 +64,7 @@ COLOR_SCHEMES = {                  -- available color themes for the plugin
 }
 CURSOR_EFFECTS_OPTIONS = {         -- cursor effect options
     "Off",
+    "Shiny Box", 
     "Shiny Mouse Click",
     "Shiny Mouse Down",
     "Shiny Always On"
@@ -243,15 +244,74 @@ function drawCursorEffect(globalVars)
     local t = imgui.GetTime()
     local sz = state.WindowSize
     
-    local isOldGlare = cursorEffect == "Shiny Mouse Click" or
-                       cursorEffect == "Shiny Mouse Down" or
-                       cursorEffect == "Shiny Always On"
-    if isOldGlare then drawGlareEffect(effectResetAvailable, o, m, t) end
+    if cursorEffect == "Shiny Box" then drawCoinGetEffect(effectResetAvailable, o, m, t) end
+    local isGlare = cursorEffect == "Shiny Mouse Click" or
+                    cursorEffect == "Shiny Mouse Down" or
+                    cursorEffect == "Shiny Always On"
+    if isGlare then drawGlareEffect(effectResetAvailable, o, m, t) end
+end
+-- Parameters
+--    effectResetAvailable : whether or not the effect can be reset [Boolean]
+--    o                    : imgui overlay drawlist
+--    m                    : mouse position/coordinates {x, y} [Table]
+--    t                    : imgui time [Float]
+function drawCoinGetEffect(effectResetAvailable, o, m, t)
+    local function generateRandomGlare(m, t)
+        local radius = 0 --30
+        local randomAngle = 2 * math.pi * math.random()
+        local randomX = m[1] + radius * math.cos(randomAngle)
+        local randomY = m[2] + radius * math.sin(randomAngle)
+        local startTime = t
+        return {{randomX, randomY}, 0, t}
+    end
+    
+    local maxNumGlares = 1
+    local glareInfo = {}
+    if not state.GetValue("startCoinEffect") then
+        for i = 1, maxNumGlares do
+            glareInfo[i] = generateRandomGlare(m, t)
+        end
+        state.SetValue("startCoinEffect", true)
+    else
+        for i = 1, maxNumGlares do
+            glareInfo[i] = {}
+        end
+    end
+    getVariables("cursorCoinEffect", glareInfo)
+    
+    local timeSpeed = 2
+    for i = 1, maxNumGlares do
+        local glareCoordinates = glareInfo[i][1]
+        local glareAngle = glareInfo[i][2]
+        local glareStartTime = glareInfo[i][3]
+        local timeElapsed = t - glareStartTime
+        local phaseTime = 0.8 + timeSpeed * timeElapsed
+        if phaseTime >= 2 and effectResetAvailable then
+            glareInfo[i] = generateRandomGlare(m, t)
+        elseif phaseTime >= 0 and phaseTime < 2 then
+            drawSingleGlare(o, phaseTime, glareAngle, glareCoordinates, 3)
+            local spacing = 20
+            local newCoords1 = {glareCoordinates[1] + spacing, glareCoordinates[2] + spacing}
+            local newCoords2 = {glareCoordinates[1] + spacing, glareCoordinates[2] - spacing}
+            local newCoords3 = {glareCoordinates[1] - spacing, glareCoordinates[2] + spacing}
+            local newCoords4 = {glareCoordinates[1] - spacing, glareCoordinates[2] - spacing}
+            local smallGlareSize = 1.5
+            local smallTimeOffset = 0.5
+            drawSingleGlare(o, phaseTime - smallTimeOffset, glareAngle, newCoords1, smallGlareSize)
+            drawSingleGlare(o, phaseTime - smallTimeOffset, glareAngle, newCoords2, smallGlareSize)
+            drawSingleGlare(o, phaseTime - smallTimeOffset, glareAngle, newCoords3, smallGlareSize)
+            drawSingleGlare(o, phaseTime - smallTimeOffset, glareAngle, newCoords4, smallGlareSize)
+            local newX = glareCoordinates[1]
+            local newY = glareCoordinates[2] -- + 4 * (timeElapsed - 0.2)
+            glareInfo[i][1] = {newX, newY}
+        end
+    end
+    saveVariables("cursorCoinEffect", glareInfo)
 end
 -- Draws the glare cursor effect
 -- Parameters
 --    effectResetAvailable : whether or not the effect can be reset [Boolean]
---    o                    : imgui overlay draw list [idk]
+--    o                    : imgui overlay drawlist
 --    m                    : mouse position/coordinates {x, y} [Table]
 --    t                    : imgui time [Float]
 function drawGlareEffect(effectResetAvailable, o, m, t)
@@ -281,7 +341,7 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
     end
     getVariables("cursorGlares", glareInfo)
     
-    local timeSpeed = 4
+    local timeSpeed = 3
     for i = 1, maxNumGlares do
         local glareCoordinates = glareInfo[i][1]
         local glareAngle = glareInfo[i][2]
@@ -291,33 +351,36 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
         if phaseTime >= 2 and effectResetAvailable then
             glareInfo[i] = generateRandomGlare(cursorRadius, t)
         elseif phaseTime >= 0 and phaseTime < 2 then
-            local white = rgbaToUint(255, 255, 255, 255)
-            local yellowTint = rgbaToUint(255, 255, 100, 30)
-            local innerMaxRadius = 3
-            local actualMaxInnerRadius = innerMaxRadius - 1 + math.random()
-            local innerRadius = actualMaxInnerRadius * math.abs(((phaseTime + 1) % 2) - 1)
-            local outerRadiusRatio = 8
-            local innerPoints = {}
-            local outerPoints = {}
-            for j = 1, 4 do
-                currentAngle = glareAngle + (math.pi / 2) * j
-                local innerX = innerRadius * math.cos(currentAngle)
-                local innerY = innerRadius * math.sin(currentAngle)
-                local outerX = outerRadiusRatio * innerX
-                local outerY = outerRadiusRatio * innerY
-                innerPoints[j] = {innerX + glareCoordinates[1], innerY + glareCoordinates[2]}
-                outerPoints[j] = {outerX + glareCoordinates[1], outerY + glareCoordinates[2]}
-            end
-            o.AddQuadFilled(innerPoints[1], outerPoints[2], innerPoints[3], outerPoints[4], white)
-            o.AddQuadFilled(outerPoints[1], innerPoints[2], outerPoints[3], innerPoints[4], white)
-            local circleSize1 = innerRadius * outerRadiusRatio / 1.2
-            local circleSize2 = innerRadius * outerRadiusRatio / 3
-            local numPointsOnCircle = 40
-            o.AddCircleFilled(glareCoordinates, circleSize1, yellowTint, numPointsOnCircle)
-            o.AddCircleFilled(glareCoordinates, circleSize2, yellowTint, numPointsOnCircle)
+            drawSingleGlare(o, phaseTime, glareAngle, glareCoordinates, 3)
         end
     end
     saveVariables("cursorGlares", glareInfo)
+end
+-- Draws a single glare
+function drawSingleGlare(o, phaseTime, glareAngle, glareCoordinates, innerMaxRadius)
+    local white = rgbaToUint(255, 255, 255, 255)
+    local yellowTint = rgbaToUint(255, 255, 100, 30)
+    local actualMaxInnerRadius = innerMaxRadius - 1 + math.random()
+    local innerRadius = actualMaxInnerRadius * math.abs(((phaseTime + 1) % 2) - 1)
+    local outerRadiusRatio = 8
+    local innerPoints = {}
+    local outerPoints = {}
+    for j = 1, 4 do
+        local currentAngle = glareAngle + (math.pi / 2) * j
+        local innerX = innerRadius * math.cos(currentAngle)
+        local innerY = innerRadius * math.sin(currentAngle)
+        local outerX = outerRadiusRatio * innerX
+        local outerY = outerRadiusRatio * innerY
+        innerPoints[j] = {innerX + glareCoordinates[1], innerY + glareCoordinates[2]}
+        outerPoints[j] = {outerX + glareCoordinates[1], outerY + glareCoordinates[2]}
+    end
+    o.AddQuadFilled(innerPoints[1], outerPoints[2], innerPoints[3], outerPoints[4], white)
+    o.AddQuadFilled(outerPoints[1], innerPoints[2], outerPoints[3], innerPoints[4], white)
+    local circleSize1 = innerRadius * outerRadiusRatio / 1.2
+    local circleSize2 = innerRadius * outerRadiusRatio / 3
+    local numPointsOnCircle = 40
+    o.AddCircleFilled(glareCoordinates, circleSize1, yellowTint, numPointsOnCircle)
+    o.AddCircleFilled(glareCoordinates, circleSize2, yellowTint, numPointsOnCircle)
 end
 -- Returns whether or not an effect reset is available to do
 -- Parameters
@@ -328,8 +391,9 @@ function isEffectResetAvailable(cursorEffect)
     state.SetValue("isMouseDown", mouseDownNow)
     local mouseClicked = not mouseDownBefore and mouseDownNow
     local effectResetAvailable = true
-    if cursorEffect == "Star Mouse Click (old)" then effectResetAvailable = mouseClicked end
-    if cursorEffect == "Star Mouse Down (old)" then effectResetAvailable = mouseDownNow end
+    if cursorEffect == "Shiny Box"         then effectResetAvailable = mouseClicked end
+    if cursorEffect == "Shiny Mouse Click" then effectResetAvailable = mouseClicked end
+    if cursorEffect == "Shiny Mouse Down"  then effectResetAvailable = mouseDownNow end
     return effectResetAvailable
 end
 -- Converts an RGBA color value into uint (unsigned integer) and returns the converted value [Int]
