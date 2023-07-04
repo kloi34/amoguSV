@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (2 July 2023)
+-- amoguSV v6.0 beta (4 July 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -57,15 +57,16 @@ COLOR_SCHEMES = {                  -- available color themes for the plugin
     "Classic",
     "Strawberry",
     "Incognito",
+    "Incognito + RGB",
     "Glass",
     "Glass + RGB",
     "RGB Gamer Mode"
 }
 CURSOR_EFFECTS_OPTIONS = {         -- cursor effect options
     "Off",
-    "On Mouse Click",
-    "On Mouse Down",
-    "Always On"
+    "Shiny Mouse Click",
+    "Shiny Mouse Down",
+    "Shiny Always On"
 }
 DISPLACE_SCALE_SPOTS = {           -- places to scale SV sections by displacing
     "Start",
@@ -235,13 +236,17 @@ end
 function drawCursorEffect(globalVars)
     local cursorEffect = CURSOR_EFFECTS_OPTIONS[globalVars.cursorEffectIndex]
     if cursorEffect == "Off" then return end
-    local effectResetAvailable = effectResetAvailible(cursorEffect)
+    local effectResetAvailable = isEffectResetAvailable(cursorEffect)
     
     local o = imgui.GetOverlayDrawList()
     local m = imgui.GetMousePos()
     local t = imgui.GetTime()
     local sz = state.WindowSize
-    drawGlareEffect(effectResetAvailable, o, m, t)
+    
+    local isOldGlare = cursorEffect == "Shiny Mouse Click" or
+                       cursorEffect == "Shiny Mouse Down" or
+                       cursorEffect == "Shiny Always On"
+    if isOldGlare then drawGlareEffect(effectResetAvailable, o, m, t) end
 end
 -- Draws the glare cursor effect
 -- Parameters
@@ -285,7 +290,7 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
         local phaseTime = timeSpeed * timeElapsed
         if phaseTime >= 2 and effectResetAvailable then
             glareInfo[i] = generateRandomGlare(cursorRadius, t)
-        elseif phaseTime >= 0 then
+        elseif phaseTime >= 0 and phaseTime < 2 then
             local white = rgbaToUint(255, 255, 255, 255)
             local yellowTint = rgbaToUint(255, 255, 100, 30)
             local innerMaxRadius = 3
@@ -314,14 +319,17 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
     end
     saveVariables("cursorGlares", glareInfo)
 end
-function effectResetAvailible(cursorEffect)
+-- Returns whether or not an effect reset is available to do
+-- Parameters
+--    cursorEffect: type of cursor effect [String]
+function isEffectResetAvailable(cursorEffect)
     local mouseDownBefore = state.GetValue("isMouseDown")
     local mouseDownNow = imgui.IsAnyMouseDown()
     state.SetValue("isMouseDown", mouseDownNow)
     local mouseClicked = not mouseDownBefore and mouseDownNow
     local effectResetAvailable = true
-    if cursorEffect == "On Mouse Click" then effectResetAvailable = mouseClicked end
-    if cursorEffect == "On Mouse Down" then effectResetAvailable = mouseDownNow end
+    if cursorEffect == "Star Mouse Click (old)" then effectResetAvailable = mouseClicked end
+    if cursorEffect == "Star Mouse Down (old)" then effectResetAvailable = mouseDownNow end
     return effectResetAvailable
 end
 -- Converts an RGBA color value into uint (unsigned integer) and returns the converted value [Int]
@@ -341,7 +349,8 @@ function setPluginAppearance(globalVars)
     setPluginAppearanceStyles(styleScheme)
     setPluginAppearanceColors(globalVars, colorScheme)
     
-    local rgbColorScheme = colorScheme == "RGB Gamer Mode" or colorScheme == "Glass + RGB"
+    local rgbColorScheme = colorScheme == "RGB Gamer Mode" or colorScheme == "Glass + RGB" or
+                           colorScheme == "Incognito + RGB"
     if rgbColorScheme and (not globalVars.rgbPaused) then updateRGBColors(globalVars) end
 end
 -- Configures the plugin GUI styles
@@ -459,6 +468,38 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white     )
+    elseif colorScheme == "Incognito + RGB" then
+        local black = {0.00, 0.00, 0.00, 1.00}
+        local white = {1.00, 1.00, 1.00, 1.00}
+        local grey = {0.20, 0.20, 0.20, 1.00}
+        local whiteTint = {1.00, 1.00, 1.00, 0.40}
+        local rgbColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
+        
+        imgui.PushStyleColor( imgui_col.WindowBg,               black     )
+        imgui.PushStyleColor( imgui_col.Border,                 rgbColor  )
+        imgui.PushStyleColor( imgui_col.FrameBg,                grey      )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         whiteTint )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          rgbColor  )
+        imgui.PushStyleColor( imgui_col.TitleBg,                grey      )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          grey      )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       black     )
+        imgui.PushStyleColor( imgui_col.CheckMark,              white     )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             grey      )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       rgbColor  )
+        imgui.PushStyleColor( imgui_col.Button,                 grey      )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          whiteTint )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           rgbColor  )
+        imgui.PushStyleColor( imgui_col.Tab,                    grey      )
+        imgui.PushStyleColor( imgui_col.TabHovered,             whiteTint )
+        imgui.PushStyleColor( imgui_col.TabActive,              rgbColor  )
+        imgui.PushStyleColor( imgui_col.Header,                 grey      )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           rgbColor  )
+        imgui.PushStyleColor( imgui_col.Separator,              rgbColor  )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         rgbColor  )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    rgbColor  )
     elseif colorScheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
@@ -741,9 +782,23 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function infoTab(globalVars)
+    explainHowToUsePlugin()
     showShortcuts()
     showInfoLinks()
-    choosePluginSettings(globalVars)
+    choosePluginBehavior(globalVars)
+    choosePluginAppearance(globalVars)
+end
+-- Explains how to use the plugin
+function explainHowToUsePlugin()
+    if not imgui.CollapsingHeader("How to amoguSV") then return end
+    local indentAmount = 10
+    imgui.Indent(indentAmount)
+    imgui.Text("1. ) Select an SV tool")
+    imgui.Text("2. ) Change the tool's settings")
+    imgui.Text("3. ) Select notes")
+    imgui.Text("4. ) Press ' T ' (or click the button that appears)")
+    imgui.Unindent(indentAmount)
+    addPadding()
 end
 -- Lists shortcuts for the plugin
 function showShortcuts()
@@ -768,23 +823,34 @@ function showInfoLinks()
     provideLink("Quaver SV Guide", "https://kloi34.github.io/QuaverSVGuide")
     provideLink("GitHub Repository", "https://github.com/kloi34/amoguSV")
 end
--- Lets you choose global plugin settings
+-- Lets you choose global plugin behavior settings
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
-function choosePluginSettings(globalVars)
-    if not imgui.CollapsingHeader("Plugin Settings") then return end
+function choosePluginBehavior(globalVars)
+    if not imgui.CollapsingHeader("Plugin Behavior Settings") then return end
     addPadding()
     chooseSVSelection(globalVars)
     addSeparator()
     choosePlaceBehavior(globalVars)
     chooseShowNoteMover(globalVars)
-    addSeparator()
+    addPadding()
+end
+-- Lets you choose global plugin appearance settings
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function choosePluginAppearance(globalVars)
+    if not imgui.CollapsingHeader("Plugin Appearance Settings") then return end
+    addPadding()
     chooseStyleScheme(globalVars)
     chooseColorScheme(globalVars)
     chooseCursorEffect(globalVars)
     chooseRGBPause(globalVars)
     chooseDrawCapybara(globalVars)
     addSeparator()
+    explainHowToChangeDefaults()
+end
+-- Explains to the user how to change default settings
+function explainHowToChangeDefaults()
     imgui.TextDisabled("How to permanently change default settings?")
     if not imgui.IsItemHovered() then return end
     imgui.BeginTooltip()
