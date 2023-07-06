@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (4 July 2023)
+-- amoguSV v6.0 beta (6 July 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -1026,7 +1026,7 @@ end
 --    settingVars : list of setting variables for this exponential menu [Table]
 function exponentialSettingsMenu(settingVars)
     local settingsChanged = false
-    settingsChanged = chooseExponentialBehavior(settingVars) or settingsChanged
+    settingsChanged = chooseSVBehavior(settingVars) or settingsChanged
     settingsChanged = chooseIntensity(settingVars) or settingsChanged
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
@@ -1085,6 +1085,7 @@ end
 --    settingVars : list of setting variables for this sinusoidal menu [Table]
 function circularSettingsMenu(settingVars)
     local settingsChanged = false
+    settingsChanged = chooseSVBehavior(settingVars) or settingsChanged
     settingsChanged = chooseArcPercent(settingVars) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
@@ -1911,6 +1912,7 @@ function getSettingVars(svType)
         }
     elseif svType == "Circular" then
         settingVars = {
+            behaviorIndex = 1,
             arcPercent = 50,
             avgSV = 1,
             verticalShift = 0,
@@ -2922,17 +2924,6 @@ function chooseEditTool(globalVars)
     if svTool == "Scale (Displace)" then toolTip("Scale SV values to change note spacing") end
     if svTool == "Swap Notes"       then toolTip("Swaps positions of notes using SVs") end
 end
--- Lets you choose the behavior of the exponential SVs
--- Returns whether or not the behavior changed [Boolean]
--- Parameters
---    settingVars : list of variables used for the current menu [Table]
-function chooseExponentialBehavior(settingVars)
-    local oldBehaviorIndex = settingVars.behaviorIndex
-    local comboIndex = settingVars.behaviorIndex - 1
-    _, comboIndex = imgui.Combo("Behavior", comboIndex, SV_BEHAVIORS, #SV_BEHAVIORS)
-    settingVars.behaviorIndex = comboIndex + 1
-    return oldBehaviorIndex ~= settingVars.behaviorIndex
-end
 -- Lets you choose the final SV to place at the end of SV sets
 -- Returns whether or not the final SV type/value changed [Boolean]
 -- Parameters
@@ -3075,7 +3066,7 @@ end
 function chooseNoNormalize(settingVars)
     addPadding()
     local oldChoice = settingVars.dontNormalize
-    local _, newChoice = imgui.Checkbox("Don't normalize to average", oldChoice)
+    local _, newChoice = imgui.Checkbox("Don't normalize to average SV", oldChoice)
     settingVars.dontNormalize = newChoice
     return oldChoice ~= newChoice
 end
@@ -3365,6 +3356,17 @@ function chooseStyleScheme(globalVars)
     _, comboIndex = imgui.Combo("Style Scheme", comboIndex, STYLE_SCHEMES, #STYLE_SCHEMES)
     globalVars.styleSchemeIndex = comboIndex + 1
 end
+-- Lets you choose the behavior of SVs
+-- Returns whether or not the behavior changed [Boolean]
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseSVBehavior(settingVars)
+    local oldBehaviorIndex = settingVars.behaviorIndex
+    local comboIndex = settingVars.behaviorIndex - 1
+    _, comboIndex = imgui.Combo("Behavior", comboIndex, SV_BEHAVIORS, #SV_BEHAVIORS)
+    settingVars.behaviorIndex = comboIndex + 1
+    return oldBehaviorIndex ~= settingVars.behaviorIndex
+end
 -- Lets you choose the number of SV points per quarter period of a sinusoidal wave
 -- Returns whether or not the number of SV points changed [Boolean]
 -- Parameters
@@ -3477,7 +3479,8 @@ function generateSVMultipliers(svType, settingVars, interlaceMultiplier)
                                             settingVars.svsPerQuarterPeriod,
                                             settingVars.verticalShift, settingVars.curveSharpness)
     elseif svType == "Circular" then
-        multipliers = generateCircularSet(settingVars.arcPercent, settingVars.avgSV, 
+        local behavior = SV_BEHAVIORS[settingVars.behaviorIndex]
+        multipliers = generateCircularSet(behavior, settingVars.arcPercent, settingVars.avgSV, 
                                           settingVars.verticalShift, settingVars.svPoints + 1,
                                           settingVars.dontNormalize)
     elseif svType == "Random" then
@@ -3655,12 +3658,15 @@ function generateSinusoidalSet(startAmplitude, endAmplitude, periods, periodsShi
 end
 -- Returns a set of sinusoidal values [Table]
 -- Parameters
+--    behavior      : description of how the set changes (speeds up or slows down) [String]
 --    arcPercent    : arc percent of a semicircle to generate values from [Int]
 --    avgValue      : average value of the set [Int/Float]
 --    verticalShift : constant to add to each value in the set at very the end [Int/Float]
 --    numValues     : total number of values in the circular set [Int]
 --    dontNormalize : Whether or not to normalize values to the target average value [Boolean]
-function generateCircularSet(arcPercent, avgValue, verticalShift, numValues, dontNormalize)
+function generateCircularSet(behavior, arcPercent, avgValue, verticalShift, numValues,
+                             dontNormalize)
+    local increaseValues = (behavior == "Speed up")
     avgValue = avgValue - verticalShift
     local startingAngle = math.pi * (arcPercent / 100)
     local angles = generateLinearSet(startingAngle, 0, numValues)
@@ -3676,6 +3682,7 @@ function generateCircularSet(arcPercent, avgValue, verticalShift, numValues, don
         local endY = yCoords[i + 1]
         circularSet[i] = (endY - startY) * (numValues - 1)
     end
+    if not increaseValues then circularSet = getReverseTable(circularSet) end
     if not dontNormalize then normalizeValues(circularSet, avgValue, true) end
     for i = 1, #circularSet do
         circularSet[i] = circularSet[i] + verticalShift
