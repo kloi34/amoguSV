@@ -18,7 +18,7 @@ Once you open the plugin you
 3. Select notes you want to use the tool on,
 4. Use the SV tool by pressing 'T' on your keyboard (or hitting the button that appears).
 
-amoguSV helps you accomplish 3 general SV-related actions:
+amoguSV lets you do 3 general SV actions: place SVs, edit SVs, and delete SVs.
 
 ### Place SVs
 
@@ -57,7 +57,8 @@ Special types of SVs:
 Remove SVs between notes.
 
 ## Special Note
-Most of the core ideas and base functionality were taken (stolen) from [iceSV](https://github.com/IceDynamix/iceSV) by [IceDynamix](https://github.com/IceDynamix). Other SV ideas also taken (stolen) from [Illuminati-CRAZ](https://github.com/Illuminati-CRAZ)’s SV plugins.
+Most of the core ideas and base functionality were taken (stolen) from [iceSV](https://github.com/IceDynamix/iceSV) by [IceDynamix](https://github.com/IceDynamix).
+Other SV ideas also taken (stolen) from [Illuminati-CRAZ](https://github.com/Illuminati-CRAZ)’s SV plugins.
 Without these two people’s contributions to SV plugins in general, amoguSV would not be as good as it is today or even exist in the first place, so huge thanks to them.
 
 ## Related Links
