@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (6 July 2023)
+-- amoguSV v6.0 beta (22 July 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -58,6 +58,7 @@ COLOR_SCHEMES = {                  -- available color themes for the plugin
     "Strawberry",
     "Incognito",
     "Incognito + RGB",
+    "Barbie",
     "Glass",
     "Glass + RGB",
     "RGB Gamer Mode"
@@ -357,10 +358,16 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
     saveVariables("cursorGlares", glareInfo)
 end
 -- Draws a single glare
+-- Parameters
+--    o                : imgui overlay drawlist
+--    phaseTime        : phase time of the glare [Int/Float]
+--    glareAngle       : angle of the glare [Int/Float]
+--    glareCoordinates : coordinates of the glare [Table]
+--    innerMaxRadius   : inner radius of glare [Int/Float]
 function drawSingleGlare(o, phaseTime, glareAngle, glareCoordinates, innerMaxRadius)
     local white = rgbaToUint(255, 255, 255, 255)
     local yellowTint = rgbaToUint(255, 255, 100, 30)
-    local actualMaxInnerRadius = innerMaxRadius - 1 + math.random()
+    local actualMaxInnerRadius = innerMaxRadius
     local innerRadius = actualMaxInnerRadius * math.abs(((phaseTime + 1) % 2) - 1)
     local outerRadiusRatio = 8
     local innerPoints = {}
@@ -475,6 +482,10 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.31, 0.38, 0.50, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.41, 0.48, 0.60, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.51, 0.58, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLines,              { 0.61, 0.61, 0.61, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.43, 0.35, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          { 0.90, 0.70, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.60, 0.00, 1.00 } )
     elseif colorScheme == "Strawberry" then
         imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.Border,                 { 1.00, 0.81, 0.88, 0.30 } )
@@ -501,11 +512,16 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.50, 0.31, 0.38, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.60, 0.41, 0.48, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.70, 0.51, 0.58, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLines,              { 0.61, 0.61, 0.61, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.43, 0.35, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          { 0.90, 0.70, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.60, 0.00, 1.00 } )
     elseif colorScheme == "Incognito" then
         local black = {0.00, 0.00, 0.00, 1.00}
         local white = {1.00, 1.00, 1.00, 1.00}
         local grey = {0.20, 0.20, 0.20, 1.00}
         local whiteTint = {1.00, 1.00, 1.00, 0.40}
+        local red = {1.00, 0.00, 0.00, 1.00}
         
         imgui.PushStyleColor( imgui_col.WindowBg,               black     )
         imgui.PushStyleColor( imgui_col.Border,                 whiteTint )
@@ -532,6 +548,10 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white     )
+        imgui.PushStyleColor( imgui_col.PlotLines,              white     )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       red       )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          white     )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   red       )
     elseif colorScheme == "Incognito + RGB" then
         local black = {0.00, 0.00, 0.00, 1.00}
         local white = {1.00, 1.00, 1.00, 1.00}
@@ -564,6 +584,45 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    rgbColor  )
+        imgui.PushStyleColor( imgui_col.PlotLines,              white     )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       rgbColor  )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          white     )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   rgbColor  )
+    elseif colorScheme == "Barbie" then
+        local pink = {0.79, 0.31, 0.55, 1.00}
+        local white = {0.95, 0.85, 0.87, 1.00}
+        local blue = {0.37, 0.64, 0.84, 1.00}
+        local pinkTint = {1.00, 0.86, 0.86, 0.40}
+        
+        imgui.PushStyleColor( imgui_col.WindowBg,               pink     )
+        imgui.PushStyleColor( imgui_col.Border,                 pinkTint )
+        imgui.PushStyleColor( imgui_col.FrameBg,                blue     )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         pinkTint )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          pinkTint )
+        imgui.PushStyleColor( imgui_col.TitleBg,                blue     )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          blue     )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       pink     )
+        imgui.PushStyleColor( imgui_col.CheckMark,              white    )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             blue     )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       pinkTint )
+        imgui.PushStyleColor( imgui_col.Button,                 blue     )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          pinkTint )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           pinkTint )
+        imgui.PushStyleColor( imgui_col.Tab,                    blue     )
+        imgui.PushStyleColor( imgui_col.TabHovered,             pinkTint )
+        imgui.PushStyleColor( imgui_col.TabActive,              pinkTint )
+        imgui.PushStyleColor( imgui_col.Header,                 blue     )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          pinkTint )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           pinkTint )
+        imgui.PushStyleColor( imgui_col.Separator,              pinkTint )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         pinkTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          pinkTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white    )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white    )
+        imgui.PushStyleColor( imgui_col.PlotLines,              pink     )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       pinkTint )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          pink     )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   pinkTint )
     elseif colorScheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
@@ -594,6 +653,10 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint        )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   transparentWhite )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    transparentWhite )
+        imgui.PushStyleColor( imgui_col.PlotLines,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       transparentWhite )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   transparentWhite )
     elseif colorScheme == "Glass + RGB" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
@@ -624,6 +687,10 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          colorTint   )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    activeColor )
+        imgui.PushStyleColor( imgui_col.PlotLines,              activeColor )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       colorTint   )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          activeColor )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   colorTint   )
     elseif colorScheme == "RGB Gamer Mode" then
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
         local inactiveColor = {globalVars.red, globalVars.green, globalVars.blue, 0.5}
@@ -656,6 +723,10 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          inactiveColor )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor   )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    activeColor   )
+        imgui.PushStyleColor( imgui_col.PlotLines,              { 0.61, 0.61, 0.61, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.43, 0.35, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          { 0.90, 0.70, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.60, 0.00, 1.00 } )
     end
 end
 -- Updates global RGB color values, cycling through high-saturation colors
@@ -1432,7 +1503,7 @@ function copyNPasteMenu(globalVars)
         local pasteOffsets = uniqueSelectedNoteOffsets()
         pasteSVs(menuVars.copiedSVs, pasteOffsets)
     end
-    toolTip("You can also press 'T' on your keyboard to paste SVs at selected notes")
+    toolTip("You can also press ' T ' on your keyboard to paste SVs at selected notes")
 end
 -- Creates the displace note menu
 -- Parameters
@@ -2655,7 +2726,7 @@ function simpleActionMenu(actionName, actionfunc, globalVars, menuVars)
     if globalVars.useManualOffsets then actionItem = "offsets" end
     local buttonText = actionName.." SVs "..actionThing.." "..actionItem
     button(buttonText, ACTION_BUTTON_SIZE, actionfunc, globalVars, menuVars)
-    toolTip("You can also press 'T' on your keyboard to do the same thing as this button")
+    toolTip("You can also press ' T ' on your keyboard to do the same thing as this button")
     ifKeyPressedThenExecute(keys.T, actionfunc, globalVars, menuVars)
 end
 -- Checks to see if enough notes are selected
@@ -3000,8 +3071,8 @@ function chooseMSPF(menuVars)
     newMSPF = forceHalf(newMSPF)
     newMSPF = clampToInterval(newMSPF, 4, 1000)
     menuVars.msPerFrame = newMSPF
-    helpMarker("Number of milliseconds the splitscroll will display a scroll speed for before "..
-               "jumping to the next scroll speed")
+    helpMarker("Number of milliseconds splitscroll will display a set of SVs before jumping to "..
+               "the next set of SVs")
 end
 -- Lets you choose whether or not to linearly change something
 -- Returns whether or not the choice changed [Boolean]
