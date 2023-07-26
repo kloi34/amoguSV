@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (22 July 2023)
+-- amoguSV v6.0 beta (26 July 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -53,7 +53,7 @@ ANIMATION_OPTIONS = {              -- ways to add note animation data
     "Manually Add",
     "Import/Export"
 }
-COLOR_SCHEMES = {                  -- available color themes for the plugin
+COLOR_THEMES = {                  -- available color themes for the plugin
     "Classic",
     "Strawberry",
     "Incognito",
@@ -168,7 +168,11 @@ STILL_TYPES = {                    -- types of still displacements
     "Auto",
     "Capy"
 }
-STYLE_SCHEMES = {                  -- available style/appearance themes for the plugin
+STUTTER_CONTROLS = {              -- parts of a stutter SV to control
+    "First SV",
+    "Second SV"
+}
+STYLE_THEMES = {                  -- available style/appearance themes for the plugin
     "Rounded",
     "Boxed",
     "Rounded + Border",
@@ -414,25 +418,25 @@ function rgbaToUint(r, g, b, a) return a*16^6 + b*16^4 + g*16^2 + r end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function setPluginAppearance(globalVars)
-    local colorScheme = COLOR_SCHEMES[globalVars.colorSchemeIndex]
-    local styleScheme = STYLE_SCHEMES[globalVars.styleSchemeIndex]
+    local colorTheme = COLOR_THEMES[globalVars.colorThemeIndex]
+    local styleTheme = STYLE_THEMES[globalVars.styleThemeIndex]
     
-    setPluginAppearanceStyles(styleScheme)
-    setPluginAppearanceColors(globalVars, colorScheme)
+    setPluginAppearanceStyles(styleTheme)
+    setPluginAppearanceColors(globalVars, colorTheme)
     
-    local rgbColorScheme = colorScheme == "RGB Gamer Mode" or colorScheme == "Glass + RGB" or
-                           colorScheme == "Incognito + RGB"
-    if rgbColorScheme and (not globalVars.rgbPaused) then updateRGBColors(globalVars) end
+    local rgbColorTheme = colorTheme == "RGB Gamer Mode" or colorTheme == "Glass + RGB" or
+                          colorTheme == "Incognito + RGB"
+    if rgbColorTheme and (not globalVars.rgbPaused) then updateRGBColors(globalVars) end
 end
 -- Configures the plugin GUI styles
 -- Parameters
---    styleScheme : name of the desired style scheme [String]
-function setPluginAppearanceStyles(styleScheme)
-    local boxed = styleScheme == "Boxed" or styleScheme == "Boxed + Border"
+--    styleTheme : name of the desired style theme [String]
+function setPluginAppearanceStyles(styleTheme)
+    local boxed = styleTheme == "Boxed" or styleTheme == "Boxed + Border"
     local cornerRoundnessValue = 5 -- up to 12, 14 for WindowRounding and 16 for ChildRounding
     if boxed then cornerRoundnessValue = 0 end
     
-    local addBorder = styleScheme == "Rounded + Border" or styleScheme == "Boxed + Border"
+    local addBorder = styleTheme == "Rounded + Border" or styleTheme == "Boxed + Border"
     local borderSize = 0
     if addBorder then borderSize = 1 end
 
@@ -453,10 +457,10 @@ function setPluginAppearanceStyles(styleScheme)
 end
 -- Configures the plugin GUI colors
 -- Parameters
---    globalVars  : list of variables used globally across all menus [Table]
---    colorScheme : name of the target color scheme [String]
-function setPluginAppearanceColors(globalVars, colorScheme)
-    if colorScheme == "Classic" then
+--    globalVars : list of variables used globally across all menus [Table]
+--    colorTheme : name of the target color theme [String]
+function setPluginAppearanceColors(globalVars, colorTheme)
+    if colorTheme == "Classic" then
         imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.Border,                 { 0.81, 0.88, 1.00, 0.30 } )
         imgui.PushStyleColor( imgui_col.FrameBg,                { 0.14, 0.24, 0.28, 1.00 } )
@@ -478,6 +482,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          { 0.81, 0.88, 1.00, 0.50 } )
         imgui.PushStyleColor( imgui_col.HeaderActive,           { 0.81, 0.88, 1.00, 0.54 } )
         imgui.PushStyleColor( imgui_col.Separator,              { 0.81, 0.88, 1.00, 0.30 } )
+        imgui.PushStyleColor( imgui_col.Text,                   { 1.00, 1.00, 1.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 0.81, 0.88, 1.00, 0.40 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.31, 0.38, 0.50, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.41, 0.48, 0.60, 1.00 } )
@@ -486,7 +491,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.43, 0.35, 1.00 } )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          { 0.90, 0.70, 0.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.60, 0.00, 1.00 } )
-    elseif colorScheme == "Strawberry" then
+    elseif colorTheme == "Strawberry" then
         imgui.PushStyleColor( imgui_col.WindowBg,               { 0.00, 0.00, 0.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.Border,                 { 1.00, 0.81, 0.88, 0.30 } )
         imgui.PushStyleColor( imgui_col.FrameBg,                { 0.28, 0.14, 0.24, 1.00 } )
@@ -508,6 +513,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          { 1.00, 0.81, 0.88, 0.50 } )
         imgui.PushStyleColor( imgui_col.HeaderActive,           { 1.00, 0.81, 0.88, 0.54 } )
         imgui.PushStyleColor( imgui_col.Separator,              { 1.00, 0.81, 0.88, 0.30 } )
+        imgui.PushStyleColor( imgui_col.Text,                   { 1.00, 1.00, 1.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 1.00, 0.81, 0.88, 0.40 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.50, 0.31, 0.38, 1.00 } )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.60, 0.41, 0.48, 1.00 } )
@@ -516,7 +522,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.43, 0.35, 1.00 } )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          { 0.90, 0.70, 0.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.60, 0.00, 1.00 } )
-    elseif colorScheme == "Incognito" then
+    elseif colorTheme == "Incognito" then
         local black = {0.00, 0.00, 0.00, 1.00}
         local white = {1.00, 1.00, 1.00, 1.00}
         local grey = {0.20, 0.20, 0.20, 1.00}
@@ -544,6 +550,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint )
         imgui.PushStyleColor( imgui_col.HeaderActive,           whiteTint )
         imgui.PushStyleColor( imgui_col.Separator,              whiteTint )
+        imgui.PushStyleColor( imgui_col.Text,                   white     )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         whiteTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
@@ -552,7 +559,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       red       )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          white     )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   red       )
-    elseif colorScheme == "Incognito + RGB" then
+    elseif colorTheme == "Incognito + RGB" then
         local black = {0.00, 0.00, 0.00, 1.00}
         local white = {1.00, 1.00, 1.00, 1.00}
         local grey = {0.20, 0.20, 0.20, 1.00}
@@ -580,6 +587,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint )
         imgui.PushStyleColor( imgui_col.HeaderActive,           rgbColor  )
         imgui.PushStyleColor( imgui_col.Separator,              rgbColor  )
+        imgui.PushStyleColor( imgui_col.Text,                   white     )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         rgbColor  )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white     )
@@ -588,7 +596,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       rgbColor  )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          white     )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   rgbColor  )
-    elseif colorScheme == "Barbie" then
+    elseif colorTheme == "Barbie" then
         local pink = {0.79, 0.31, 0.55, 1.00}
         local white = {0.95, 0.85, 0.87, 1.00}
         local blue = {0.37, 0.64, 0.84, 1.00}
@@ -602,7 +610,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.TitleBg,                blue     )
         imgui.PushStyleColor( imgui_col.TitleBgActive,          blue     )
         imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       pink     )
-        imgui.PushStyleColor( imgui_col.CheckMark,              white    )
+        imgui.PushStyleColor( imgui_col.CheckMark,              blue     )
         imgui.PushStyleColor( imgui_col.SliderGrab,             blue     )
         imgui.PushStyleColor( imgui_col.SliderGrabActive,       pinkTint )
         imgui.PushStyleColor( imgui_col.Button,                 blue     )
@@ -615,6 +623,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          pinkTint )
         imgui.PushStyleColor( imgui_col.HeaderActive,           pinkTint )
         imgui.PushStyleColor( imgui_col.Separator,              pinkTint )
+        imgui.PushStyleColor( imgui_col.Text,                   white    )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         pinkTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          pinkTint )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white    )
@@ -623,10 +632,11 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       pinkTint )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          pink     )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   pinkTint )
-    elseif colorScheme == "Glass" then
+    elseif colorTheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
         local whiteTint = {1.00, 1.00, 1.00, 0.30}
+        local white = {1.00, 1.00, 1.00, 1.00}
         
         imgui.PushStyleColor( imgui_col.WindowBg,               transparent      )
         imgui.PushStyleColor( imgui_col.Border,                 transparentWhite )
@@ -649,6 +659,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint        )
         imgui.PushStyleColor( imgui_col.HeaderActive,           whiteTint        )
         imgui.PushStyleColor( imgui_col.Separator,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.Text,                   white            )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         whiteTint        )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint        )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   transparentWhite )
@@ -657,10 +668,11 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       transparentWhite )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          whiteTint        )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   transparentWhite )
-    elseif colorScheme == "Glass + RGB" then
+    elseif colorTheme == "Glass + RGB" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
         local colorTint = {globalVars.red, globalVars.green, globalVars.blue, 0.3}
+        local white = {1.00, 1.00, 1.00, 1.00}
         
         imgui.PushStyleColor( imgui_col.WindowBg,               transparent )
         imgui.PushStyleColor( imgui_col.Border,                 activeColor )
@@ -683,6 +695,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          colorTint   ) 
         imgui.PushStyleColor( imgui_col.HeaderActive,           colorTint   )
         imgui.PushStyleColor( imgui_col.Separator,              colorTint   )
+        imgui.PushStyleColor( imgui_col.Text,                   white       )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         colorTint   )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          colorTint   )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor )
@@ -691,7 +704,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       colorTint   )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          activeColor )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   colorTint   )
-    elseif colorScheme == "RGB Gamer Mode" then
+    elseif colorTheme == "RGB Gamer Mode" then
         local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
         local inactiveColor = {globalVars.red, globalVars.green, globalVars.blue, 0.5}
         local white = {1.00, 1.00, 1.00, 1.00}
@@ -719,6 +732,7 @@ function setPluginAppearanceColors(globalVars, colorScheme)
         imgui.PushStyleColor( imgui_col.HeaderHovered,          inactiveColor )
         imgui.PushStyleColor( imgui_col.HeaderActive,           activeColor   )
         imgui.PushStyleColor( imgui_col.Separator,              inactiveColor )
+        imgui.PushStyleColor( imgui_col.Text,                   white         )
         imgui.PushStyleColor( imgui_col.TextSelectedBg,         clearWhite    )
         imgui.PushStyleColor( imgui_col.ScrollbarGrab,          inactiveColor )
         imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor   )
@@ -836,8 +850,8 @@ function draw()
         startOffset = 0,
         endOffset = 0,
         placeBehaviorIndex = 1,
-        colorSchemeIndex = 1,
-        styleSchemeIndex = 1,
+        colorThemeIndex = 1,
+        styleThemeIndex = 1,
         cursorEffectIndex = 1,
         red = 0,
         green = 1,
@@ -962,7 +976,7 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function choosePluginBehavior(globalVars)
-    if not imgui.CollapsingHeader("Plugin Behavior Settings") then return end
+    if not imgui.CollapsingHeader("Plugin Behavior") then return end
     addPadding()
     chooseSVSelection(globalVars)
     addSeparator()
@@ -974,10 +988,10 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function choosePluginAppearance(globalVars)
-    if not imgui.CollapsingHeader("Plugin Appearance Settings") then return end
+    if not imgui.CollapsingHeader("Plugin Appearance") then return end
     addPadding()
-    chooseStyleScheme(globalVars)
-    chooseColorScheme(globalVars)
+    chooseStyleTheme(globalVars)
+    chooseColorTheme(globalVars)
     chooseCursorEffect(globalVars)
     chooseRGBPause(globalVars)
     chooseDrawCapybara(globalVars)
@@ -993,7 +1007,7 @@ function explainHowToChangeDefaults()
     imgui.BulletText("Find the line with \"local globalVars = { \"")
     imgui.BulletText("Edit values in globalVars that correspond to a plugin setting")
     imgui.BulletText("Save the file with changes and reload the plugin")
-    imgui.Text("Example: change \"colorSchemeIndex = 1,\" to \"colorSchemeIndex = 2,\"")
+    imgui.Text("Example: change \"colorThemeIndex = 1,\" to \"colorThemeIndex = 2,\"")
     imgui.EndTooltip()
 end
 -- Creates the "Place SVs" tab
@@ -1234,18 +1248,15 @@ function stutterMenu(globalVars)
     getVariables("stutterMenu", menuVars)
     
     local settingsChanged = #menuVars.svMultipliers == 0
-    local svText = "First SV:"
-    if menuVars.controlLastSV then svText = "Last SV:" end
-    imgui.Text(svText)
+    settingsChanged = chooseControlSecondSV(menuVars) or settingsChanged
     settingsChanged = chooseStartEndSVs(menuVars) or settingsChanged
     settingsChanged = chooseStutterDuration(menuVars) or settingsChanged
+    settingsChanged = chooseLinearlyChange(menuVars) or settingsChanged
     
     addSeparator()
     settingsChanged = chooseStuttersPerSection(menuVars) or settingsChanged
     settingsChanged = chooseAverageSV(menuVars) or settingsChanged
     settingsChanged = chooseFinalSV(menuVars) or settingsChanged
-    settingsChanged = chooseLinearlyChange(menuVars) or settingsChanged
-    settingsChanged = chooseControlLastSV(menuVars) or settingsChanged
     if settingsChanged then updateStutterMenuSVs(menuVars) end
     displayStutterSVWindows(menuVars)
     
@@ -2835,13 +2846,13 @@ function chooseBezierPoints(settingVars)
     local y2Changed = (oldSecondPoint[2] ~= settingVars.y2)
     return x1Changed or y1Changed or x2Changed or y2Changed
 end
--- Lets you choose the color scheme of the plugin
+-- Lets you choose the color theme of the plugin
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
-function chooseColorScheme(globalVars)
-    local comboIndex = globalVars.colorSchemeIndex - 1
-    _, comboIndex = imgui.Combo("Color Scheme", comboIndex, COLOR_SCHEMES, #COLOR_SCHEMES)
-    globalVars.colorSchemeIndex = comboIndex + 1
+function chooseColorTheme(globalVars)
+    local comboIndex = globalVars.colorThemeIndex - 1
+    _, comboIndex = imgui.Combo("Color Theme", comboIndex, COLOR_THEMES, #COLOR_THEMES)
+    globalVars.colorThemeIndex = comboIndex + 1
 end
 -- Lets you choose a constant amount to shift SVs
 -- Returns whether or not the shift amount changed [Boolean]
@@ -2860,13 +2871,17 @@ function chooseConstantShift(settingVars, defaultShift)
     settingVars.verticalShift = newShift
     return oldShift ~= newShift
 end
--- Lets you choose whether or not to control the last SV
+-- Lets you choose whether or not to control the second SV
 -- Returns whether or not the choice changed [Boolean]
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
-function chooseControlLastSV(menuVars)
+function chooseControlSecondSV(menuVars)
     local oldChoice = menuVars.controlLastSV
-    local _, newChoice = imgui.Checkbox("Control last SV instead", oldChoice)
+    local newChoice
+    local comboIndex = 0
+    if oldChoice then comboIndex = 1 end
+    _, comboIndex = imgui.Combo("##control", comboIndex, STUTTER_CONTROLS, #STUTTER_CONTROLS)
+    if comboIndex == 1 then newChoice = true else newChoice = false end
     menuVars.controlLastSV = newChoice
     local choiceChanged = oldChoice ~= newChoice
     if choiceChanged then menuVars.stutterDuration = 100 - menuVars.stutterDuration end
@@ -3241,7 +3256,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function chooseRGBPause(globalVars)
     _, globalVars.rgbPaused = imgui.Checkbox("Pause RGB color changing", globalVars.rgbPaused)
-    helpMarker("If you have a RGB color scheme selected, stops the colors from cycling/changing")
+    helpMarker("If you have a RGB color theme selected, stops the colors from cycling/changing")
 end
 -- Lets you choose whether or not to show the note mover window
 -- Parameters
@@ -3340,7 +3355,7 @@ end
 function chooseStartEndSVs(settingVars)
     if settingVars.linearlyChange == false then
         local oldValue = settingVars.startSV
-        local _, newValue = imgui.InputFloat("Start SV", oldValue, 0, 0, "%.2fx")
+        local _, newValue = imgui.InputFloat("SV Value", oldValue, 0, 0, "%.2fx")
         settingVars.startSV = newValue
         return oldValue ~= newValue
     end
@@ -3419,13 +3434,13 @@ function chooseStuttersPerSection(menuVars)
     menuVars.stuttersPerSection = newNumber
     return oldNumber ~= newNumber
 end
--- Lets you choose the style scheme of the plugin
+-- Lets you choose the style theme of the plugin
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
-function chooseStyleScheme(globalVars)
-    local comboIndex = globalVars.styleSchemeIndex - 1
-    _, comboIndex = imgui.Combo("Style Scheme", comboIndex, STYLE_SCHEMES, #STYLE_SCHEMES)
-    globalVars.styleSchemeIndex = comboIndex + 1
+function chooseStyleTheme(globalVars)
+    local comboIndex = globalVars.styleThemeIndex - 1
+    _, comboIndex = imgui.Combo("Style Theme", comboIndex, STYLE_THEMES, #STYLE_THEMES)
+    globalVars.styleThemeIndex = comboIndex + 1
 end
 -- Lets you choose the behavior of SVs
 -- Returns whether or not the behavior changed [Boolean]
