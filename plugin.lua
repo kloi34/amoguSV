@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (26 July 2023)
+-- amoguSV v6.0 beta (1 August 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -7,7 +7,7 @@
 --    Plugin        Creator                Link                                                
 ---------------------------------------------------------------------------------------------------
 --    iceSV         IceDynamix             @ https://github.com/IceDynamix/iceSV
---    KeepStill     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/KeepStill
+--    KeepStill     Illuminati-CRAZ        @ https://githuxb.com/Illuminati-CRAZ/KeepStill
 --    Vibrato       Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Vibrato
 --    Displacer     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Displacer
 
@@ -4747,7 +4747,7 @@ function editReverseScrollSVs(globalVars, menuVars)
             local newMultiplierBefore = noteDisplacement * multiplier + svMultiplierBefore
             local newMultiplierAt = (teleportDistance - noteDisplacement) * multiplier + svMultiplierAt
             local newMultiplierAfter = svMultiplierAfter
-            if svMultiplierAfter < 1 then svMultiplierAfter = 1 end
+            if svMultiplierAfter ~= 1 then newMultiplierAfter = 1 end
             table.insert(svsToAdd2, utils.CreateScrollVelocity(timeBefore, newMultiplierBefore))
             table.insert(svsToAdd2, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
             table.insert(svsToAdd2, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
