@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (1 August 2023)
+-- amoguSV v6.0 beta (13 August 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -7,7 +7,7 @@
 --    Plugin        Creator                Link                                                
 ---------------------------------------------------------------------------------------------------
 --    iceSV         IceDynamix             @ https://github.com/IceDynamix/iceSV
---    KeepStill     Illuminati-CRAZ        @ https://githuxb.com/Illuminati-CRAZ/KeepStill
+--    KeepStill     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/KeepStill
 --    Vibrato       Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Vibrato
 --    Displacer     Illuminati-CRAZ        @ https://github.com/Illuminati-CRAZ/Displacer
 
@@ -53,7 +53,7 @@ ANIMATION_OPTIONS = {              -- ways to add note animation data
     "Manually Add",
     "Import/Export"
 }
-COLOR_THEMES = {                  -- available color themes for the plugin
+COLOR_THEMES = {                   -- available color themes for the plugin
     "Classic",
     "Strawberry",
     "Incognito",
@@ -68,7 +68,8 @@ CURSOR_EFFECTS_OPTIONS = {         -- cursor effect options
     "Shiny Box", 
     "Shiny Mouse Click",
     "Shiny Mouse Down",
-    "Shiny Always On"
+    "Shiny Always On",
+    "Circle"
 }
 DISPLACE_SCALE_SPOTS = {           -- places to scale SV sections by displacing
     "Start",
@@ -168,11 +169,11 @@ STILL_TYPES = {                    -- types of still displacements
     "Auto",
     "Capy"
 }
-STUTTER_CONTROLS = {              -- parts of a stutter SV to control
+STUTTER_CONTROLS = {               -- parts of a stutter SV to control
     "First SV",
     "Second SV"
 }
-STYLE_THEMES = {                  -- available style/appearance themes for the plugin
+STYLE_THEMES = {                   -- available style/appearance themes for the plugin
     "Rounded",
     "Boxed",
     "Rounded + Border",
@@ -250,10 +251,12 @@ function drawCursorEffect(globalVars)
     local sz = state.WindowSize
     
     if cursorEffect == "Shiny Box" then drawCoinGetEffect(effectResetAvailable, o, m, t) end
-    local isGlare = cursorEffect == "Shiny Mouse Click" or
-                    cursorEffect == "Shiny Mouse Down" or
-                    cursorEffect == "Shiny Always On"
-    if isGlare then drawGlareEffect(effectResetAvailable, o, m, t) end
+    local isGlareEffect = cursorEffect == "Shiny Mouse Click" or
+                          cursorEffect == "Shiny Mouse Down" or
+                          cursorEffect == "Shiny Always On"
+    if isGlareEffect then drawGlareEffect(effectResetAvailable, o, m, t) end
+    if cursorEffect == "Circle" then drawRingEffect(effectResetAvailable, o, m, t) end
+    
 end
 -- Parameters
 --    effectResetAvailable : whether or not the effect can be reset [Boolean]
@@ -261,28 +264,23 @@ end
 --    m                    : mouse position/coordinates {x, y} [Table]
 --    t                    : imgui time [Float]
 function drawCoinGetEffect(effectResetAvailable, o, m, t)
-    local function generateRandomGlare(m, t)
-        local radius = 0 --30
-        local randomAngle = 2 * math.pi * math.random()
-        local randomX = m[1] + radius * math.cos(randomAngle)
-        local randomY = m[2] + radius * math.sin(randomAngle)
-        local startTime = t
-        return {{randomX, randomY}, 0, t}
+    local function generateGlare(m, t)
+        return {m, 0, t}
     end
     
     local maxNumGlares = 1
     local glareInfo = {}
-    if not state.GetValue("startCoinEffect") then
+    if not state.GetValue("startBoxEffect") then
         for i = 1, maxNumGlares do
-            glareInfo[i] = generateRandomGlare(m, t)
+            glareInfo[i] = generateGlare(m, t)
         end
-        state.SetValue("startCoinEffect", true)
+        state.SetValue("startBoxEffect", true)
     else
         for i = 1, maxNumGlares do
             glareInfo[i] = {}
         end
     end
-    getVariables("cursorCoinEffect", glareInfo)
+    getVariables("cursorBoxEffect", glareInfo)
     
     local timeSpeed = 2
     for i = 1, maxNumGlares do
@@ -292,7 +290,7 @@ function drawCoinGetEffect(effectResetAvailable, o, m, t)
         local timeElapsed = t - glareStartTime
         local phaseTime = 0.8 + timeSpeed * timeElapsed
         if phaseTime >= 2 and effectResetAvailable then
-            glareInfo[i] = generateRandomGlare(m, t)
+            glareInfo[i] = generateGlare(m, t)
         elseif phaseTime >= 0 and phaseTime < 2 then
             drawSingleGlare(o, phaseTime, glareAngle, glareCoordinates, 3)
             local spacing = 20
@@ -311,7 +309,7 @@ function drawCoinGetEffect(effectResetAvailable, o, m, t)
             glareInfo[i][1] = {newX, newY}
         end
     end
-    saveVariables("cursorCoinEffect", glareInfo)
+    saveVariables("cursorBoxEffect", glareInfo)
 end
 -- Draws the glare cursor effect
 -- Parameters
@@ -361,6 +359,54 @@ function drawGlareEffect(effectResetAvailable, o, m, t)
     end
     saveVariables("cursorGlares", glareInfo)
 end
+-- Draws the ring cursor effect
+-- Parameters
+--    effectResetAvailable : whether or not the effect can be reset [Boolean]
+--    o                    : imgui overlay drawlist
+--    m                    : mouse position/coordinates {x, y} [Table]
+--    t                    : imgui time [Float]
+function drawRingEffect(effectResetAvailable, o, m, t)
+    local function generateRing(t, m)
+        local ringInfo = {
+            startTime = t,
+            maxRadius = state.WindowSize[2] / 30,
+            coords = m
+        }
+        return ringInfo
+    end
+    
+    local maxNumRings = 10
+    local ringInfo = {}
+    if not state.GetValue("startRingEffect") then
+        for i = 1, maxNumRings do
+            ringInfo[i] = generateRing(t - 20, m)
+        end
+        state.SetValue("startRingEffect", true)
+    else
+        for i = 1, maxNumRings do
+            ringInfo[i] = {}
+        end
+    end
+    getVariables("ringInfo", ringInfo)
+    
+    local ringTotalTime = 0.7
+    local ringColor = rgbaToUint(255, 255, 255, 127)
+    local updatedOneRing = false
+    for i = 1, maxNumRings do
+        local thisRing = ringInfo[i]
+        local timeElapsed = t - thisRing.startTime
+        if timeElapsed >= 0 and timeElapsed < ringTotalTime then
+            local percentTimeElapsed = (ringTotalTime - timeElapsed) / ringTotalTime
+            local bezierMultiplier = simplifiedOneDimensionalBezier(0, 1.5, percentTimeElapsed)
+            local currentRadius = thisRing.maxRadius * bezierMultiplier
+            o.AddCircleFilled(thisRing.coords, currentRadius, ringColor, 20)
+        elseif effectResetAvailable and (not updatedOneRing) and timeElapsed >= ringTotalTime then
+            updatedOneRing = true
+            ringInfo[i] = generateRing(t, m)
+        end
+    end
+    saveVariables("ringInfo", ringInfo)
+end
 -- Draws a single glare
 -- Parameters
 --    o                : imgui overlay drawlist
@@ -405,6 +451,7 @@ function isEffectResetAvailable(cursorEffect)
     if cursorEffect == "Shiny Box"         then effectResetAvailable = mouseClicked end
     if cursorEffect == "Shiny Mouse Click" then effectResetAvailable = mouseClicked end
     if cursorEffect == "Shiny Mouse Down"  then effectResetAvailable = mouseDownNow end
+    if cursorEffect == "Circle"            then effectResetAvailable = mouseClicked end
     return effectResetAvailable
 end
 -- Converts an RGBA color value into uint (unsigned integer) and returns the converted value [Int]
@@ -2880,7 +2927,7 @@ function chooseControlSecondSV(menuVars)
     local newChoice
     local comboIndex = 0
     if oldChoice then comboIndex = 1 end
-    _, comboIndex = imgui.Combo("##control", comboIndex, STUTTER_CONTROLS, #STUTTER_CONTROLS)
+    _, comboIndex = imgui.Combo("Control SV", comboIndex, STUTTER_CONTROLS, #STUTTER_CONTROLS)
     if comboIndex == 1 then newChoice = true else newChoice = false end
     menuVars.controlLastSV = newChoice
     local choiceChanged = oldChoice ~= newChoice
