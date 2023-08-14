@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (13 August 2023)
+-- amoguSV v5.6 (14 August 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -167,7 +167,8 @@ STILL_TYPES = {                    -- types of still displacements
     "Start",
     "End",
     "Auto",
-    "Capy"
+    "Capy",
+    "Bara"
 }
 STUTTER_CONTROLS = {               -- parts of a stutter SV to control
     "First SV",
@@ -1497,7 +1498,7 @@ function placeStillSVMenu(globalVars)
         noteSpacing = 1,
         stillTypeIndex = 1,
         stillDistance = 200,
-        autoDistance = {},
+        prePlaceDistances = {},
         svMultipliers = {},
         svDistances = {},
         svGraphStats = createSVGraphStats(),
@@ -2493,28 +2494,21 @@ end
 -- Parameters
 --    stillType        : type of still [String]
 --    stillDistance    : distance of the still according to the still type [Int/Float]
---    autoDistance     : auto distances for "Capy" stills  [Int/Float]
 --    svDisplacements  : list of displacements of notes based on svs [Table]
 --    nsvDisplacements : list of displacements of notes based on notes only, no sv [Table]
-function calculateStillDisplacements(stillType, stillDistance, autoDistance, svDisplacements,
-                                     nsvDisplacements)
+function calculateStillDisplacements(stillType, stillDistance, svDisplacements, nsvDisplacements)
     local finalDisplacements = {}
     for i = 1, #svDisplacements do
         local difference = nsvDisplacements[i] - svDisplacements[i]
         table.insert(finalDisplacements, difference)
     end
     local extraDisplacement = stillDistance
-    if stillType == "End" then
+    if stillType == "End" or stillType == "Bara" then
         extraDisplacement = stillDistance - finalDisplacements[#finalDisplacements]
     end
     if stillType ~= "No" then
         for i = 1, #finalDisplacements do
             finalDisplacements[i] = finalDisplacements[i] + extraDisplacement
-        end
-    end
-    if stillType == "Capy" then
-        for i = 1, #finalDisplacements do
-            finalDisplacements[i] = autoDistance[i] + extraDisplacement - svDisplacements[i]
         end
     end
     return finalDisplacements
@@ -3448,7 +3442,8 @@ function chooseStillType(menuVars)
     if stillType == "Start" then toolTip("Use an initial starting displacement for the still") end
     if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
     if stillType == "Auto"  then toolTip("Use last displacement of a previous still to start") end
-    if stillType == "Capy"  then toolTip("Keeps original note displacements but uses new start") end
+    if stillType == "Capy"  then toolTip("Keeps original note displacements with new start") end
+    if stillType == "Bara"  then toolTip("Keeps original note displacements with new end") end
     
     if dontChooseDistance then
         imgui.Unindent(indentWidth)
@@ -4026,7 +4021,19 @@ function placeSVs(globalVars, menuVars)
     local offsets = getSelectedOffsets(globalVars)
     local firstOffset = offsets[1]
     local lastOffset = offsets[#offsets]
-    if placingStillSVs then offsets = {firstOffset, lastOffset} end
+    if placingStillSVs then
+        offsets = {firstOffset, lastOffset}
+        for i = 1, #offsets do
+            local currentOffset = offsets[i]
+            local multiplier = getUsableOffsetMultiplier(currentOffset)
+            local duration = 1 / multiplier
+            local timeBefore = currentOffset - duration
+            local timeAt = currentOffset
+            local svMultiplierBefore = getSVMultiplierAt(timeBefore)
+            local svMultiplierAt = getSVMultiplierAt(timeAt)
+            menuVars.prePlaceDistances[i] = {svMultiplierBefore, svMultiplierAt}
+        end
+    end
       
     for i = 1, #offsets - 1 do
         local startOffset = offsets[i]
@@ -4050,12 +4057,6 @@ function placeSVs(globalVars, menuVars)
         svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
     end
     
-    local stillCapy = placingStillSVs and STILL_TYPES[menuVars.stillTypeIndex] == "Capy"
-    if stillCapy then 
-        local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
-        menuVars.autoDistance = calculateDisplacementsFromSVs(svsToRemove, noteOffsets)
-    end
-    
     removeAndAddSVs(svsToRemove, svsToAdd)
     if placingStillSVs then placeStillSVs(menuVars, firstOffset, lastOffset) end
 end
@@ -4066,13 +4067,18 @@ end
 --    lastOffset  : ending millisecond time of the still [Int]
 function placeStillSVs(menuVars, firstOffset, lastOffset)
     local stillType = STILL_TYPES[menuVars.stillTypeIndex]
+    local capybaraStill = stillType == "Capy" or stillType == "Bara" 
+    local noteSpacing = menuVars.noteSpacing
+    if capybaraStill then
+        noteSpacing = 0
+    end
     local noteOffsets = uniqueNoteOffsets(firstOffset, lastOffset)
     local svsToAdd = {}
     local svsToRemove = {}
     local svTimeIsAdded = {}
     local svsBetweenOffsets = getSVsBetweenOffsets(firstOffset, lastOffset)
     local svDisplacements = calculateDisplacementsFromSVs(svsBetweenOffsets, noteOffsets)
-    local nsvDisplacements = calculateDisplacementsFromNotes(noteOffsets, menuVars.noteSpacing)
+    local nsvDisplacements = calculateDisplacementsFromNotes(noteOffsets, noteSpacing)
     local stillDistance = menuVars.stillDistance
     if stillType == "Auto" then
         local candidateSVs = getSVsBetweenOffsets(firstOffset - 1, firstOffset)
@@ -4084,8 +4090,7 @@ function placeStillSVs(menuVars, firstOffset, lastOffset)
             stillDistance = lastSV.Multiplier * time
         end
     end
-    local autoD = menuVars.autoDistance
-    local finalDisplacements = calculateStillDisplacements(stillType, stillDistance, autoD,
+    local finalDisplacements = calculateStillDisplacements(stillType, stillDistance,
                                                            svDisplacements, nsvDisplacements)
     for i = 1, #noteOffsets do
         local noteOffset = noteOffsets[i]
@@ -4099,6 +4104,9 @@ function placeStillSVs(menuVars, firstOffset, lastOffset)
             local svMultiplierAt = getSVMultiplierAt(timeAt)
             local svMultiplierAfter = getSVMultiplierAt(timeAfter)
             local newMultiplierAt = -finalDisplacements[i] * multiplier + svMultiplierAt
+            if capybaraStill then
+                newMultiplierAt = newMultiplierAt + menuVars.prePlaceDistances[i][2]
+            end
             local newMultiplierAfter = svMultiplierAfter
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
@@ -4108,6 +4116,9 @@ function placeStillSVs(menuVars, firstOffset, lastOffset)
             svTimeIsAdded[timeBefore] = true
             local svMultiplierBefore = getSVMultiplierAt(timeBefore)
             local newMultiplierBefore = finalDisplacements[i] * multiplier + svMultiplierBefore
+            if capybaraStill then
+                newMultiplierBefore = newMultiplierBefore + menuVars.prePlaceDistances[i][1]
+            end
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, newMultiplierBefore))
         end
     end
