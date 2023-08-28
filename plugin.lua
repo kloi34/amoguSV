@@ -1,4 +1,4 @@
--- amoguSV v5.6 (14 August 2023)
+-- amoguSV v6.0 beta (28 August 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -88,6 +88,7 @@ EDIT_SV_TOOLS = {                  -- tools for editing SVs
     "Copy & Paste",
     "Displace Note",
     "Displace View",
+    "Fix LN Ends",
     "Flicker",
     "Measure",
     "Merge",
@@ -1079,6 +1080,7 @@ function editSVTab(globalVars)
     if toolName == "Copy & Paste"     then copyNPasteMenu(globalVars) end
     if toolName == "Displace Note"    then displaceNoteMenu(globalVars) end
     if toolName == "Displace View"    then displaceViewMenu(globalVars) end
+    if toolName == "Fix LN Ends"      then fixLNEndsMenu(globalVars) end
     if toolName == "Flicker"          then flickerMenu(globalVars) end
     if toolName == "Measure"          then measureSVMenu(globalVars) end
     if toolName == "Merge"            then simpleActionMenu("Merge", mergeSVs, globalVars, nil) end
@@ -1593,6 +1595,23 @@ function displaceViewMenu(globalVars)
     addSeparator()
     simpleActionMenu("Displace view", displaceViewSVs, globalVars, menuVars)
     saveVariables("displaceViewMenu", menuVars)
+end
+-- Creates the fix flipped LN ends menu
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function fixLNEndsMenu(globalVars)
+    local menuVars = {
+        fixedLNEndsAmount = 0
+    }
+    getVariables("fixLNEndsMenu", menuVars)
+    imgui.Text("Fixed "..menuVars.fixedLNEndsAmount.." flipped LN ends")
+    helpMarker("If there is a negative SV at an LN end, the LN end will be flipped. This is "..
+              "noticable especially for arrow skins and is jarring. This tool will fix that.")
+    addSeparator()
+    button("Fix flippped LN ends", ACTION_BUTTON_SIZE, fixFlippedLNEnds, globalVars, menuVars)
+    toolTip("You can also press ' T ' on your keyboard to do the same thing as this button")
+    ifKeyPressedThenExecute(keys.T, fixFlippedLNEnds, globalVars, menuVars)
+    saveVariables("fixLNEndsMenu", menuVars)
 end
 -- Creates the flicker menu
 -- Parameters
@@ -3043,13 +3062,14 @@ function chooseEditTool(globalVars)
     if svTool == "Copy & Paste"     then toolTip("Copy SVs and paste them somewhere else") end
     if svTool == "Displace Note"    then toolTip("Move where notes are hit on the screen") end
     if svTool == "Displace View"    then toolTip("Temporarily displace the playfield view") end
+    if svTool == "Fix LN Ends"      then toolTip("Fix flipped LN ends") end 
     if svTool == "Flicker"          then toolTip("Flash notes on and off the screen") end
     if svTool == "Measure"          then toolTip("Get info/stats about SVs in a section") end
     if svTool == "Merge"            then toolTip("Combine SVs that overlap") end
-    if svTool == "Reverse Scroll"   then toolTip("Reverses SV scroll direction (IRREVERSABLE)") end
+    if svTool == "Reverse Scroll"   then toolTip("Reverse SV scroll direction (IRREVERSABLE)") end
     if svTool == "Scale (Multiply)" then toolTip("Scale SV values to change note spacing") end
     if svTool == "Scale (Displace)" then toolTip("Scale SV values to change note spacing") end
-    if svTool == "Swap Notes"       then toolTip("Swaps positions of notes using SVs") end
+    if svTool == "Swap Notes"       then toolTip("Swap positions of notes using SVs") end
 end
 -- Lets you choose the final SV to place at the end of SV sets
 -- Returns whether or not the final SV type/value changed [Boolean]
@@ -5054,6 +5074,51 @@ function displaceViewSVs(globalVars, menuVars)
     end
     getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
     removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Fixes flipped LN ends by adding specific SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function fixFlippedLNEnds(globalVars, menuVars)
+    local fixedLNEndsCount = 0
+    local fixedLNEndTimes = {}
+    local svsToRemove = {}
+    local svsToAdd = {}
+    local svTimeIsAdded = {}
+    for _, hitObject in pairs(map.HitObjects) do
+        local lnEndTime = hitObject.EndTime
+        local isLN = lnEndTime ~= 0 
+        local lnHasNegativeSV = (getSVMultiplierAt(lnEndTime) < 0)
+        local hasntAlreadyBeenFixed = fixedLNEndTimes[lnEndTime] == nil
+        if isLN and lnHasNegativeSV and hasntAlreadyBeenFixed then
+            fixedLNEndTimes[lnEndTime] = true
+            local multiplier = getUsableOffsetMultiplier(lnEndTime)
+            local duration = 1 / multiplier
+            local timeAt = lnEndTime
+            local timeAfter = lnEndTime + duration
+            local timeAfterAfter = lnEndTime + duration + duration
+            svTimeIsAdded[timeAt] = true
+            svTimeIsAdded[timeAfter] = true
+            svTimeIsAdded[timeAfterAfter] = true
+            local svMultiplierAt = getSVMultiplierAt(timeAt)
+            local svMultiplierAfter = getSVMultiplierAt(timeAfter)
+            local svMultiplierAfterAfter = getSVMultiplierAt(timeAfterAfter)
+            local newMultiplierAt = 0
+            local newMultiplierAfter = svMultiplierAt + svMultiplierAfter
+            local newMultiplierAfterAFter = svMultiplierAfterAfter
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
+            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfterAfter,
+                                                              newMultiplierAfterAFter))
+            fixedLNEndsCount = fixedLNEndsCount + 1
+        end
+    end
+    local startOffset = map.HitObjects[1].StartTime
+    local endOffset = map.HitObjects[#map.HitObjects].EndTime
+    if endOffset == 0 then endOffset = map.HitObjects[#map.HitObjects].StartTime end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
+    menuVars.fixedLNEndsAmount = fixedLNEndsCount
 end
 -- Pastes copied SVs
 -- Parameters
