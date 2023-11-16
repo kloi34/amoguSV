@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (28 August 2023)
+-- amoguSV v6.0 beta (16 November 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -56,9 +56,11 @@ ANIMATION_OPTIONS = {              -- ways to add note animation data
 COLOR_THEMES = {                   -- available color themes for the plugin
     "Classic",
     "Strawberry",
+    "Amethyst",
+    "Tree",
+    "Barbie",
     "Incognito",
     "Incognito + RGB",
-    "Barbie",
     "Glass",
     "Glass + RGB",
     "RGB Gamer Mode"
@@ -115,7 +117,6 @@ EMOTICONS = {                      -- emoticons to visually clutter the plugin a
 }
 FINAL_SV_TYPES = {                 -- options for the last SV placed at the tail end of all SVs
     "Normal",
-    "Skip",
     "Custom"
 }
 FLICKER_TYPES = {                  -- types of flickers
@@ -473,7 +474,8 @@ function setPluginAppearance(globalVars)
     setPluginAppearanceStyles(styleTheme)
     setPluginAppearanceColors(globalVars, colorTheme)
     
-    local rgbColorTheme = colorTheme == "RGB Gamer Mode" or colorTheme == "Glass + RGB" or
+    local rgbColorTheme = colorTheme == "RGB Gamer Mode" or
+                          colorTheme == "Glass + RGB" or
                           colorTheme == "Incognito + RGB"
     if rgbColorTheme and (not globalVars.rgbPaused) then updateRGBColors(globalVars) end
 end
@@ -488,7 +490,7 @@ function setPluginAppearanceStyles(styleTheme)
     local addBorder = styleTheme == "Rounded + Border" or styleTheme == "Boxed + Border"
     local borderSize = 0
     if addBorder then borderSize = 1 end
-
+    
     imgui.PushStyleVar( imgui_style_var.FrameBorderSize,    borderSize           )
     imgui.PushStyleVar( imgui_style_var.WindowPadding,      { PADDING_WIDTH, 8 } )
     imgui.PushStyleVar( imgui_style_var.FramePadding,       { PADDING_WIDTH, 5 } )
@@ -571,6 +573,104 @@ function setPluginAppearanceColors(globalVars, colorTheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.43, 0.35, 1.00 } )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          { 0.90, 0.70, 0.00, 1.00 } )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.60, 0.00, 1.00 } )
+    elseif colorTheme == "Amethyst" then
+        imgui.PushStyleColor( imgui_col.WindowBg,               { 0.16, 0.00, 0.20, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Border,                 { 0.90, 0.00, 0.81, 0.30 } )
+        imgui.PushStyleColor( imgui_col.FrameBg,                { 0.40, 0.20, 0.40, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.50, 0.30, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.55, 0.35, 0.55, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBg,                { 0.31, 0.11, 0.35, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          { 0.41, 0.21, 0.45, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       { 0.41, 0.21, 0.45, 0.50 } )
+        imgui.PushStyleColor( imgui_col.CheckMark,              { 1.00, 0.80, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             { 0.95, 0.75, 0.95, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       { 1.00, 0.80, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Button,                 { 0.60, 0.40, 0.60, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.70, 0.50, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.80, 0.60, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Tab,                    { 0.50, 0.30, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabHovered,             { 0.70, 0.50, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabActive,              { 0.70, 0.50, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Header,                 { 1.00, 0.80, 1.00, 0.40 } )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          { 1.00, 0.80, 1.00, 0.50 } )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           { 1.00, 0.80, 1.00, 0.54 } )
+        imgui.PushStyleColor( imgui_col.Separator,              { 1.00, 0.80, 1.00, 0.30 } )
+        imgui.PushStyleColor( imgui_col.Text,                   { 1.00, 1.00, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 1.00, 0.80, 1.00, 0.40 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.60, 0.40, 0.60, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.70, 0.50, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.80, 0.60, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLines,              { 1.00, 0.80, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 1.00, 0.70, 0.30, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          { 1.00, 0.80, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 1.00, 0.70, 0.30, 1.00 } )
+    elseif colorTheme == "Tree" then
+        imgui.PushStyleColor( imgui_col.WindowBg,               { 0.20, 0.16, 0.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Border,                 { 0.81, 0.90, 0.00, 0.30 } )
+        imgui.PushStyleColor( imgui_col.FrameBg,                { 0.40, 0.40, 0.20, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         { 0.50, 0.50, 0.30, 1.00 } )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          { 0.55, 0.55, 0.35, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBg,                { 0.35, 0.31, 0.11, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          { 0.45, 0.41, 0.21, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       { 0.45, 0.41, 0.21, 0.50 } )
+        imgui.PushStyleColor( imgui_col.CheckMark,              { 1.00, 1.00, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             { 0.95, 0.95, 0.75, 1.00 } )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       { 1.00, 1.00, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Button,                 { 0.60, 0.60, 0.40, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          { 0.70, 0.70, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           { 0.80, 0.80, 0.60, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Tab,                    { 0.50, 0.50, 0.30, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabHovered,             { 0.70, 0.70, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TabActive,              { 0.70, 0.70, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.Header,                 { 1.00, 1.00, 0.80, 0.40 } )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          { 1.00, 1.00, 0.80, 0.50 } )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           { 1.00, 1.00, 0.80, 0.54 } )
+        imgui.PushStyleColor( imgui_col.Separator,              { 1.00, 1.00, 0.80, 0.30 } )
+        imgui.PushStyleColor( imgui_col.Text,                   { 1.00, 1.00, 1.00, 1.00 } )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         { 1.00, 1.00, 0.80, 0.40 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          { 0.60, 0.60, 0.40, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   { 0.70, 0.70, 0.50, 1.00 } )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    { 0.80, 0.80, 0.60, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLines,              { 1.00, 1.00, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       { 0.30, 1.00, 0.70, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          { 1.00, 1.00, 0.80, 1.00 } )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   { 0.30, 1.00, 0.70, 1.00 } )
+    elseif colorTheme == "Barbie" then
+        local pink = {0.79, 0.31, 0.55, 1.00}
+        local white = {0.95, 0.85, 0.87, 1.00}
+        local blue = {0.37, 0.64, 0.84, 1.00}
+        local pinkTint = {1.00, 0.86, 0.86, 0.40}
+        
+        imgui.PushStyleColor( imgui_col.WindowBg,               pink     )
+        imgui.PushStyleColor( imgui_col.Border,                 pinkTint )
+        imgui.PushStyleColor( imgui_col.FrameBg,                blue     )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         pinkTint )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          pinkTint )
+        imgui.PushStyleColor( imgui_col.TitleBg,                blue     )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          blue     )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       pink     )
+        imgui.PushStyleColor( imgui_col.CheckMark,              blue     )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             blue     )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       pinkTint )
+        imgui.PushStyleColor( imgui_col.Button,                 blue     )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          pinkTint )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           pinkTint )
+        imgui.PushStyleColor( imgui_col.Tab,                    blue     )
+        imgui.PushStyleColor( imgui_col.TabHovered,             pinkTint )
+        imgui.PushStyleColor( imgui_col.TabActive,              pinkTint )
+        imgui.PushStyleColor( imgui_col.Header,                 blue     )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          pinkTint )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           pinkTint )
+        imgui.PushStyleColor( imgui_col.Separator,              pinkTint )
+        imgui.PushStyleColor( imgui_col.Text,                   white    )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         pinkTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          pinkTint )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white    )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white    )
+        imgui.PushStyleColor( imgui_col.PlotLines,              pink     )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       pinkTint )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          pink     )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   pinkTint )
     elseif colorTheme == "Incognito" then
         local black = {0.00, 0.00, 0.00, 1.00}
         local white = {1.00, 1.00, 1.00, 1.00}
@@ -645,42 +745,6 @@ function setPluginAppearanceColors(globalVars, colorTheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       rgbColor  )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          white     )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   rgbColor  )
-    elseif colorTheme == "Barbie" then
-        local pink = {0.79, 0.31, 0.55, 1.00}
-        local white = {0.95, 0.85, 0.87, 1.00}
-        local blue = {0.37, 0.64, 0.84, 1.00}
-        local pinkTint = {1.00, 0.86, 0.86, 0.40}
-        
-        imgui.PushStyleColor( imgui_col.WindowBg,               pink     )
-        imgui.PushStyleColor( imgui_col.Border,                 pinkTint )
-        imgui.PushStyleColor( imgui_col.FrameBg,                blue     )
-        imgui.PushStyleColor( imgui_col.FrameBgHovered,         pinkTint )
-        imgui.PushStyleColor( imgui_col.FrameBgActive,          pinkTint )
-        imgui.PushStyleColor( imgui_col.TitleBg,                blue     )
-        imgui.PushStyleColor( imgui_col.TitleBgActive,          blue     )
-        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       pink     )
-        imgui.PushStyleColor( imgui_col.CheckMark,              blue     )
-        imgui.PushStyleColor( imgui_col.SliderGrab,             blue     )
-        imgui.PushStyleColor( imgui_col.SliderGrabActive,       pinkTint )
-        imgui.PushStyleColor( imgui_col.Button,                 blue     )
-        imgui.PushStyleColor( imgui_col.ButtonHovered,          pinkTint )
-        imgui.PushStyleColor( imgui_col.ButtonActive,           pinkTint )
-        imgui.PushStyleColor( imgui_col.Tab,                    blue     )
-        imgui.PushStyleColor( imgui_col.TabHovered,             pinkTint )
-        imgui.PushStyleColor( imgui_col.TabActive,              pinkTint )
-        imgui.PushStyleColor( imgui_col.Header,                 blue     )
-        imgui.PushStyleColor( imgui_col.HeaderHovered,          pinkTint )
-        imgui.PushStyleColor( imgui_col.HeaderActive,           pinkTint )
-        imgui.PushStyleColor( imgui_col.Separator,              pinkTint )
-        imgui.PushStyleColor( imgui_col.Text,                   white    )
-        imgui.PushStyleColor( imgui_col.TextSelectedBg,         pinkTint )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          pinkTint )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   white    )
-        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    white    )
-        imgui.PushStyleColor( imgui_col.PlotLines,              pink     )
-        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       pinkTint )
-        imgui.PushStyleColor( imgui_col.PlotHistogram,          pink     )
-        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   pinkTint )
     elseif colorTheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
@@ -899,7 +963,7 @@ function draw()
         startOffset = 0,
         endOffset = 0,
         placeBehaviorIndex = 1,
-        colorThemeIndex = 1,
+        colorThemeIndex = 3,
         styleThemeIndex = 1,
         cursorEffectIndex = 1,
         red = 0,
@@ -934,7 +998,8 @@ function draw()
 end
 -- Makes the main plugin window focused/active if Shift + Tab is pressed
 function setWindowFocusIfHotkeysPressed()
-    local shiftKeyPressedDown = utils.IsKeyDown(keys.LeftShift) or utils.IsKeyDown(keys.RightShift)
+    local shiftKeyPressedDown = utils.IsKeyDown(keys.LeftShift) or
+                                utils.IsKeyDown(keys.RightShift)
     local tabKeyPressed = utils.IsKeyPressed(keys.Tab)
     if shiftKeyPressedDown and tabKeyPressed then imgui.SetNextWindowFocus() end
 end
@@ -948,8 +1013,10 @@ function initializeNextWindowNotCollapsed(key)
 end
 -- Makes the plugin window centered if Ctrl + Shift + Tab is pressed
 function centerWindowIfHotkeysPressed()
-    local ctrlPressedDown = utils.IsKeyDown(keys.LeftControl) or utils.IsKeyDown(keys.RightControl)
-    local shiftPressedDown = utils.IsKeyDown(keys.LeftShift) or utils.IsKeyDown(keys.RightShift)
+    local ctrlPressedDown = utils.IsKeyDown(keys.LeftControl) or
+                            utils.IsKeyDown(keys.RightControl)
+    local shiftPressedDown = utils.IsKeyDown(keys.LeftShift) or
+                             utils.IsKeyDown(keys.RightShift)
     local tabPressed = utils.IsKeyPressed(keys.Tab)
     if not (ctrlPressedDown and shiftPressedDown and tabPressed) then return end
     
@@ -1052,7 +1119,7 @@ function explainHowToChangeDefaults()
     imgui.TextDisabled("How to permanently change default settings?")
     if not imgui.IsItemHovered() then return end
     imgui.BeginTooltip()
-    imgui.BulletText("Open the plugin file (\"plugin.lua\") in a text editor or code editor")
+    imgui.BulletText("Open the plugin file \"plugin.lua\" in a text editor or code editor")
     imgui.BulletText("Find the line with \"local globalVars = { \"")
     imgui.BulletText("Edit values in globalVars that correspond to a plugin setting")
     imgui.BulletText("Save the file with changes and reload the plugin")
@@ -1284,7 +1351,7 @@ function stutterMenu(globalVars)
         stutterDuration = 50,
         stuttersPerSection = 1,
         avgSV = 1,
-        finalSVIndex = 3,
+        finalSVIndex = 2,
         customSV = 1,
         linearlyChange = false,
         controlLastSV = false,
@@ -1327,7 +1394,7 @@ function telportStutterMenu(globalVars)
         useDistance = false,
         linearlyChange = false,
         avgSV = 1,
-        finalSVIndex = 3,
+        finalSVIndex = 2,
         customSV = 1
     }
     getVariables("teleportStutterMenu", menuVars)
@@ -1405,6 +1472,7 @@ function splitScrollAdvancedMenu(globalVars)
         distanceBack = 1000000,
         msPerFrame = 16,
         noteTimes2 = {},
+        svsInScroll1 = {},
         svsInScroll2 = {}
     }
     getVariables("splitScrollAdvancedMenu", menuVars)
@@ -1638,7 +1706,9 @@ function measureSVMenu(globalVars)
     local menuVars = {
         measuredNSVDistance = 0,
         measuredDistance = 0,
-        avgSV = 0
+        avgSV = 0,
+        firstNoteDisplacement = 0,
+        lastNoteDisplacement = 0
     }
     getVariables("measureMenu", menuVars)
     displayMeasuredStats(menuVars)
@@ -1887,6 +1957,10 @@ function displayMeasuredStats(menuVars)
                "places), calculated with SVs")
     imgui.Text("Average SV: "..menuVars.avgSV.."x")
     helpMarker("(rounded to 5 decimal places)")
+    imgui.Text("First Note Displacement: "..menuVars.firstNoteDisplacement.." msx")
+    helpMarker("(calculated by amoguSV displacement metrics + rounded to 5 decimal places)")
+    imgui.Text("Last Note Displacement: "..menuVars.lastNoteDisplacement.." msx")
+    helpMarker("(calculated by amoguSV displacement metrics + rounded to 5 decimal places)")
 end
 -- Displays stats for stutter SVs
 -- Parameters
@@ -2011,7 +2085,7 @@ function getSettingVars(svType)
             startSV = 1.5,
             endSV = 0.5,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     elseif svType == "Exponential" then
@@ -2021,7 +2095,7 @@ function getSettingVars(svType)
             verticalShift = 0,
             avgSV = 1,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     elseif svType == "Bezier" then
@@ -2033,7 +2107,7 @@ function getSettingVars(svType)
             verticalShift = 0,
             avgSV = 1,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     elseif svType == "Hermite" then
@@ -2043,7 +2117,7 @@ function getSettingVars(svType)
             verticalShift = 0,
             avgSV = 1,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     elseif svType == "Sinusoidal" then
@@ -2056,7 +2130,7 @@ function getSettingVars(svType)
             periodsShift = 0.25,
             svsPerQuarterPeriod = 8,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     elseif svType == "Circular" then
@@ -2066,7 +2140,7 @@ function getSettingVars(svType)
             avgSV = 1,
             verticalShift = 0,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1,
             dontNormalize = false
         }
@@ -2076,7 +2150,7 @@ function getSettingVars(svType)
             randomScale = 2,
             avgSV = 1,
             svPoints = 16,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     elseif svType == "Custom" then
@@ -2084,7 +2158,7 @@ function getSettingVars(svType)
             svMultipliers = {1.5, -0.5, 1.5, -0.5, 1.5, -0.5, 1.5, -0.5},
             selectedMultiplierIndex = 1,
             svPoints = 8,
-            finalSVIndex = 3,
+            finalSVIndex = 2,
             customSV = 1
         }
     end
@@ -2243,7 +2317,6 @@ function updateFinalSV(finalSVIndex, svMultipliers, customSV)
     local finalSVType = FINAL_SV_TYPES[finalSVIndex]
     if finalSVType == "Normal" then return end
     table.remove(svMultipliers)
-    if finalSVType == "Skip" then return end
     table.insert(svMultipliers, customSV)
 end
 -- Updates scale stats for SV graphs
@@ -2320,6 +2393,18 @@ end
 
 ----------------------------------------------------------------------- Notes, SVs, Offsets, Tables
 
+-- Adds the final SV to the SVs to add list if there isn't an SV there already
+-- Parameters
+--    svsToAdd          : list of SVs to add [Table]
+--    endOffset         : millisecond time of the final SV [Int]
+--    finalSVMultiplier : the final SV's multiplier [Int/Float]
+function addFinalSV(svsToAdd, endOffset, finalSVMultiplier)
+    local sv = map.GetScrollVelocityAt(endOffset) 
+    local svExistsAtEndOffset = sv and (sv.StartTime == endOffset)
+    if svExistsAtEndOffset then return end
+    
+    table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, finalSVMultiplier))
+end
 -- Constructs a new reverse-order table from an existing table
 -- Returns the reversed table [Table]
 -- Parameters
@@ -3066,7 +3151,7 @@ function chooseEditTool(globalVars)
     if svTool == "Flicker"          then toolTip("Flash notes on and off the screen") end
     if svTool == "Measure"          then toolTip("Get info/stats about SVs in a section") end
     if svTool == "Merge"            then toolTip("Combine SVs that overlap") end
-    if svTool == "Reverse Scroll"   then toolTip("Reverse SV scroll direction (IRREVERSABLE)") end
+    if svTool == "Reverse Scroll"   then toolTip("Reverse the scroll direction using SVs") end
     if svTool == "Scale (Multiply)" then toolTip("Scale SV values to change note spacing") end
     if svTool == "Scale (Displace)" then toolTip("Scale SV values to change note spacing") end
     if svTool == "Swap Notes"       then toolTip("Swap positions of notes using SVs") end
@@ -3090,6 +3175,7 @@ function chooseFinalSV(settingVars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.5)
     local comboIndex = oldIndex - 1
     _, comboIndex = imgui.Combo("Final SV", comboIndex, FINAL_SV_TYPES, #FINAL_SV_TYPES)
+    helpMarker("Final SV won't be placed if there's already an SV at the end time")
     if finalSVType ~= "Custom" then
         imgui.Unindent(DEFAULT_WIDGET_WIDTH * 0.35 + 24)
     end
@@ -3283,7 +3369,7 @@ function choosePlaceSVType(globalVars)
     _, comboIndex = imgui.Combo("##placetype", comboIndex, PLACE_TYPES, #PLACE_TYPES)
     globalVars.placeTypeIndex = comboIndex + 1
     local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
-    if placeType == "Still" then toolTip("Still makes notes keep the normal distance apart") end
+    if placeType == "Still" then toolTip("Still keeps notes at normal distance/spacing apart") end
 end
 -- Lets you choose the variability scale of randomness
 -- Returns whether or not the variability value changed [Boolean]
@@ -3593,6 +3679,7 @@ end
 function chooseUseDistance(menuVars)
     _, menuVars.useDistance = imgui.Checkbox("Use distance for start SV", menuVars.useDistance)
 end
+
 ---------------------------------------------------------------------------------------------------
 -- Doing SV Stuff ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -3953,17 +4040,11 @@ function placeStutterSVs(globalVars, menuVars)
             stutterIndex = stutterIndex + 1
         end
     end
-    local finalSVType = FINAL_SV_TYPES[menuVars.finalSVIndex]
-    local hasFinalSV = finalSVType ~= "Skip"
-    if hasFinalSV then
-        local lastMultiplier
-        if menuVars.linearlyChange then
-            lastMultiplier = menuVars.svMultipliers2[3]
-        else
-            lastMultiplier = menuVars.svMultipliers[3]
-        end
-        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, lastMultiplier))
+    local lastMultiplier = menuVars.svMultipliers[3]
+    if menuVars.linearlyChange then
+        lastMultiplier = menuVars.svMultipliers2[3]
     end
+    addFinalSV(svsToAdd, lastOffset, lastMultiplier)
     local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
     if placeBehavior == "Replace old SVs" then
         svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
@@ -4017,9 +4098,9 @@ function placeTeleportStutterSVs(globalVars, menuVars)
     
     local finalSVType = FINAL_SV_TYPES[menuVars.finalSVIndex]
     if finalSVType == "Custom" then
-        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, menuVars.customSV))
+        addFinalSV(svsToAdd, lastOffset, menuVars.customSV)
     elseif finalSVType == "Normal" then
-        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, menuVars.avgSV))
+        addFinalSV(svsToAdd, lastOffset, menuVars.avgSV)
     end
     
     local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
@@ -4065,11 +4146,10 @@ function placeSVs(globalVars, menuVars)
             table.insert(svsToAdd, utils.CreateScrollVelocity(offset, multiplier))
         end
     end
-    
     local hasFinalSV = #menuVars.svDistances == numMultipliers
     if hasFinalSV then
         local lastMultiplier = menuVars.svMultipliers[numMultipliers]
-        table.insert(svsToAdd, utils.CreateScrollVelocity(lastOffset, lastMultiplier))
+        addFinalSV(svsToAdd, lastOffset, lastMultiplier)
     end
     
     local placeBehavior = PLACE_BEHAVIORS[globalVars.placeBehaviorIndex]
@@ -4761,6 +4841,24 @@ function measureSVs(globalVars, menuVars)
     if menuVars.measuredNSVDistance ~= 0 then
         menuVars.avgSV = round(displacement / menuVars.measuredNSVDistance, 5)
     end
+    
+    local multiplierStart = getUsableOffsetMultiplier(startOffset)
+    local durationStart = 1 / multiplierStart
+    local start = startOffset
+    local startAfter = startOffset + durationStart
+    local startMultiplier = getSVMultiplierAt(start)
+    local startAfterMultiplier = getSVMultiplierAt(startAfter)
+    local unroundedStartDisp = -(startMultiplier - startAfterMultiplier) * durationStart
+    menuVars.firstNoteDisplacement = round(unroundedStartDisp, 5)
+    
+    local multiplierEnd = getUsableOffsetMultiplier(endOffset)
+    local durationEnd = 1 / multiplierEnd
+    local endBefore = endOffset - durationEnd
+    local endBeforeBefore = endBefore - durationEnd
+    local endBeforeMultiplier = getSVMultiplierAt(endBefore)
+    local endBeforeBeforeMultiplier = getSVMultiplierAt(endBeforeBefore)
+    local unroundedEndDisp = (endBeforeMultiplier - endBeforeBeforeMultiplier) * durationEnd
+    menuVars.lastNoteDisplacement = round(unroundedEndDisp, 5)
 end
 -- Merges SVs
 -- Parameters
@@ -4909,11 +5007,7 @@ function scaleDisplaceSVs(globalVars, menuVars)
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt2, newMultiplierAt))
         end
     end
-    local sv = map.GetScrollVelocityAt(endOffset) 
-    local svExistsAtEndOffset = sv and (sv.StartTime == endOffset)
-    if not svExistsAtEndOffset then
-        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, getSVMultiplierAt(endOffset)))
-    end
+    addFinalSV(svsToAdd, endOffset, getSVMultiplierAt(endOffset))
     getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
@@ -5067,11 +5161,7 @@ function displaceViewSVs(globalVars, menuVars)
         table.insert(svsToAdd, utils.CreateScrollVelocity(time1At, newMultiplierAt))
         table.insert(svsToAdd, utils.CreateScrollVelocity(time1After, newMultiplierAfter))
     end
-    local sv = map.GetScrollVelocityAt(endOffset) 
-    local svExistsAtEndOffset = sv and (sv.StartTime == endOffset)
-    if not svExistsAtEndOffset then
-        table.insert(svsToAdd, utils.CreateScrollVelocity(endOffset, getSVMultiplierAt(endOffset)))
-    end
+    addFinalSV(svsToAdd, endOffset, getSVMultiplierAt(endOffset))
     getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
@@ -5105,11 +5195,11 @@ function fixFlippedLNEnds(globalVars, menuVars)
             local svMultiplierAfterAfter = getSVMultiplierAt(timeAfterAfter)
             local newMultiplierAt = 0
             local newMultiplierAfter = svMultiplierAt + svMultiplierAfter
-            local newMultiplierAfterAFter = svMultiplierAfterAfter
+            local newMultiplierAfterAfter = svMultiplierAfterAfter
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, newMultiplierAt))
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, newMultiplierAfter))
             table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfterAfter,
-                                                              newMultiplierAfterAFter))
+                                                              newMultiplierAfterAfter))
             fixedLNEndsCount = fixedLNEndsCount + 1
         end
     end
