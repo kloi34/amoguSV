@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (16 November 2023)
+-- amoguSV v6.0 beta (19 November 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -35,6 +35,10 @@ RADIO_BUTTON_SPACING = 7.5         -- value determining spacing between radio bu
 SAMELINE_SPACING = 5               -- value determining spacing between GUI items on the same row
 ACTION_BUTTON_SIZE = {             -- dimensions of the button that does important things
     1.6 * DEFAULT_WIDGET_WIDTH - 1,
+    1.6 * DEFAULT_WIDGET_HEIGHT
+}
+HALF_ACTION_BUTTON_SIZE = {        -- dimensions of the button that does kinda important things
+    0.8 * DEFAULT_WIDGET_WIDTH - 3,
     1.6 * DEFAULT_WIDGET_HEIGHT
 }
 SECONDARY_BUTTON_SIZE = {          -- dimensions of a button that does less important things
@@ -1085,7 +1089,7 @@ end
 -- Provides links relevant to the plugin
 function showInfoLinks()
     if not imgui.CollapsingHeader("Links") then return end
-    provideLink("Quaver SV Guide", "https://kloi34.github.io/QuaverSVGuide")
+    provideLink("Quaver SV Guide", "https://docs.google.com/document/d/1ug_WV_BI720617ybj4zuHhjaQMwa0PPekZyJoa17f-I/edit?usp=sharing")
     provideLink("GitHub Repository", "https://github.com/kloi34/amoguSV")
 end
 -- Lets you choose global plugin behavior settings
@@ -1485,13 +1489,15 @@ function splitScrollAdvancedMenu(globalVars)
     addSeparator()
     local noNoteTimesInitially = #menuVars.noteTimes2 == 0
     addOrClearNoteTimes(menuVars, noNoteTimesInitially)
-    if noNoteTimesInitially then saveVariables("splitScrollAdvancedMenu", menuVars) return end
     
     addSeparator()
-    local noSVsInitially = #menuVars.svsInScroll2 == 0
-    addOrClearSVs(menuVars, noSVsInitially)
+    local no1stSVsInitially = #menuVars.svsInScroll1 == 0
+    local no2ndSVsInitially = #menuVars.svsInScroll2 == 0
+    buttonsForSVsInScroll1(menuVars, no1stSVsInitially)
+    addSeparator()
+    buttonsForSVsInScroll2(menuVars, no2ndSVsInitially)
     saveVariables("splitScrollAdvancedMenu", menuVars) 
-    if noSVsInitially then return end
+    if noNoteTimesInitially or no1stSVsInitially or no2ndSVsInitially then return end
     
     addSeparator()
     simpleActionMenu("Place Splitscroll", placeAdvancedSplitScrollSVs, globalVars, menuVars)
@@ -1832,25 +1838,81 @@ function addOrClearNoteTimes(menuVars, noNoteTimesInitially)
     if not imgui.Button("Clear all 2nd scroll note times", ACTION_BUTTON_SIZE) then return end
     menuVars.noteTimes2 = {}
 end
--- Adds or clears SVs for the 2nd scroll for the splitscroll menu
+-- Makes buttons for adding and clearing SVs for the 1st scroll for the splitscroll menu
 -- Parameters
 --    menuVars       : list of variables used for the current SV menu [Table]
 --    noSVsInitially : whether or not there were SVs initially [Boolean]
-function addOrClearSVs(menuVars, noSVsInitially)
+function buttonsForSVsInScroll1(menuVars, noSVsInitially)
+    imgui.Text(#menuVars.svsInScroll1.." SVs assigned for 1st scroll")
+    local function addFirstScrollSVs(menuVars)
+        local buttonText = "Assign SVs between\nselected notes to 1st scroll"
+        if not imgui.Button(buttonText, ACTION_BUTTON_SIZE) then return end
+        local offsets = uniqueSelectedNoteOffsets()
+        if #offsets < 2 then return end
+        menuVars.svsInScroll1 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
+    end
+    if noSVsInitially then addFirstScrollSVs(menuVars) return end
+    buttonClear1stScrollSVs(menuVars)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    buttonPlace1stScrollSVs(menuVars)
+end
+-- Makes buttons for adding and clearing SVs for the 2nd scroll for the splitscroll menu
+-- Parameters
+--    menuVars       : list of variables used for the current SV menu [Table]
+--    noSVsInitially : whether or not there were SVs initially [Boolean]
+function buttonsForSVsInScroll2(menuVars, noSVsInitially)
     imgui.Text(#menuVars.svsInScroll2.." SVs assigned for 2nd scroll")
-    helpMarker("Steps:\n1. ) Place SVs for 2nd scroll:\n2. ) Assign SVs to 2nd scroll with the "..
-               "button\n3. ) Delete all SVs used for 2nd scroll (use \"Delete SVs\" tab)\n4. "..
-               ") Place SVs for 1st scroll\n5. ) Place splitscroll SVs")
     local function addSecondScrollSVs(menuVars)
-        if imgui.Button("Assign SVs between selected\nnotes for 2nd scroll", ACTION_BUTTON_SIZE) then
-            local offsets = uniqueSelectedNoteOffsets()
-            if #offsets < 2 then return end
-            menuVars.svsInScroll2 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
-        end
+        local buttonText = "Assign SVs between\nselected notes to 2nd scroll"
+        if not imgui.Button(buttonText, ACTION_BUTTON_SIZE) then return end
+        local offsets = uniqueSelectedNoteOffsets()
+        if #offsets < 2 then return end
+        
+        menuVars.svsInScroll2 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
     end
     if noSVsInitially then addSecondScrollSVs(menuVars) return end
-    if not imgui.Button("Clear assigned 2nd scroll SVs", ACTION_BUTTON_SIZE) then return end
+    buttonClear2ndScrollSVs(menuVars)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    buttonPlace2ndScrollSVs(menuVars)
+end
+-- Makes a button that clears SVs for the 1st scroll for the splitscroll menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function buttonClear1stScrollSVs(menuVars)
+    if not imgui.Button("Clear assigned\n 1st scroll SVs", HALF_ACTION_BUTTON_SIZE) then return end
+    menuVars.svsInScroll1 = {}
+end
+-- Makes a button that places SVs assigned for 1st scroll for the splitscroll menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function buttonPlace1stScrollSVs(menuVars)
+    if not imgui.Button("Re-place assigned\n1st scroll SVs", HALF_ACTION_BUTTON_SIZE) then return end
+    local svsToAdd = menuVars.svsInScroll1
+    local startOffset = svsToAdd[1].StartTime
+    local extraOffset = 1/128
+    local endOffset = svsToAdd[#svsToAdd].StartTime + extraOffset
+    local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Makes a button that clears SVs for the 2nd scroll for the splitscroll menu
+-- Parameters
+--    menuVars       : list of variables used for the current SV menu [Table]
+--    noSVsInitially : whether or not there were SVs initially [Boolean]
+function buttonClear2ndScrollSVs(menuVars)
+    if not imgui.Button("Clear assigned\n2nd scroll SVs", HALF_ACTION_BUTTON_SIZE) then return end
     menuVars.svsInScroll2 = {}
+end
+-- Makes a button that places SVs assigned for 2nd scroll for the splitscroll menu
+-- Parameters
+--    menuVars : list of variables used for the current SV menu [Table]
+function buttonPlace2ndScrollSVs(menuVars)
+    if not imgui.Button("Re-place assigned\n2nd scroll SVs", HALF_ACTION_BUTTON_SIZE) then return end
+    local svsToAdd = menuVars.svsInScroll2
+    local startOffset = svsToAdd[1].StartTime
+    local extraOffset = 1/128
+    local endOffset = svsToAdd[#svsToAdd].StartTime + extraOffset
+    local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Adjusts the number of SV multipliers available for the custom SV menu
 -- Parameters
@@ -1958,9 +2020,11 @@ function displayMeasuredStats(menuVars)
     imgui.Text("Average SV: "..menuVars.avgSV.."x")
     helpMarker("(rounded to 5 decimal places)")
     imgui.Text("First Note Displacement: "..menuVars.firstNoteDisplacement.." msx")
-    helpMarker("(calculated by amoguSV displacement metrics + rounded to 5 decimal places)")
+    helpMarker("(calculated by amoguSV displacement metrics + rounded to 5 decimal places, "..
+               "so it may not work on older maps or certain spots)")
     imgui.Text("Last Note Displacement: "..menuVars.lastNoteDisplacement.." msx")
-    helpMarker("(calculated by amoguSV displacement metrics + rounded to 5 decimal places)")
+    helpMarker("(calculated by amoguSV displacement metrics + rounded to 5 decimal places, "..
+               "so it may not work on older maps or certain spots)")
 end
 -- Displays stats for stutter SVs
 -- Parameters
@@ -2393,7 +2457,7 @@ end
 
 ----------------------------------------------------------------------- Notes, SVs, Offsets, Tables
 
--- Adds the final SV to the SVs to add list if there isn't an SV there already
+-- Adds the final SV to the "svsToAdd" list if there isn't an SV at the end offset already
 -- Parameters
 --    svsToAdd          : list of SVs to add [Table]
 --    endOffset         : millisecond time of the final SV [Int]
@@ -4411,7 +4475,7 @@ function placeAdvancedSplitScrollSVs(globalVars, menuVars)
     local noteIndex = 2
     local sv1Index = 1
     local sv2Index = 1
-    local svsIn1 = getSVsBetweenOffsets(firstOffset, lastOffset)
+    local svsIn1 = menuVars.svsInScroll1
     local svsIn2 = menuVars.svsInScroll2
     if #svsIn1 == 0 or svsIn1[1].StartTime ~= firstOffset then
         local newStartSV = utils.CreateScrollVelocity(firstOffset, getSVMultiplierAt(firstOffset))
