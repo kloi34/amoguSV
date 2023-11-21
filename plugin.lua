@@ -1,4 +1,4 @@
--- amoguSV v6.0 beta (19 November 2023)
+-- amoguSV v6.0 beta (21 November 2023)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -45,6 +45,10 @@ SECONDARY_BUTTON_SIZE = {          -- dimensions of a button that does less impo
     0.3 * DEFAULT_WIDGET_WIDTH,
     DEFAULT_WIDGET_HEIGHT - 2
 }
+EXPORT_BUTTON_SIZE = {             -- dimensions of the export menu settings button
+    40,
+    DEFAULT_WIDGET_HEIGHT - 2
+}
 
 ------------------------------------------------------------------------------ SV/Time restrictions
 
@@ -65,6 +69,8 @@ COLOR_THEMES = {                   -- available color themes for the plugin
     "Barbie",
     "Incognito",
     "Incognito + RGB",
+    "Tobi's Glass",
+    "Tobi's RGB Glass",
     "Glass",
     "Glass + RGB",
     "RGB Gamer Mode"
@@ -749,6 +755,80 @@ function setPluginAppearanceColors(globalVars, colorTheme)
         imgui.PushStyleColor( imgui_col.PlotLinesHovered,       rgbColor  )
         imgui.PushStyleColor( imgui_col.PlotHistogram,          white     )
         imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   rgbColor  )
+    elseif colorTheme == "Tobi's Glass" then
+        local transparent = {0.00, 0.00, 0.00, 0.70}
+        local transparentWhite = {0.30, 0.30, 0.30, 0.50}
+        local whiteTint = {1.00, 1.00, 1.00, 0.30}
+        local buttonColor = {0.14, 0.24, 0.28, 0.80}
+        local frameColor = {0.24, 0.34, 0.38, 1.00}
+        local white = {1.00, 1.00, 1.00, 1.00}  
+
+        imgui.PushStyleColor( imgui_col.WindowBg,               transparent      )
+        imgui.PushStyleColor( imgui_col.Border,                 frameColor       )
+        imgui.PushStyleColor( imgui_col.FrameBg,                buttonColor      )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         whiteTint        )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.TitleBg,                transparent      )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent      )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent      )
+        imgui.PushStyleColor( imgui_col.CheckMark,              white            )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             whiteTint        )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       transparentWhite )
+        imgui.PushStyleColor( imgui_col.Button,                 buttonColor      )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           whiteTint        )
+        imgui.PushStyleColor( imgui_col.Tab,                    transparent      )
+        imgui.PushStyleColor( imgui_col.TabHovered,             whiteTint        )
+        imgui.PushStyleColor( imgui_col.TabActive,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.Header,                 transparent      )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.HeaderActive,           whiteTint        )
+        imgui.PushStyleColor( imgui_col.Separator,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.Text,                   white            )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         whiteTint        )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   transparentWhite )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    transparentWhite )
+        imgui.PushStyleColor( imgui_col.PlotLines,              whiteTint        )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       transparentWhite )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          whiteTint        )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   transparentWhite )
+    elseif colorTheme == "Tobi's RGB Glass" then
+        local transparent = {0.00, 0.00, 0.00, 0.85}
+        local activeColor = {globalVars.red, globalVars.green, globalVars.blue, 0.8}
+        local colorTint = {globalVars.red, globalVars.green, globalVars.blue, 0.3}
+        local white = {1.00, 1.00, 1.00, 1.00}
+        
+        imgui.PushStyleColor( imgui_col.WindowBg,               transparent )
+        imgui.PushStyleColor( imgui_col.Border,                 activeColor )
+        imgui.PushStyleColor( imgui_col.FrameBg,                transparent )
+        imgui.PushStyleColor( imgui_col.FrameBgHovered,         colorTint   )
+        imgui.PushStyleColor( imgui_col.FrameBgActive,          colorTint   )
+        imgui.PushStyleColor( imgui_col.TitleBg,                transparent )
+        imgui.PushStyleColor( imgui_col.TitleBgActive,          transparent )
+        imgui.PushStyleColor( imgui_col.TitleBgCollapsed,       transparent )
+        imgui.PushStyleColor( imgui_col.CheckMark,              activeColor )
+        imgui.PushStyleColor( imgui_col.SliderGrab,             colorTint   )
+        imgui.PushStyleColor( imgui_col.SliderGrabActive,       activeColor )
+        imgui.PushStyleColor( imgui_col.Button,                 transparent )
+        imgui.PushStyleColor( imgui_col.ButtonHovered,          colorTint   )
+        imgui.PushStyleColor( imgui_col.ButtonActive,           colorTint   )
+        imgui.PushStyleColor( imgui_col.Tab,                    transparent )
+        imgui.PushStyleColor( imgui_col.TabHovered,             colorTint   )
+        imgui.PushStyleColor( imgui_col.TabActive,              colorTint   )
+        imgui.PushStyleColor( imgui_col.Header,                 transparent )
+        imgui.PushStyleColor( imgui_col.HeaderHovered,          colorTint   ) 
+        imgui.PushStyleColor( imgui_col.HeaderActive,           colorTint   )
+        imgui.PushStyleColor( imgui_col.Separator,              colorTint   )
+        imgui.PushStyleColor( imgui_col.Text,                   white       )
+        imgui.PushStyleColor( imgui_col.TextSelectedBg,         colorTint   )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrab,          colorTint   )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabHovered,   activeColor )
+        imgui.PushStyleColor( imgui_col.ScrollbarGrabActive,    activeColor )
+        imgui.PushStyleColor( imgui_col.PlotLines,              activeColor )
+        imgui.PushStyleColor( imgui_col.PlotLinesHovered,       colorTint   )
+        imgui.PushStyleColor( imgui_col.PlotHistogram,          activeColor )
+        imgui.PushStyleColor( imgui_col.PlotHistogramHovered,   colorTint   )
     elseif colorTheme == "Glass" then
         local transparent = {0.00, 0.00, 0.00, 0.25}
         local transparentWhite = {1.00, 1.00, 1.00, 0.70}
@@ -909,7 +989,175 @@ function saveVariables(listName, variables)
         state.SetValue(listName..key, value)
     end
 end
-
+-- Returns menuVars for the menu at Place SVs > Standard
+function getStandardPlaceMenuVars()
+    local menuVars = {
+        svTypeIndex = 1,
+        svMultipliers = {},
+        svDistances = {},
+        svGraphStats = createSVGraphStats(),
+        svStats = createSVStats(),
+        interlace = false,
+        interlaceRatio = -0.5
+    }
+    getVariables("placeStandardMenu", menuVars)
+    return menuVars
+end
+-- Returns menuVars for the menu at Place SVs > Special
+function getSpecialPlaceMenuVars()
+    local menuVars = {
+        svTypeIndex = 1
+    }
+    getVariables("placeSpecialMenu", menuVars)
+    return menuVars
+end
+-- Returns menuVars for the menu at Place SVs > Still
+function getStillPlaceMenuVars()
+    local menuVars = {
+        svTypeIndex = 1,
+        noteSpacing = 1,
+        stillTypeIndex = 1,
+        stillDistance = 200,
+        prePlaceDistances = {},
+        svMultipliers = {},
+        svDistances = {},
+        svGraphStats = createSVGraphStats(),
+        svStats = createSVStats(),
+        interlace = false,
+        interlaceRatio = -0.5
+    }
+    getVariables("placeStillMenu", menuVars)
+    return menuVars
+end
+-- Gets the current "Place SV" menu's setting variables
+-- Parameters
+--    svType : name of the current menu's type of SV [Table]
+function getSettingVars(svType)
+    local settingVars
+    if svType == "Linear" then
+        settingVars = {
+            startSV = 1.5,
+            endSV = 0.5,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    elseif svType == "Exponential" then
+        settingVars = {
+            behaviorIndex = 1,
+            intensity = 30,
+            verticalShift = 0,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    elseif svType == "Bezier" then
+        settingVars = {
+            x1 = 0,
+            y1 = 0,
+            x2 = 0,
+            y2 = 1,
+            verticalShift = 0,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    elseif svType == "Hermite" then
+        settingVars = {
+            startSV = 0,
+            endSV = 0,
+            verticalShift = 0,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    elseif svType == "Sinusoidal" then
+        settingVars = {
+            startSV = 2,
+            endSV = 2,
+            curveSharpness = 50,
+            verticalShift = 1,
+            periods = 1,
+            periodsShift = 0.25,
+            svsPerQuarterPeriod = 8,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    elseif svType == "Circular" then
+        settingVars = {
+            behaviorIndex = 1,
+            arcPercent = 50,
+            avgSV = 1,
+            verticalShift = 0,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1,
+            dontNormalize = false
+        }
+    elseif svType == "Random" then
+        settingVars = {
+            randomTypeIndex = 1,
+            randomScale = 2,
+            avgSV = 1,
+            svPoints = 16,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    elseif svType == "Custom" then
+        settingVars = {
+            svMultipliers = {1.5, -0.5, 1.5, -0.5, 1.5, -0.5, 1.5, -0.5},
+            selectedMultiplierIndex = 1,
+            svPoints = 8,
+            finalSVIndex = 2,
+            customSV = 1
+        }
+    end
+    getVariables(svType.."Settings", settingVars)
+    return settingVars
+end
+-- Returns menuVars for the menu at Place SVs > Special > Stutter
+function getStutterMenuVars()
+    local menuVars = {
+        startSV = 1.5,
+        endSV = 0.5,
+        stutterDuration = 50,
+        stuttersPerSection = 1,
+        avgSV = 1,
+        finalSVIndex = 2,
+        customSV = 1,
+        linearlyChange = false,
+        controlLastSV = false,
+        svMultipliers = {},
+        svDistances = {},
+        svGraphStats = createSVGraphStats(),
+        svMultipliers2 = {},
+        svDistances2 = {},
+        svGraph2Stats = createSVGraphStats()
+    }
+    getVariables("stutterMenu", menuVars)
+    return menuVars
+end
+-- Returns menuVars for the menu at Place SVs > Special > Teleport Stutter
+function getTeleportStutterMenuVars()
+    local menuVars = {
+        svPercent = 50,
+        svPercent2 = 0,
+        distance = 50,
+        mainSV = 0.5,
+        mainSV2 = 0,
+        useDistance = false,
+        linearlyChange = false,
+        avgSV = 1,
+        finalSVIndex = 2,
+        customSV = 1
+    }
+    getVariables("teleportStutterMenu", menuVars)
+    return menuVars
+end
 ---------------------------------------------------------------------------------------------------
 -- Handy GUI elements -----------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -978,6 +1226,9 @@ function draw()
         showNoteMover = false,
         editToolIndex = 1,
         placeTypeIndex = 1,
+        showExportImportMenu = false,
+        exportText = "",
+        importText = "",
         debugText = "debuggy capybara"
     }
     getVariables("globalVars", globalVars)
@@ -1135,6 +1386,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function placeSVTab(globalVars)
     choosePlaceSVType(globalVars)
+    exportImportSettingsButton(globalVars)
     local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
     if placeType == "Standard" then placeStandardSVMenu(globalVars) end
     if placeType == "Special"  then placeSpecialSVMenu(globalVars) end
@@ -1174,25 +1426,17 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeStandardSVMenu(globalVars)
-    local menuVars = {
-        svTypeIndex = 1,
-        svMultipliers = {},
-        svDistances = {},
-        svGraphStats = createSVGraphStats(),
-        svStats = createSVStats(),
-        interlace = false,
-        interlaceRatio = -0.5
-    }
-    getVariables("placeStandardMenu", menuVars)
+    local menuVars = getStandardPlaceMenuVars()
     local needSVUpdate = #menuVars.svMultipliers == 0
     
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
     addSeparator()
     
-    settingsGraphsAndPlaceMenu(globalVars, menuVars, needSVUpdate)
-    saveVariables("placeStandardMenu", menuVars)
+    local alreadySaved = settingsGraphsAndPlaceMenu(globalVars, menuVars, needSVUpdate)
+    if not alreadySaved then saveVariables("placeStandardMenu", menuVars) end
 end
 -- Creates part of the menu for placing standard or still SVs: settings, graphs, and place button
+-- Returns whether or not settings have been saved already [Boolean]
 -- Parameters
 --    globalVars   : list of variables used globally across all menus [Table]
 --    menuVars     : list of setting variables for the current menu [Table]
@@ -1200,6 +1444,12 @@ end
 function settingsGraphsAndPlaceMenu(globalVars, menuVars, needSVUpdate)
     local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
     local settingVars = getSettingVars(currentSVType)
+    
+    if globalVars.showExportImportMenu then
+        exportImportSettingsMenu(globalVars, menuVars, settingVars)
+        return true
+    end
+    
     local menuFunctionName = string.lower(currentSVType).."SettingsMenu"
     needSVUpdate = _G[menuFunctionName](settingVars) or needSVUpdate
     
@@ -1213,6 +1463,7 @@ function settingsGraphsAndPlaceMenu(globalVars, menuVars, needSVUpdate)
     addSeparator()
     simpleActionMenu("Place", placeSVs, globalVars, menuVars)
     saveVariables(currentSVType.."Settings", settingVars)
+    return false
 end
 
 -- Creates the menu for linear SV settings
@@ -1331,42 +1582,32 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeSpecialSVMenu(globalVars)
-    local menuVars = {
-        svTypeIndex = 1
-    }
-    getVariables("placeSpecialMenu", menuVars)
+    local menuVars = getSpecialPlaceMenuVars()
     chooseSpecialSVType(menuVars)
     local currentSVType = SPECIAL_SVS[menuVars.svTypeIndex]
-    if currentSVType == "Stutter"                then stutterMenu(globalVars) end
-    if currentSVType == "Teleport Stutter"       then telportStutterMenu(globalVars) end
+    local alreadySaved = false
+    if currentSVType == "Stutter"                then
+        alreadySaved = stutterMenu(globalVars, menuVars) end
+    if currentSVType == "Teleport Stutter"       then
+        alreadySaved = telportStutterMenu(globalVars, menuVars) end
     if currentSVType == "Reverse Scroll"         then reverseScrollMenu(globalVars) end
     if currentSVType == "Splitscroll (Basic)"    then splitScrollBasicMenu(globalVars) end
     if currentSVType == "Splitscroll (Advanced)" then splitScrollAdvancedMenu(globalVars) end
     if currentSVType == "Animate"                then animateMenu(globalVars) end
-    saveVariables("placeSpecialMenu", menuVars)
+    if not alreadySaved then saveVariables("placeSpecialMenu", menuVars) end
 end
 -- Creates the menu for stutter SV
+-- Returns whether or not settings have been saved already [Boolean]
 -- Parameters
---    globalVars : list of variables used globally across all menus [Table]
-function stutterMenu(globalVars)
-    local menuVars = {
-        startSV = 1.5,
-        endSV = 0.5,
-        stutterDuration = 50,
-        stuttersPerSection = 1,
-        avgSV = 1,
-        finalSVIndex = 2,
-        customSV = 1,
-        linearlyChange = false,
-        controlLastSV = false,
-        svMultipliers = {},
-        svDistances = {},
-        svGraphStats = createSVGraphStats(),
-        svMultipliers2 = {},
-        svDistances2 = {},
-        svGraph2Stats = createSVGraphStats()
-    }
-    getVariables("stutterMenu", menuVars)
+--    globalVars     : list of variables used globally across all menus [Table]
+--    higherMenuVars : list of variables used for the higher level menu from before [Table]
+function stutterMenu(globalVars, higherMenuVars)
+    local menuVars = getStutterMenuVars()
+    
+    if globalVars.showExportImportMenu then
+        exportImportSettingsMenu(globalVars, higherMenuVars, menuVars)
+        return true
+    end
     
     local settingsChanged = #menuVars.svMultipliers == 0
     settingsChanged = chooseControlSecondSV(menuVars) or settingsChanged
@@ -1384,25 +1625,20 @@ function stutterMenu(globalVars)
     addSeparator()
     simpleActionMenu("Place", placeStutterSVs, globalVars, menuVars)
     saveVariables("stutterMenu", menuVars)
+    return false
 end
 -- Creates the menu for teleport stutter SV
+-- Returns whether or not settings have been saved already [Boolean]
 -- Parameters
---    globalVars : list of variables used globally across all menus [Table]
-function telportStutterMenu(globalVars)
-    local menuVars = {
-        svPercent = 50,
-        svPercent2 = 0,
-        distance = 50,
-        mainSV = 0.5,
-        mainSV2 = 0,
-        useDistance = false,
-        linearlyChange = false,
-        avgSV = 1,
-        finalSVIndex = 2,
-        customSV = 1
-    }
-    getVariables("teleportStutterMenu", menuVars)
+--    globalVars     : list of variables used globally across all menus [Table]
+--    higherMenuVars : list of variables used for the higher level menu from before [Table]
+function telportStutterMenu(globalVars, higherMenuVars)
+    local menuVars = getTeleportStutterMenuVars()
     
+    if globalVars.showExportImportMenu then
+        exportImportSettingsMenu(globalVars, higherMenuVars, menuVars)
+        return true
+    end
     if menuVars.useDistance then
         chooseDistance(menuVars)
         helpMarker("Start SV teleport distance")
@@ -1418,6 +1654,7 @@ function telportStutterMenu(globalVars)
     addSeparator()
     simpleActionMenu("Place", placeTeleportStutterSVs, globalVars, menuVars)
     saveVariables("teleportStutterMenu", menuVars)
+    return false
 end
 -- Creates the menu for reverse scroll SV
 -- Parameters
@@ -1428,6 +1665,12 @@ function reverseScrollMenu(globalVars)
         distance = 400
     }
     getVariables("reverseScrollMenu", menuVars)
+    
+    if globalVars.showExportImportMenu then
+        --exportImportSettingsMenu(globalVars, higherMenuVars, menuVars)
+        imgui.Text("Export/import not available for this tool")
+        return
+    end
     chooseAverageSV(menuVars)
     chooseDistance(menuVars)
     helpMarker("Height at which reverse scroll notes are hit")
@@ -1450,6 +1693,13 @@ function splitScrollBasicMenu(globalVars)
         noteTimes2 = {},
     }
     getVariables("splitScrollBasicMenu", menuVars)
+    
+    if globalVars.showExportImportMenu then
+        --exportImportSettingsMenu(globalVars, higherMenuVars, menuVars)
+        imgui.Text("Export/import not available for this tool")
+        return
+    end
+    
     makeNoteMoverWindow(globalVars)
     
     addPadding()
@@ -1480,6 +1730,13 @@ function splitScrollAdvancedMenu(globalVars)
         svsInScroll2 = {}
     }
     getVariables("splitScrollAdvancedMenu", menuVars)
+    
+    if globalVars.showExportImportMenu then
+        --exportImportSettingsMenu(globalVars, higherMenuVars, menuVars)
+        imgui.Text("Export/import not available for this tool")
+        return
+    end
+    
     makeNoteMoverWindow(globalVars)
     
     addPadding()
@@ -1518,6 +1775,13 @@ function animateMenu(globalVars)
         importText = ""
     }
     getVariables("animateMenu", menuVars)
+    
+    if globalVars.showExportImportMenu then
+        --exportImportSettingsMenu(globalVars, higherMenuVars, menuVars)
+        imgui.Text("Export/import not available for this tool")
+        return
+    end
+    
     imgui.BeginTabBar("SV tabs")
     if imgui.BeginTabItem("Settings") then
         addPadding()
@@ -1569,31 +1833,20 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeStillSVMenu(globalVars)
-    local menuVars = {
-        svTypeIndex = 1,
-        noteSpacing = 1,
-        stillTypeIndex = 1,
-        stillDistance = 200,
-        prePlaceDistances = {},
-        svMultipliers = {},
-        svDistances = {},
-        svGraphStats = createSVGraphStats(),
-        svStats = createSVStats(),
-        interlace = false,
-        interlaceRatio = -0.5
-    }
-    getVariables("placeStillMenu", menuVars)
+    local menuVars = getStillPlaceMenuVars()
     local needSVUpdate = #menuVars.svMultipliers == 0
     
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
-    addPadding()
-    imgui.Text("Still Settings:")
-    chooseNoteSpacing(menuVars)
-    chooseStillType(menuVars)
+    if not globalVars.showExportImportMenu then
+        addPadding()
+        imgui.Text("Still Settings:")
+        chooseNoteSpacing(menuVars)
+        chooseStillType(menuVars)
+    end
     addSeparator()
     
-    settingsGraphsAndPlaceMenu(globalVars, menuVars, needSVUpdate)
-    saveVariables("placeStillMenu", menuVars)
+    local alreadySaved = settingsGraphsAndPlaceMenu(globalVars, menuVars, needSVUpdate)
+    if not alreadySaved then saveVariables("placeStillMenu", menuVars) end
 end
 -- Creates the add teleport menu
 -- Parameters
@@ -2135,99 +2388,361 @@ function exportAnimationMenu(globalVars, menuVars)
     if #menuVars.frameTimes == 0 then imgui.Text("No note/frame data to export") return end
     imgui.Text("Copy exported data + paste somewhere safe")
     imgui.InputTextMultiline("##animationExport", menuVars.exportText, #menuVars.exportText,
-                             {ACTION_BUTTON_SIZE[1], 50}, imgui_input_text_flags.ReadOnly)
+                             ACTION_BUTTON_SIZE, imgui_input_text_flags.ReadOnly)
     button("Export Animation Data", ACTION_BUTTON_SIZE, exportAnimationFrames,
            globalVars, menuVars)
 end
--- Gets the current "Place SV" menu's setting variables
+-- Creates the button for exporting/importing current menu settings
 -- Parameters
---    svType : name of the current menu's type of SV [Table]
-function getSettingVars(svType)
-    local settingVars
-    if svType == "Linear" then
-        settingVars = {
-            startSV = 1.5,
-            endSV = 0.5,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1
-        }
-    elseif svType == "Exponential" then
-        settingVars = {
-            behaviorIndex = 1,
-            intensity = 30,
-            verticalShift = 0,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1
-        }
-    elseif svType == "Bezier" then
-        settingVars = {
-            x1 = 0,
-            y1 = 0,
-            x2 = 0,
-            y2 = 1,
-            verticalShift = 0,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1
-        }
-    elseif svType == "Hermite" then
-        settingVars = {
-            startSV = 0,
-            endSV = 0,
-            verticalShift = 0,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1
-        }
-    elseif svType == "Sinusoidal" then
-        settingVars = {
-            startSV = 2,
-            endSV = 2,
-            curveSharpness = 50,
-            verticalShift = 1,
-            periods = 1,
-            periodsShift = 0.25,
-            svsPerQuarterPeriod = 8,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1
-        }
-    elseif svType == "Circular" then
-        settingVars = {
-            behaviorIndex = 1,
-            arcPercent = 50,
-            avgSV = 1,
-            verticalShift = 0,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1,
-            dontNormalize = false
-        }
-    elseif svType == "Random" then
-        settingVars = {
-            randomTypeIndex = 1,
-            randomScale = 2,
-            avgSV = 1,
-            svPoints = 16,
-            finalSVIndex = 2,
-            customSV = 1
-        }
-    elseif svType == "Custom" then
-        settingVars = {
-            svMultipliers = {1.5, -0.5, 1.5, -0.5, 1.5, -0.5, 1.5, -0.5},
-            selectedMultiplierIndex = 1,
-            svPoints = 8,
-            finalSVIndex = 2,
-            customSV = 1
-        }
+--    globalVars : list of variables used globally across all menus [Table]
+function exportImportSettingsButton(globalVars)
+    local buttonText = ": )"
+    if globalVars.showExportImportMenu then buttonText = "X" end
+    local buttonPressed = imgui.Button(buttonText, EXPORT_BUTTON_SIZE)
+    toolTip("Export and import menu settings")
+    imgui.SameLine(0, SAMELINE_SPACING)
+    if not buttonPressed then return end
+    globalVars.showExportImportMenu = not globalVars.showExportImportMenu
+end
+-- Makes the export and import menu for place SV settings
+-- Parameters
+--    globalVars  : list of variables used globally across all menus [Table]
+--    menuVars    : list of setting variables for the current menu [Table]
+--    settingVars : list of setting variables for the current sv type [Table]
+function exportImportSettingsMenu(globalVars, menuVars, settingVars)
+    imgui.Text("Copy + paste exported data somewhere safe")
+    imgui.InputTextMultiline("##placeExport", globalVars.exportText, #globalVars.exportText,
+                             {ACTION_BUTTON_SIZE[1], 50}, imgui_input_text_flags.ReadOnly)
+    exportPlaceSVButton(globalVars, menuVars, settingVars)
+    addSeparator()
+    imgui.Text("Paste exported data here to import")
+    _, globalVars.importText = imgui.InputTextMultiline("##placeImport", globalVars.importText,
+                                                        999999, {ACTION_BUTTON_SIZE[1], 50})
+    importPlaceSVButton(globalVars)
+end
+-- Creates the export button for Place SV settings
+-- Parameters
+--    globalVars  : list of variables used globally across all menus [Table]
+--    menuVars    : list of setting variables for the current menu [Table]
+--    settingVars : list of setting variables for the current sv type [Table]
+function exportPlaceSVButton(globalVars, menuVars, settingVars)
+    if not imgui.Button("Export current settings for current menu", ACTION_BUTTON_SIZE) then return end
+    local exportList = {}
+    local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
+    local stillType = placeType == "Still"
+    local regularType = placeType == "Standard" or stillType
+    local specialType = placeType == "Special"
+    local currentSVType
+    if regularType then
+        currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
+    elseif specialType then
+        currentSVType = SPECIAL_SVS[menuVars.svTypeIndex]
     end
-    getVariables(svType.."Settings", settingVars)
-    return settingVars
+    
+    exportList[1] = placeType
+    exportList[2] = currentSVType
+    if regularType then
+        table.insert(exportList, tostring(menuVars.interlace))
+        table.insert(exportList, menuVars.interlaceRatio)
+    end
+    if stillType then
+        table.insert(exportList, menuVars.noteSpacing)
+        table.insert(exportList, menuVars.stillTypeIndex)
+        table.insert(exportList, menuVars.stillDistance)
+    end
+    if currentSVType == "Linear" then
+        table.insert(exportList, settingVars.startSV)
+        table.insert(exportList, settingVars.endSV)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Exponential" then
+        table.insert(exportList, settingVars.behaviorIndex)
+        table.insert(exportList, settingVars.intensity)
+        table.insert(exportList, settingVars.verticalShift)
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Bezier" then
+        table.insert(exportList, settingVars.x1)
+        table.insert(exportList, settingVars.y1)
+        table.insert(exportList, settingVars.x2)
+        table.insert(exportList, settingVars.y2)
+        table.insert(exportList, settingVars.verticalShift)
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Hermite" then
+        table.insert(exportList, settingVars.startSV)
+        table.insert(exportList, settingVars.endSV)
+        table.insert(exportList, settingVars.verticalShift)
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Sinusoidal" then
+        table.insert(exportList, settingVars.startSV)
+        table.insert(exportList, settingVars.endSV)
+        table.insert(exportList, settingVars.curveSharpness)
+        table.insert(exportList, settingVars.verticalShift)
+        table.insert(exportList, settingVars.periods)
+        table.insert(exportList, settingVars.periodsShift)
+        table.insert(exportList, settingVars.svsPerQuarterPeriod)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Circular" then
+        table.insert(exportList, settingVars.behaviorIndex)
+        table.insert(exportList, settingVars.arcPercent)
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.verticalShift)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+        table.insert(exportList, tostring(settingVars.dontNormalize))
+    elseif currentSVType == "Random" then
+        table.insert(exportList, settingVars.randomTypeIndex)
+        table.insert(exportList, settingVars.randomScale)
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Custom" then
+        for i = 1, #settingVars.svMultipliers do
+            table.insert(exportList, settingVars.svMultipliers[i])
+        end
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.selectedMultiplierIndex)
+        table.insert(exportList, settingVars.svPoints)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Stutter" then
+        table.insert(exportList, settingVars.startSV)
+        table.insert(exportList, settingVars.endSV)
+        table.insert(exportList, settingVars.stutterDuration)
+        table.insert(exportList, settingVars.stuttersPerSection)
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+        table.insert(exportList, tostring(settingVars.linearlyChange))
+        table.insert(exportList, tostring(settingVars.controlLastSV))
+    elseif currentSVType == "Teleport Stutter" then
+        table.insert(exportList, settingVars.svPercent)
+        table.insert(exportList, settingVars.svPercent2)
+        table.insert(exportList, settingVars.distance)
+        table.insert(exportList, settingVars.mainSV)
+        table.insert(exportList, settingVars.mainSV2)
+        table.insert(exportList, tostring(settingVars.useDistance))
+        table.insert(exportList, tostring(settingVars.linearlyChange))
+        table.insert(exportList, settingVars.avgSV)
+        table.insert(exportList, settingVars.finalSVIndex)
+        table.insert(exportList, settingVars.customSV)
+        
+    --[[ might do in the future if requested
+    elseif currentSVType == "Reverse Scroll" then
+    elseif currentSVType == "Splitscroll (Basic)" then
+    elseif currentSVType == "Splitscroll (Advanced)" then
+    elseif currentSVType == "Animate" then
+    --]]
+    end
+    
+    globalVars.exportText = table.concat(exportList, "|")
+end
+-- Creates the import button for Place SV settings
+-- Returns whether or not the import button has been pressed [Boolean]
+-- Parameters
+--    globalVars  : list of variables used globally across all menus [Table]
+function importPlaceSVButton(globalVars)
+    if not imgui.Button("Import settings from pasted string", ACTION_BUTTON_SIZE) then return false end
+    
+    
+    local settingsTable = {}
+    for str in string.gmatch(globalVars.importText, "([^|]+)") do
+        local num = tonumber(str)
+        if num ~= nil then
+            str = num
+        end
+        if str == "false" then
+            str = false
+        elseif str == "true" then
+            str = true
+        end
+        table.insert(settingsTable, str)
+    end
+    if #settingsTable < 2 then return end
+    
+    local placeType = table.remove(settingsTable, 1)
+    local currentSVType = table.remove(settingsTable, 1)
+    
+    local standardPlaceType = placeType == "Standard"
+    local specialPlaceType  = placeType == "Special"
+    local stillPlaceType    = placeType == "Still"
+    
+    local menuVars
+    if standardPlaceType then menuVars = getStandardPlaceMenuVars() end
+    if specialPlaceType  then menuVars = getSpecialPlaceMenuVars() end
+    if stillPlaceType    then menuVars = getStillPlaceMenuVars() end
+    
+    local linearSVType      = currentSVType == "Linear"
+    local exponentialSVType = currentSVType == "Exponential"
+    local bezierSVType      = currentSVType == "Bezier"
+    local hermiteSVType     = currentSVType == "Hermite"
+    local sinusoidalSVType  = currentSVType == "Sinusoidal"
+    local circularSVType    = currentSVType == "Circular"
+    local randomSVType      = currentSVType == "Random"
+    local customSVType      = currentSVType == "Custom"
+    local stutterSVType     = currentSVType == "Stutter"
+    local tpStutterSVType   = currentSVType == "Teleport Stutter"
+    
+    local settingVars
+    if standardPlaceType or stillPlaceType then
+        settingVars = getSettingVars(currentSVType)
+    elseif stutterSVType then
+        settingVars = getStutterMenuVars()
+    elseif tpStutterSVType then
+        settingVars = getTeleportStutterMenuVars()
+    end
+    
+    if standardPlaceType then globalVars.placeTypeIndex = 1 end
+    if specialPlaceType  then globalVars.placeTypeIndex = 2 end
+    if stillPlaceType    then globalVars.placeTypeIndex = 3 end
+    
+    if linearSVType      then menuVars.svTypeIndex = 1 end
+    if exponentialSVType then menuVars.svTypeIndex = 2 end
+    if bezierSVType      then menuVars.svTypeIndex = 3 end
+    if hermiteSVType     then menuVars.svTypeIndex = 4 end
+    if sinusoidalSVType  then menuVars.svTypeIndex = 5 end
+    if circularSVType    then menuVars.svTypeIndex = 6 end
+    if randomSVType      then menuVars.svTypeIndex = 7 end
+    if customSVType      then menuVars.svTypeIndex = 8 end
+    
+    if stutterSVType     then menuVars.svTypeIndex = 1 end
+    if tpStutterSVType   then menuVars.svTypeIndex = 2 end
+    --[[
+    if currentSVType == "Reverse Scroll"         then menuVars.svTypeIndex = 3 end
+    if currentSVType == "Splitscroll (Basic)"    then menuVars.svTypeIndex = 4 end
+    if currentSVType == "Splitscroll (Advanced)" then menuVars.svTypeIndex = 5 end
+    if currentSVType == "Animate"                then menuVars.svTypeIndex = 6 end
+    --]]
+    
+    if standardPlaceType or stillPlaceType then
+        menuVars.interlace = table.remove(settingsTable, 1)
+        menuVars.interlaceRatio = table.remove(settingsTable, 1)
+    end
+    if stillPlaceType then
+        menuVars.noteSpacing = table.remove(settingsTable, 1)
+        menuVars.stillTypeIndex = table.remove(settingsTable, 1)
+        menuVars.stillDistance = table.remove(settingsTable, 1)
+    end
+    if linearSVType then
+        settingVars.startSV = table.remove(settingsTable, 1)
+        settingVars.endSV = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    elseif exponentialSVType then
+        settingVars.behaviorIndex = table.remove(settingsTable, 1)
+        settingVars.intensity = table.remove(settingsTable, 1)
+        settingVars.verticalShift = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    elseif bezierSVType then
+        settingVars.x1 = table.remove(settingsTable, 1)
+        settingVars.y1 = table.remove(settingsTable, 1)
+        settingVars.x2 = table.remove(settingsTable, 1)
+        settingVars.y2 = table.remove(settingsTable, 1)
+        settingVars.verticalShift = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    elseif hermiteSVType then
+        settingVars.startSV = table.remove(settingsTable, 1)
+        settingVars.endSV = table.remove(settingsTable, 1)
+        settingVars.verticalShift = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    elseif sinusoidalSVType then
+        settingVars.startSV = table.remove(settingsTable, 1)
+        settingVars.endSV = table.remove(settingsTable, 1)
+        settingVars.curveSharpness = table.remove(settingsTable, 1)
+        settingVars.verticalShift = table.remove(settingsTable, 1)
+        settingVars.periods = table.remove(settingsTable, 1)
+        settingVars.periodsShift = table.remove(settingsTable, 1)
+        settingVars.svsPerQuarterPeriod = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    elseif circularSVType then
+        settingVars.behaviorIndex = table.remove(settingsTable, 1)
+        settingVars.arcPercent = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.verticalShift = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+        settingVars.dontNormalize = table.remove(settingsTable, 1)
+    elseif randomSVType then
+        settingVars.randomTypeIndex = table.remove(settingsTable, 1)
+        settingVars.randomScale = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.svPoints = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    elseif customSVType then
+        settingVars.customSV = table.remove(settingsTable)
+        settingVars.finalSVIndex = table.remove(settingsTable)
+        settingVars.svPoints = table.remove(settingsTable)
+        settingVars.selectedMultiplierIndex = table.remove(settingsTable)
+        settingVars.finalSVIndex = table.remove(settingsTable)
+        settingVars.svMultipliers = settingsTable
+    end
+    
+    if stutterSVType then
+        settingVars.startSV = table.remove(settingsTable, 1)
+        settingVars.endSV = table.remove(settingsTable, 1)
+        settingVars.stutterDuration = table.remove(settingsTable, 1)
+        settingVars.stuttersPerSection = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+        settingVars.linearlyChange = table.remove(settingsTable, 1)
+        settingVars.controlLastSV = table.remove(settingsTable, 1)
+    elseif tpStutterSVType then
+        settingVars.svPercent = table.remove(settingsTable, 1)
+        settingVars.svPercent2 = table.remove(settingsTable, 1)
+        settingVars.distance = table.remove(settingsTable, 1)
+        settingVars.mainSV = table.remove(settingsTable, 1)
+        settingVars.mainSV2 = table.remove(settingsTable, 1)
+        settingVars.useDistance = table.remove(settingsTable, 1)
+        settingVars.linearlyChange = table.remove(settingsTable, 1)
+        settingVars.avgSV = table.remove(settingsTable, 1)
+        settingVars.finalSVIndex = table.remove(settingsTable, 1)
+        settingVars.customSV = table.remove(settingsTable, 1)
+    end
+    if standardPlaceType or stillPlaceType then
+        updateMenuSVs(currentSVType, menuVars, settingVars)
+        saveVariables(currentSVType.."Settings", settingVars)
+    elseif stutterSVType then
+        updateStutterMenuSVs(settingVars)
+        saveVariables("stutterMenu", settingVars)
+    elseif tpStutterSVType then
+        saveVariables("teleportStutterMenu", settingVars)
+    end
+    
+    if standardPlaceType then saveVariables("placeStandardMenu", menuVars) end
+    if specialPlaceType  then saveVariables("placeSpecialMenu", menuVars) end
+    if stillPlaceType    then saveVariables("placeStillMenu", menuVars) end
+    
+    globalVars.importText = ""
+    globalVars.showExportImportMenu = false
+    return true
 end
 -- Imports animation settings + frames from a string
 -- Parameters
@@ -2265,7 +2780,7 @@ end
 function importAnimationMenu(globalVars, menuVars)
     imgui.Text("Paste exported note/frame data here")
     _, menuVars.importText = imgui.InputTextMultiline("##animationImport", menuVars.importText,
-                                                      999999, {ACTION_BUTTON_SIZE[1], 50})
+                                                      999999, ACTION_BUTTON_SIZE)
     button("Import Animation Data", ACTION_BUTTON_SIZE, importAnimationFrames,
            globalVars, menuVars)
 end
@@ -3508,10 +4023,7 @@ function chooseSpecialSVType(menuVars)
     local comboIndex = menuVars.svTypeIndex - 1
     local emoticonIndex = menuVars.svTypeIndex + #STANDARD_SVS
     local emoticon = EMOTICONS[emoticonIndex]
-    local indentAmount = 45
-    imgui.Indent(indentAmount)
     _, comboIndex = imgui.Combo("  "..emoticon, comboIndex, SPECIAL_SVS, #SPECIAL_SVS)
-    imgui.Unindent(indentAmount)
     menuVars.svTypeIndex = comboIndex + 1
     addSeparator()
 end
@@ -3523,10 +4035,7 @@ function chooseStandardSVType(menuVars)
     local oldcomboIndex = menuVars.svTypeIndex - 1
     local emoticonIndex = menuVars.svTypeIndex
     local emoticon = EMOTICONS[emoticonIndex]
-    local indentAmount = 45
-    imgui.Indent(indentAmount)
     local _, newComboIndex = imgui.Combo(" "..emoticon, oldcomboIndex, STANDARD_SVS, #STANDARD_SVS)
-    imgui.Unindent(indentAmount)
     menuVars.svTypeIndex = newComboIndex + 1
     return oldcomboIndex ~= newComboIndex
 end
@@ -4017,10 +4526,7 @@ end
 -- Parameters
 --    oldMultipliers : chosen custom multiplier values [Table]
 function generateCustomSet(oldMultipliers)
-    local newMultipliers = {}
-    for _, multiplier in pairs(oldMultipliers) do
-        table.insert(newMultipliers, multiplier)
-    end
+    local newMultipliers = makeDuplicateList(oldMultipliers)
     local averageMultiplier = calculateAverage(newMultipliers, true)
     table.insert(newMultipliers, averageMultiplier)
     return newMultipliers
