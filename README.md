@@ -35,7 +35,7 @@ Standard or "Still" sets SV of different shapes:
 * Combo
 
 Special types of SVs:
-* Stutter (also known as "Bump")
+* Stutter
 * Teleport Stutter
 * Splitscroll (Basic)
 * Splitscroll (Advanced)
