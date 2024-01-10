@@ -12,9 +12,9 @@ The plugin provides various tools to place, edit, and delete SVs (Scroll Velocit
 3. Move the amoguSV-main folder into the Plugins folder (located in the Quaver folder)
 
 ## Plugin Overview 
-amoguSV makes working with SVs quick and easy.
+amoguSV makes working with SVs quick and easy!
 
-Once you open the plugin you
+Once you open the plugin you...
 1. Choose an SV tool,
 2. Adjust the SV tool's settings,
 3. Select notes you want to use the tool at/between,
