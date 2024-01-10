@@ -7,17 +7,18 @@ This is a plugin for [Quaver](https://github.com/Quaver), the ultimate community
 The plugin provides various tools to place, edit, and delete SVs (Scroll Velocities) quickly and efficiently when making maps.
 
 ## Installation
-1. Download the ZIP file by pressing the green code button on GitHub and clicking "Download ZIP"
-2. Extract the ZIP file to the "Plugins" folder (located inside the main Quaver folder)
+1. Click on the green Code button, then click Download ZIP
+2. Extract the downloaded ZIP file to get the amoguSV-main folder
+3. Move the amoguSV-main folder into the Plugins folder (located in the Quaver folder)
 
 ## Plugin Overview 
 amoguSV makes working with SVs quick and easy.
 
 Once you open the plugin you
-1. Select the SV tool you want to use,
-2. Adjust the settings of the SV tool,
-3. Select notes you want to use the tool on,
-4. Use the SV tool by pressing 'T' on your keyboard (or hitting the button that appears).
+1. Choose an SV tool,
+2. Adjust the SV tool's settings,
+3. Select notes you want to use the tool at/between,
+4. Use the SV tool by pressing 'T' on your keyboard (or hitting the big button that appears).
 
 amoguSV lets you do 3 general SV actions: place SVs, edit SVs, and delete SVs.
 
@@ -31,14 +32,13 @@ Standard or "Still" sets SV of different shapes:
 * Circular
 * Random
 * Custom
+* Combo
 
 Special types of SVs:
 * Stutter (also known as "Bump")
 * Teleport Stutter
-* Reverse Scroll
 * Splitscroll (Basic)
 * Splitscroll (Advanced)
-* Animate
 
 ### Edit SVs
 * Add Teleport
@@ -62,9 +62,12 @@ Most of the core ideas and base functionality were taken (stolen) from [iceSV](h
 Other SV ideas also taken (stolen) from [Illuminati-CRAZ](https://github.com/Illuminati-CRAZ)’s SV plugins.
 Without these two people’s contributions to SV plugins in general, amoguSV would not be as good as it is today or even exist in the first place, so huge thanks to them.
 
+Also, some cursor effects were inspired (stolen) from https://github.com/tholman/cursor-effects
+
 ## Related Links
 * [Quaver Plugin Guide](https://github.com/IceDynamix/QuaverPluginGuide/blob/master/quaver_plugin_guide.md) by IceDynamix
 * [iceSV](https://github.com/IceDynamix/iceSV) by IceDynamix
 * [KeepStill](https://github.com/Illuminati-CRAZ/KeepStill) by Illuminati-CRAZ
 * [Vibrato](https://github.com/Illuminati-CRAZ/Vibrato) by Illuminati-CRAZ
 * [Displacer](https://github.com/Illuminati-CRAZ/Displacer) by Illuminati-CRAZ
+* [Goofy SV mapping guide](https://docs.google.com/document/d/1ug_WV_BI720617ybj4zuHhjaQMwa0PPekZyJoa17f-I)
