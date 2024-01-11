@@ -1,4 +1,4 @@
--- amoguSV v6.0 (10 January 2024)
+-- amoguSV v6.0 (12 January 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -1722,6 +1722,7 @@ end
 -- Creates the plugin window
 function draw()
     local globalVars = {
+        dontReplaceSV = false,
         upscroll = false,
         colorThemeIndex = 3,
         styleThemeIndex = 1,
@@ -1786,7 +1787,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function infoTab(globalVars)
     provideBasicPluginInfo()
-    provideMorePluginInfo()
+    provideMorePluginInfo(globalVars)
     listKeyboardShortcuts()
     choosePluginAppearance(globalVars)
 end
@@ -1809,7 +1810,7 @@ function editSVTab(globalVars)
     addSeparator()
     local toolName = EDIT_SV_TOOLS[globalVars.editToolIndex]
     if toolName == "Add Teleport"     then addTeleportMenu() end
-    if toolName == "Copy & Paste"     then copyNPasteMenu() end
+    if toolName == "Copy & Paste"     then copyNPasteMenu(globalVars) end
     if toolName == "Displace Note"    then displaceNoteMenu() end
     if toolName == "Displace View"    then displaceViewMenu() end
     if toolName == "Fix LN Ends"      then fixLNEndsMenu() end
@@ -1858,7 +1859,7 @@ function placeStandardSVMenu(globalVars)
                      menuVars.svMultipliers, nil)
     
     addSeparator()
-    simpleActionMenu("Place SVs between selected notes", 2, placeSVs, nil, menuVars)
+    simpleActionMenu("Place SVs between selected notes", 2, placeSVs, globalVars, menuVars)
     
     local labelText = table.concat({currentSVType, "SettingsStandard"})
     saveVariables(labelText, settingVars)
@@ -1921,7 +1922,7 @@ function placeStillSVMenu(globalVars)
                      menuVars.svMultipliers, nil)
     
     addSeparator()
-    simpleActionMenu("Place SVs between selected notes", 2, placeSVs, nil, menuVars)
+    simpleActionMenu("Place SVs between selected notes", 2, placeSVs, globalVars, menuVars)
     
     local labelText = table.concat({currentSVType, "SettingsStill"})
     saveVariables(labelText, settingVars)
@@ -2251,7 +2252,8 @@ function addTeleportMenu()
     simpleActionMenu("Add teleport SVs at selected notes", 1, addTeleportSVs, nil, menuVars)
 end
 -- Creates the copy and paste menu
-function copyNPasteMenu()
+--    globalVars : list of variables used globally across all menus [Table]
+function copyNPasteMenu(globalVars)
     local menuVars = {
         copiedSVs = {}
     }
@@ -2270,7 +2272,7 @@ function copyNPasteMenu()
     if noSVsCopiedInitially then return end
     
     addSeparator()
-    simpleActionMenu("Paste SVs at selected notes", 1, pasteSVs, nil, menuVars)
+    simpleActionMenu("Paste SVs at selected notes", 1, pasteSVs, globalVars, menuVars)
 end
 -- Creates the displace note menu
 function displaceNoteMenu()
@@ -2466,10 +2468,12 @@ function provideBasicPluginInfo()
     addPadding()
 end
 -- Gives more info about the plugin
-function provideMorePluginInfo()
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function provideMorePluginInfo(globalVars)
     if not imgui.CollapsingHeader("More info") then return end
     addPadding()
-    imgui.TextWrapped("Placing SVs on top of existing SVs will automatically remove existing SVs")
+    chooseDontReplaceSV(globalVars)
     addSeparator()
     linkBox("Goofy SV mapping guide",
             "https://docs.google.com/document/d/1ug_WV_BI720617ybj4zuHhjaQMwa0PPekZyJoa17f-I")
@@ -3041,7 +3045,6 @@ function exportCustomSVButton(globalVars, menuVars)
     table.remove(multipliersCopy)
     globalVars.exportCustomSVData = table.concat(multipliersCopy, " ")
 end
-
 -- Creates the import button for Place SV settings
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -3049,6 +3052,9 @@ function importPlaceSVButton(globalVars)
     local buttonText = "Import settings from pasted data"
     if not imgui.Button(buttonText, ACTION_BUTTON_SIZE) then return end
     
+    -- Variant of code based on 
+    -- https://stackoverflow.com/questions/6075262/
+    --    lua-table-tostringtablename-and-table-fromstringstringtable-functions
     local settingsTable = {}
     for str in string.gmatch(globalVars.importData, "([^|]+)") do
         local num = tonumber(str)
@@ -4214,6 +4220,13 @@ function chooseDistanceBack(settingVars)
                                                    0, 0, "%.3f msx")
     helpMarker("Splitscroll distance to separate the two scrolls planes\n(1,000,000 = default)")
 end
+-- Lets you choose whether or not to replace SVs when placing SVs
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseDontReplaceSV(globalVars)
+    local label = "Dont replace SVs when placing regular SVs"
+    _, globalVars.dontReplaceSV = imgui.Checkbox(label, globalVars.dontReplaceSV)
+end
 -- Lets you choose whether or not to draw a capybara on screen
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -5119,16 +5132,23 @@ end
 
 -- Places standard SVs between selected notes
 -- Parameters
---    menuVars : list of variables used for the current menu [Table]
-function placeSVs(menuVars)
+--    globalVars : list of variables used globally across all menus [Table]
+--    menuVars   : list of variables used for the current menu [Table]
+function placeSVs(globalVars, menuVars)
     local placingStillSVs = menuVars.noteSpacing ~= nil
     local numMultipliers = #menuVars.svMultipliers
-    local offsets = uniqueNoteOffsetsBetweenSelected()
+    local offsets = uniqueSelectedNoteOffsets()
+    if placingStillSVs then
+        offsets = uniqueNoteOffsetsBetweenSelected()
+    end
     local firstOffset = offsets[1]
     local lastOffset = offsets[#offsets]
     if placingStillSVs then offsets = {firstOffset, lastOffset} end
     local svsToAdd = {}
     local svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset)
+    if (not placingStillSVs) and globalVars.dontReplaceSV then
+        svsToRemove = {}
+    end
     for i = 1, #offsets - 1 do
         local startOffset = offsets[i]
         local endOffset = offsets[i + 1]
@@ -5681,14 +5701,18 @@ function clearCopiedSVs(menuVars)
 end
 -- Pastes copied SVs at selected notes
 -- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
 --    menuVars : list of variables used for the current menu [Table]
-function pasteSVs(menuVars)
+function pasteSVs(globalVars, menuVars)
     local offsets = uniqueSelectedNoteOffsets()
     local startOffset = offsets[1]
     local endOffset = offsets[#offsets]
     local lastCopiedSV = menuVars.copiedSVs[#menuVars.copiedSVs]
     local endRemoveOffset = endOffset + lastCopiedSV.relativeOffset + 1/128
     local svsToRemove = getSVsBetweenOffsets(startOffset, endRemoveOffset)
+    if globalVars.dontReplaceSV then
+        svsToRemove = {}
+    end
     local svsToAdd = {}
     for i = 1, #offsets do
         local pasteOffset = offsets[i]
