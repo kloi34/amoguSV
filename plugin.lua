@@ -1,4 +1,4 @@
--- amoguSV v6.0 (12 January 2024)
+-- amoguSV v6.0.2 (15 January 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -2252,6 +2252,7 @@ function addTeleportMenu()
     simpleActionMenu("Add teleport SVs at selected notes", 1, addTeleportSVs, nil, menuVars)
 end
 -- Creates the copy and paste menu
+-- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function copyNPasteMenu(globalVars)
     local menuVars = {
@@ -4574,11 +4575,19 @@ function chooseStartEndSVs(settingVars)
         settingVars.startSV = newValue
         return oldValue ~= newValue
     end
+    local buttonPressed = imgui.Button("Swap", SECONDARY_BUTTON_SIZE)
     local oldValues = {settingVars.startSV, settingVars.endSV}
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
     local _, newValues = imgui.InputFloat2("Start/End SV", oldValues, "%.2fx")
+    imgui.PopItemWidth()
     settingVars.startSV = newValues[1]
     settingVars.endSV = newValues[2]
-    return oldValues[1] ~= newValues[1] or oldValues[2] ~= newValues[2]
+    if buttonPressed then
+        settingVars.startSV = oldValues[2]
+        settingVars.endSV = oldValues[1]
+    end
+    return buttonPressed or oldValues[1] ~= newValues[1] or oldValues[2] ~= newValues[2]
 end
 -- Lets you choose a start SV percent
 -- Parameters
