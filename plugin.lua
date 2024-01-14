@@ -1,4 +1,4 @@
--- amoguSV v6.0.3 (15 January 2024)
+-- amoguSV v6.1 (15 January 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -3223,7 +3223,7 @@ function importPlaceSVButton(globalVars)
         settingVars.customSV = table.remove(settingsTable, 1)
     end
     
-    if standardPlaceType or stillPlaceType then
+    if standardPlaceType then
         updateMenuSVs(currentSVType, globalVars, menuVars, settingVars)
         local labelText = table.concat({currentSVType, "SettingsStandard"})
         saveVariables(labelText, settingVars)
