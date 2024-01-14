@@ -5198,7 +5198,7 @@ function placeStillSVs(menuVars)
     elseif stillType == "Otua" then
         local multiplier = getUsableDisplacementMultiplier(lastOffset)
         local duration = 1 / multiplier
-        local timeAt = firstOffset
+        local timeAt = lastOffset
         local multiplierAt = getSVMultiplierAt(timeAt)
         stillDistance = -multiplierAt * duration
     end
