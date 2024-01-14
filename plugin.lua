@@ -167,7 +167,9 @@ STANDARD_SVS_COMBOLESS = {          -- types of standard SVs (excluding combo)
 STILL_TYPES = {                     -- types of still displacements
     "No",
     "Start",
-    "End"
+    "End",
+    "Auto",
+    "Otua"
 }
 STYLE_THEMES = {                    -- available style/appearance themes for the plugin
     "Rounded",
@@ -3510,7 +3512,7 @@ function calculateStillDisplacements(stillType, stillDistance, svDisplacements, 
         table.insert(finalDisplacements, difference)
     end
     local extraDisplacement = stillDistance
-    if stillType == "End" then
+    if stillType == "End" or stillType == "Otua" then
         extraDisplacement = stillDistance - finalDisplacements[#finalDisplacements]
     end
     if stillType ~= "No" then
@@ -4607,7 +4609,9 @@ end
 --    menuVars : list of variables used for the current menu [Table]
 function chooseStillType(menuVars)
     local stillType = STILL_TYPES[menuVars.stillTypeIndex]
-    local dontChooseDistance = stillType == "No"
+    local dontChooseDistance = stillType == "No" or
+                               stillType == "Auto" or
+                               stillType == "Otua"
     local indentWidth = DEFAULT_WIDGET_WIDTH * 0.5 + 16
     if dontChooseDistance then
         imgui.Indent(indentWidth)
@@ -4624,6 +4628,8 @@ function chooseStillType(menuVars)
     if stillType == "No"    then toolTip("Don't use an initial or end displacement") end
     if stillType == "Start" then toolTip("Use an initial starting displacement for the still") end
     if stillType == "End"   then toolTip("Have a displacement to end at for the still") end
+    if stillType == "Auto"  then toolTip("Use last displacement of the previous still to start") end
+    if stillType == "Otua"  then toolTip("Use next displacement of the next still to end at") end
     
     if dontChooseDistance then
         imgui.Unindent(indentWidth)
@@ -5183,6 +5189,19 @@ function placeStillSVs(menuVars)
     local noteOffsets = uniqueNoteOffsetsBetweenSelected()
     local firstOffset = noteOffsets[1]
     local lastOffset = noteOffsets[#noteOffsets]
+    if stillType == "Auto" then
+        local multiplier = getUsableDisplacementMultiplier(firstOffset)
+        local duration = 1 / multiplier
+        local timeBefore = firstOffset - duration
+        local multiplierBefore = getSVMultiplierAt(timeBefore)
+        stillDistance = multiplierBefore * duration
+    elseif stillType == "Otua" then
+        local multiplier = getUsableDisplacementMultiplier(lastOffset)
+        local duration = 1 / multiplier
+        local timeAt = firstOffset
+        local multiplierAt = getSVMultiplierAt(timeAt)
+        stillDistance = -multiplierAt * duration
+    end
     local svsToAdd = {}
     local svsToRemove = {}
     local svTimeIsAdded = {}
