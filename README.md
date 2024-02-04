@@ -14,11 +14,11 @@ The plugin provides various tools to place, edit, and delete SVs (Scroll Velocit
 ## Plugin Overview 
 amoguSV makes working with SVs quick and easy!
 
-Once you open the plugin you...
-1. Choose an SV tool,
-2. Adjust the SV tool's settings,
-3. Select notes you want to use the tool at/between,
-4. Use the SV tool by pressing 'T' on your keyboard (or hitting the big button that appears).
+Once you open the plugin you
+1. Choose an SV tool
+2. Adjust the SV tool's settings
+3. Select notes you want to use the tool at/between
+4. Use the SV tool by pressing 'T' on your keyboard (or hitting the big button that appears)
 
 amoguSV lets you do 3 general SV actions: place SVs, edit SVs, and delete SVs.
 
