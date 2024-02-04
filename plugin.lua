@@ -1,4 +1,4 @@
--- amoguSV v6.1 (15 January 2024)
+-- amoguSV v6.1.1 (5 February 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -170,6 +170,10 @@ STILL_TYPES = {                     -- types of still displacements
     "End",
     "Auto",
     "Otua"
+}
+STUTTER_CONTROLS = {                -- parts of a stutter SV to control
+    "First SV",
+    "Second SV"
 }
 STYLE_THEMES = {                    -- available style/appearance themes for the plugin
     "Rounded",
@@ -1716,6 +1720,64 @@ function spawnWindowAtCoords(name, coords)
     state.SetValue(key, true)
 end
 --]]
+-- Returns whether or not the corresponding menu tab shortcut keys were pressed [Boolean]
+-- Parameters
+--    tabName : name of the menu tab [String]
+function keysPressedForMenuTab(tabName)
+    local shiftPressedDown = utils.IsKeyDown(keys.LeftShift) or
+                             utils.IsKeyDown(keys.RightShift)
+    if shiftPressedDown then return false end
+    
+    local altPressedDown = utils.IsKeyDown(keys.LeftAlt) or
+                           utils.IsKeyDown(keys.RightAlt)
+    local otherKey
+    if tabName == "##info"          then otherKey = keys.A end
+    if tabName == "##placeStandard" then otherKey = keys.Z end
+    if tabName == "##placeSpecial"  then otherKey = keys.X end
+    if tabName == "##placeStill"    then otherKey = keys.C end
+    if tabName == "##edit"          then otherKey = keys.S end
+    if tabName == "##delete"        then otherKey = keys.D end
+    local otherKeyPressed = utils.IsKeyPressed(otherKey)
+    return altPressedDown and otherKeyPressed
+end
+-- Changes the SV type if certain keys are pressed
+-- Returns whether or not the SV type has changed [Boolean]
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function changeSVTypeIfKeysPressed(menuVars)
+    local altPressedDown = utils.IsKeyDown(keys.LeftAlt) or
+                           utils.IsKeyDown(keys.RightAlt)
+    local shiftPressedDown = utils.IsKeyDown(keys.LeftShift) or
+                             utils.IsKeyDown(keys.RightShift)
+    local xPressed = utils.IsKeyPressed(keys.X)
+    local zPressed = utils.IsKeyPressed(keys.Z)
+    if not (altPressedDown and shiftPressedDown and (xPressed or zPressed)) then return false end
+    
+    local maxSVTypes = #STANDARD_SVS
+    local isSpecialType = menuVars.interlace == nil
+    if isSpecialType then maxSVTypes = #SPECIAL_SVS end
+    
+    if xPressed then menuVars.svTypeIndex = menuVars.svTypeIndex + 1 end
+    if zPressed then menuVars.svTypeIndex = menuVars.svTypeIndex - 1 end
+    menuVars.svTypeIndex = wrapToInterval(menuVars.svTypeIndex, 1, maxSVTypes)
+    return true
+end
+-- Changes the edit tool if certain keys are pressed
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function changeEditToolIfKeysPressed(globalVars)
+    local altPressedDown = utils.IsKeyDown(keys.LeftAlt) or
+                           utils.IsKeyDown(keys.RightAlt)
+    local shiftPressedDown = utils.IsKeyDown(keys.LeftShift) or
+                             utils.IsKeyDown(keys.RightShift)
+    local xPressed = utils.IsKeyPressed(keys.X)
+    local zPressed = utils.IsKeyPressed(keys.Z)
+    if not (altPressedDown and shiftPressedDown and (xPressed or zPressed)) then return end
+    
+    if xPressed then globalVars.editToolIndex = globalVars.editToolIndex + 1 end
+    if zPressed then globalVars.editToolIndex = globalVars.editToolIndex - 1 end
+    globalVars.editToolIndex = wrapToInterval(globalVars.editToolIndex, 1, #EDIT_SV_TOOLS)
+end
 
 ---------------------------------------------------------------------------------------------------
 -- Plugin Menus (+ other higher level menu-related functions) -------------------------------------
@@ -1724,6 +1786,7 @@ end
 -- Creates the plugin window
 function draw()
     local globalVars = {
+        keyboardMode = false,
         dontReplaceSV = false,
         upscroll = false,
         colorThemeIndex = 3,
@@ -1758,11 +1821,17 @@ function draw()
     
     imgui.Begin("amoguSV", imgui_window_flags.AlwaysAutoResize)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
-    imgui.BeginTabBar("SV tabs")
-    for i = 1, #TAB_MENUS do
-        createMenuTab(globalVars, TAB_MENUS[i])
+    if globalVars.keyboardMode then
+        imgui.BeginTabBar("Quick tabs")
+        createQuickTabs(globalVars)
+        imgui.EndTabBar()
+    else
+        imgui.BeginTabBar("SV tabs")
+        for i = 1, #TAB_MENUS do
+            createMenuTab(globalVars, TAB_MENUS[i])
+        end
+        imgui.EndTabBar()
     end
-    imgui.EndTabBar()
     state.IsWindowHovered = imgui.IsWindowHovered()
     imgui.End()
     
@@ -1789,8 +1858,18 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function infoTab(globalVars)
     provideBasicPluginInfo()
-    provideMorePluginInfo(globalVars)
+    provideMorePluginInfo()
     listKeyboardShortcuts()
+    choosePluginBehaviorSettings(globalVars)
+    choosePluginAppearance(globalVars)
+end
+-- Creates the "Info" tab for "keyboard" mode
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function infoTabKeyboard(globalVars)
+    provideMorePluginInfo()
+    listKeyboardShortcuts()
+    choosePluginBehaviorSettings(globalVars)
     choosePluginAppearance(globalVars)
 end
 -- Creates the "Place SVs" tab
@@ -1798,7 +1877,6 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function placeSVTab(globalVars)
     choosePlaceSVType(globalVars)
-    exportImportSettingsButton(globalVars)
     local placeType = PLACE_TYPES[globalVars.placeTypeIndex]
     if placeType == "Standard" then placeStandardSVMenu(globalVars) end
     if placeType == "Special"  then placeSpecialSVMenu(globalVars) end
@@ -1809,6 +1887,7 @@ end
 --    globalVars : list of variables used globally across all menus [Table]
 function editSVTab(globalVars)
     chooseEditTool(globalVars)
+    changeEditToolIfKeysPressed(globalVars)
     addSeparator()
     local toolName = EDIT_SV_TOOLS[globalVars.editToolIndex]
     if toolName == "Add Teleport"     then addTeleportMenu() end
@@ -1830,6 +1909,42 @@ end
 function deleteSVTab(globalVars)
     simpleActionMenu("Delete SVs between selected notes", 2, deleteSVs, nil, nil)
 end
+-- Creates the menu tabs for quick keyboard access for "keyboard" mode
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function createQuickTabs(globalVars)
+    local tabMenus = {
+        "##info",
+        "##placeStandard",
+        "##placeSpecial",
+        "##placeStill",
+        "##edit",
+        "##delete"
+    }
+    local tabMenuFunctions = {
+        infoTabKeyboard,
+        placeStandardSVMenu,
+        placeSpecialSVMenu,
+        placeStillSVMenu,
+        editSVTab,
+        deleteSVTab
+    }
+    for i = 1, #tabMenus do
+        local tabName = tabMenus[i]
+        local tabItemFlag = imgui_tab_item_flags.None
+        if keysPressedForMenuTab(tabName) then tabItemFlag = imgui_tab_item_flags.SetSelected end
+        if imgui.BeginTabItem(tabName, true, tabItemFlag) then
+            imgui.InvisibleButton("SV stands for sv veleocity", {255, 1});
+            if tabName == "##info" then
+                imgui.Text("This is keyboard mode (for pro users)")
+                imgui.Text("Tab navigation: Alt + (Z, X, C, A, S, D)")
+                imgui.Text("Tool naviation: Alt + Shift + (Z, X)")
+            end
+            tabMenuFunctions[i](globalVars)
+            imgui.EndTabItem()
+        end
+    end
+end
 
 --------------------------------------------------------------------------------------------- Menus
 
@@ -1837,8 +1952,10 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeStandardSVMenu(globalVars)
+    exportImportSettingsButton(globalVars)
     local menuVars = getStandardPlaceMenuVars()
-    local needSVUpdate = #menuVars.svMultipliers == 0
+    local needSVUpdate = changeSVTypeIfKeysPressed(menuVars)
+    needSVUpdate = needSVUpdate or #menuVars.svMultipliers == 0
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
     
     addSeparator()
@@ -1871,7 +1988,9 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeSpecialSVMenu(globalVars)
+    exportImportSettingsButton(globalVars)
     local menuVars = getSpecialPlaceMenuVars()
+    changeSVTypeIfKeysPressed(menuVars)
     chooseSpecialSVType(menuVars)
 
     addSeparator()
@@ -1896,8 +2015,10 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function placeStillSVMenu(globalVars)
+    exportImportSettingsButton(globalVars)
     local menuVars = getStillPlaceMenuVars()
-    local needSVUpdate = #menuVars.svMultipliers == 0
+    local needSVUpdate = changeSVTypeIfKeysPressed(menuVars)
+    needSVUpdate = needSVUpdate or #menuVars.svMultipliers == 0
     needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
     
     addSeparator()
@@ -2042,21 +2163,19 @@ function randomSettingsMenu(settingVars, skipFinalSV)
     settingsChanged = chooseRandomType(settingVars) or settingsChanged
     settingsChanged = chooseRandomScale(settingVars) or settingsChanged
     settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if not skipFinalSV then
-        settingsChanged = chooseFinalSV(settingVars) or settingsChanged
-    end
-    
-    addSeparator()
     if imgui.Button("Generate New Random Set", {ACTION_BUTTON_SIZE[1], 24}) then
         generateRandomSetMenuSVs(settingVars)
         settingsChanged = true
     end
     
     addSeparator()
+    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     if not settingVars.dontNormalize then
         settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     end
-    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
+    if not skipFinalSV then
+        settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    end
     settingsChanged = chooseNoNormalize(settingVars) or settingsChanged
     
     return settingsChanged
@@ -2106,15 +2225,17 @@ function comboSettingsMenu(settingVars)
     local maxComboPhase = settingVars1.svPoints + settingVars2.svPoints
     
     settingsChanged = chooseStandardSVTypes(settingVars) or settingsChanged
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseComboPhase(settingVars, maxComboPhase) or settingsChanged
+    if settingVars.comboPhase ~= 0 and settingVars.comboPhase ~= maxComboPhase then
+        settingsChanged = chooseComboSVOption(settingVars) or settingsChanged
+    end
     
     addSeparator()
-    settingsChanged = chooseComboPhase(settingVars, maxComboPhase) or settingsChanged
-    settingsChanged = chooseComboSVOption(settingVars) or settingsChanged
+    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     if not settingVars.dontNormalize then
         settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     end
-    settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
     settingsChanged = chooseNoNormalize(settingVars) or settingsChanged
     
     return settingsChanged
@@ -2289,7 +2410,6 @@ function displaceNoteMenu()
     addSeparator()
     simpleActionMenu("Displace selected notes", 1, displaceNoteSVs, nil, menuVars)
 end
-
 -- Creates the displace view menu
 function displaceViewMenu()
     local menuVars = {
@@ -2442,10 +2562,8 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function choosePluginAppearance(globalVars)
-    if not imgui.CollapsingHeader("Plugin appearance settings") then return end
+    if not imgui.CollapsingHeader("Plugin Appearance Settings") then return end
     addPadding()
-    chooseUpscroll(globalVars)
-    addSeparator()
     chooseStyleTheme(globalVars)
     chooseColorTheme(globalVars)
     addSeparator()
@@ -2471,20 +2589,16 @@ function provideBasicPluginInfo()
     addPadding()
 end
 -- Gives more info about the plugin
--- Parameters
---    globalVars : list of variables used globally across all menus [Table]
-function provideMorePluginInfo(globalVars)
-    if not imgui.CollapsingHeader("More info") then return end
+function provideMorePluginInfo()
+    if not imgui.CollapsingHeader("More Info") then return end
     addPadding()
-    chooseDontReplaceSV(globalVars)
-    addSeparator()
     linkBox("Goofy SV mapping guide",
             "https://docs.google.com/document/d/1ug_WV_BI720617ybj4zuHhjaQMwa0PPekZyJoa17f-I")
     linkBox("GitHub repository", "https://github.com/kloi34/amoguSV")
 end
 -- Lists keyboard shortcuts for the plugin
 function listKeyboardShortcuts()
-    if not imgui.CollapsingHeader("Keyboard shortcuts") then return end
+    if not imgui.CollapsingHeader("Keyboard Shortcuts") then return end
     local indentAmount = -6
     imgui.Indent(indentAmount)
     addPadding()
@@ -2496,8 +2610,24 @@ function listKeyboardShortcuts()
     addSeparator()
     imgui.BulletText("T = activate the big button doing SV stuff")
     toolTip("Use this to do SV stuff for a quick workflow")
+    addSeparator()
+    imgui.BulletText("Alt + Shift + (Z or X) = switch tool type")
+    toolTip("Use this to do SV stuff for a quick workflow")
     addPadding()
     imgui.Unindent(indentAmount)
+end
+-- Lets you choose plugin behavior settings
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function choosePluginBehaviorSettings(globalVars)
+    if not imgui.CollapsingHeader("Plugin Behavior Settings") then return end
+    addPadding()
+    chooseKeyboardMode(globalVars)
+    addSeparator()
+    chooseUpscroll(globalVars)
+    addSeparator()
+    chooseDontReplaceSV(globalVars)
+    addPadding()
 end
 -- Displays measured SV stats rounded
 -- Parameters
@@ -3785,6 +3915,17 @@ function sortAscending(a, b) return a < b end
 --    a : first SV
 --    b : second SV
 function sortAscendingStartTime(a, b) return a.StartTime < b.StartTime end
+-- Restricts a number to be within a closed interval that wraps around
+-- Returns the result of the restriction [Int/Float]
+-- Parameters
+--    number     : number to keep within the interval [Int/Float]
+--    lowerBound : lower bound of the interval [Int/Float]
+--    upperBound : upper bound of the interval [Int/Float]
+function wrapToInterval(number, lowerBound, upperBound)
+    if number < lowerBound then return upperBound end
+    if number > upperBound then return lowerBound end
+    return number
+end
 
 -------------------------------------------------------------------------------- Graph/Plot Related
 
@@ -3895,9 +4036,24 @@ end
 --    list      : list for the combo to use [Table]
 --    listIndex : current index of the item from the list being selected in the combo [Int]
 function combo(label, list, listIndex)
+    local newListIndex = listIndex
+    local currentComboItem = list[listIndex]
+    local comboFlag = imgui_combo_flags.HeightLarge
+    if not imgui.BeginCombo(label, currentComboItem, comboFlag) then return listIndex end
+    
+    for i = 1, #list do
+        local listItem = list[i]
+        if imgui.Selectable(listItem) then
+            newListIndex = i
+        end
+    end
+    imgui.EndCombo()
+    return newListIndex
+    --[[
     local oldComboIndex = listIndex - 1
     local _, newComboIndex = imgui.Combo(label, oldComboIndex, list, #list)
     return newComboIndex + 1
+    --]]
 end
 -- Executes a function if a key is pressed
 -- Parameters
@@ -3977,10 +4133,10 @@ end
 -- Initializes and returns a default svStats object [Table]
 function createSVStats()
     local svStats = {
-            minSV = 0,
-            maxSV = 0,
-            avgSV = 0
-        }
+        minSV = 0,
+        maxSV = 0,
+        avgSV = 0
+    }
     return svStats
 end
 
@@ -4108,17 +4264,10 @@ end
 --    settingVars : list of variables used for the current menu [Table]
 function chooseControlSecondSV(settingVars)
     local oldChoice = settingVars.controlLastSV
-    imgui.AlignTextToFramePadding()
-    imgui.Text("Control:")
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    if imgui.RadioButton("First SV", not settingVars.controlLastSV) then
-        settingVars.controlLastSV = false
-    end
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    if imgui.RadioButton("Last SV", settingVars.controlLastSV) then
-        settingVars.controlLastSV = true
-    end
-    addPadding()
+    local stutterControlsIndex = 1
+    if oldChoice then stutterControlsIndex = 2 end
+    local newStutterControlsIndex = combo("Control SV", STUTTER_CONTROLS, stutterControlsIndex)
+    settingVars.controlLastSV = newStutterControlsIndex == 2
     local choiceChanged = oldChoice ~= settingVars.controlLastSV
     if choiceChanged then settingVars.stutterDuration = 100 - settingVars.stutterDuration end
     return choiceChanged
@@ -4361,6 +4510,21 @@ function chooseLinearlyChange(settingVars)
     settingVars.linearlyChange = newChoice
     return oldChoice ~= newChoice
 end
+-- Lets you choose whether or not the plugin will be in keyboard mode
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseKeyboardMode(globalVars)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Plugin Mode:")
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Default", not globalVars.keyboardMode) then
+        globalVars.keyboardMode = false
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Keyboard", globalVars.keyboardMode) then
+        globalVars.keyboardMode = true
+    end
+end
 -- Lets you choose the main SV multiplier of a teleport stutter
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
@@ -4368,10 +4532,10 @@ function chooseMainSV(settingVars)
     local label = "Main SV"
     if settingVars.linearlyChange then label = label.." (start)" end
     _, settingVars.mainSV = imgui.InputFloat(label, settingVars.mainSV, 0, 0, "%.2fx")
-    helpMarker("This SV will last ~99.99%% of the stutter")
-    if not settingVars.linearlyChange then return end
+    local helpMarkerText = "This SV will last ~99.99%% of the stutter"
+    if not settingVars.linearlyChange then helpMarker(helpMarkerText) return end
     
-   _, settingVars.mainSV2 = imgui.InputFloat("Main SV (end)", settingVars.mainSV2, 0, 0, "%.2fx")
+    _, settingVars.mainSV2 = imgui.InputFloat("Main SV (end)", settingVars.mainSV2, 0, 0, "%.2fx")
 end
 -- Lets you choose a rounded or unrounded view of SV stats on the measure SV menu
 -- Parameters
@@ -4598,8 +4762,8 @@ function chooseStartSVPercent(settingVars)
     local label1 = "Start SV %"
     if settingVars.linearlyChange then label1 = label1.." (start)" end
     _, settingVars.svPercent = imgui.InputFloat(label1, settingVars.svPercent, 1, 1, "%.2f%%")
-    helpMarker("%% distance between notes") 
-    if not settingVars.linearlyChange then return end
+    local helpMarkerText = "%% distance between notes"
+    if not settingVars.linearlyChange then helpMarker(helpMarkerText) return end
     
     local label2 = "Start SV % (end)"
     _, settingVars.svPercent2 = imgui.InputFloat(label2, settingVars.svPercent2, 1, 1, "%.2f%%")
@@ -4674,22 +4838,7 @@ end
 --    settingVars : list of variables used for the current menu [Table]
 function chooseSVBehavior(settingVars)
     local oldBehaviorIndex = settingVars.behaviorIndex
-    imgui.AlignTextToFramePadding()
-    imgui.Text("Behavior:")
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    local behavior = SV_BEHAVIORS[settingVars.behaviorIndex]
-    local slowDownText = SV_BEHAVIORS[1]
-    local speedUpText = SV_BEHAVIORS[2]
-    local slowDown = behavior == slowDownText
-    local speedUp = behavior == speedUpText
-    if imgui.RadioButton(slowDownText, slowDown) then
-        settingVars.behaviorIndex = 1
-    end
-    imgui.SameLine(0, RADIO_BUTTON_SPACING)
-    if imgui.RadioButton(speedUpText, speedUp) then
-        settingVars.behaviorIndex = 2
-    end
-    addSeparator()
+    settingVars.behaviorIndex = combo("Behavior", SV_BEHAVIORS, oldBehaviorIndex)
     return oldBehaviorIndex ~= settingVars.behaviorIndex
 end
 -- Lets you choose the number of SV points per quarter period of a sinusoidal wave
@@ -4719,8 +4868,17 @@ end
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
 function chooseUpscroll(globalVars)
-     _, globalVars.upscroll = imgui.Checkbox("Upscroll, not downscroll", globalVars.upscroll)
-     helpMarker("Flips the distance vs time graph for upscroll players")
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Scroll Direction:")
+    toolTip("Orientation for distance graphs and visuals")
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Down", not globalVars.upscroll) then
+        globalVars.upscroll = false
+    end
+    imgui.SameLine(0, RADIO_BUTTON_SPACING)
+    if imgui.RadioButton("Up         ", globalVars.upscroll) then
+        globalVars.upscroll = true
+    end
 end
 -- Lets you choose whether to use distance or not
 -- Parameters
@@ -5323,109 +5481,98 @@ end
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function placeSplitScrollSVs(settingVars)
-    local isNoteOffsetFor2nd = {}
+    local noteOffsetToScrollIndex = {}
     local offsets = uniqueNoteOffsetsBetweenSelected()
     for _, offset in pairs(settingVars.noteTimes2) do
         table.insert(offsets, offset)
-        isNoteOffsetFor2nd[offset] = true
     end
     offsets = table.sort(offsets, sortAscending)
     local firstOffset = offsets[1]
     local lastOffset = offsets[#offsets]
     local totalTime = lastOffset - firstOffset
     local noteOffsets = uniqueNoteOffsetsBetween(firstOffset, lastOffset)
+    for _, offset in pairs(noteOffsets) do
+        noteOffsetToScrollIndex[offset] = 1
+    end
+    for _, offset in pairs(settingVars.noteTimes2) do
+        noteOffsetToScrollIndex[offset] = 2
+    end
     local svsToAdd = {}
-    local svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset + 2) -- a jank + 2, but meh...
-    local scrollSpeed1 = settingVars.scrollSpeed1
-    local height1 = settingVars.height1
-    local scrollSpeed2 = settingVars.scrollSpeed2
-    local height2 = settingVars.height2
-    local initialDistance = settingVars.distanceBack
-    local scrollDifference = scrollSpeed1 - scrollSpeed2
+    local lastDuration = 1 / getUsableDisplacementMultiplier(lastOffset)
+    local svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset + 2 * lastDuration)
+    local scrollSpeeds = {settingVars.scrollSpeed1, settingVars.scrollSpeed2}
+    local scrollDifference = scrollSpeeds[1] - scrollSpeeds[2]
+    local noteHeights = {settingVars.height1, settingVars.height2}
+    local tpDistance = settingVars.distanceBack
     local msPerFrame = settingVars.msPerFrame
-    local numFrames = math.floor((totalTime - 1) / msPerFrame)
+    local numFrames = math.floor((totalTime - 1) / msPerFrame) + 1
     local noteIndex = 2
-    local goingFrom1To2 = false
-    local currentScrollSpeed = scrollSpeed2
-    local nextScrollSpeed = scrollSpeed1
-    for i = 0, (numFrames + 1) do
+    addSVToList(svsToAdd, firstOffset, scrollSpeeds[1], true)
+    for i = 1, numFrames do
+        local isLastFrame = i == numFrames
+        local scrollIndex = ((i - 1) % 2) + 1
         local timePassed = i * msPerFrame
-        if i == numFrames + 1 then timePassed = totalTime end
-        local tpDistance = initialDistance + timePassed * scrollDifference
-        if i == 0 then tpDistance = 0 end
+        if isLastFrame then timePassed = totalTime end
+        local frameTpDistance = tpDistance + timePassed * scrollDifference
+        if scrollIndex == 1 then frameTpDistance = -frameTpDistance end
+        local currentHeight = noteHeights[scrollIndex]
+        local currentScrollSpeed = scrollSpeeds[scrollIndex]
+        local nextScrollSpeed = scrollSpeeds[scrollIndex + 1] or scrollSpeeds[1]
+        if isLastFrame then nextScrollSpeed = getSVMultiplierAt(lastOffset + lastDuration) end
+        
         local timeAt = firstOffset + timePassed
         local multiplier = getUsableDisplacementMultiplier(timeAt)
         local duration = 1 / multiplier
         local timeBefore = timeAt - duration
         local timeAfter = timeAt + duration
-        local currentHeight = height2
-        if goingFrom1To2 then
-            tpDistance = -tpDistance
-            currentScrollSpeed = scrollSpeed1
-            nextScrollSpeed = scrollSpeed2
-            currentHeight = height1
-        else
-            currentScrollSpeed = scrollSpeed2
-            nextScrollSpeed = scrollSpeed1
-        end
-        if i == numFrames + 1 then
-            nextScrollSpeed = scrollSpeed1
-        end
         local noteOffset = noteOffsets[noteIndex]
         while noteOffset < timeAt do
             local noteMultiplier = getUsableDisplacementMultiplier(noteOffset)
             local noteDuration = 1 / noteMultiplier
-            local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
-                                      (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
+            local noteScrollIndex = noteOffsetToScrollIndex[noteOffset]
+            local noteInOtherScroll = noteScrollIndex ~= scrollIndex
             local noteTimeBefore = noteOffset - noteDuration
             local noteTimeAt = noteOffset
             local noteTimeAfter = noteOffset + noteDuration
-            local thisHeight = height1
-            if isNoteOffsetFor2nd[noteOffset] then
-                thisHeight = height2
-            end
-            local extraDisplacement = 0
+            local noteHeight = noteHeights[noteScrollIndex]
+            local tpDistanceToOtherScroll = 0
             if noteInOtherScroll then
-                extraDisplacement = initialDistance + (noteOffset - firstOffset) * scrollDifference
+                local timeElapsed = noteOffset - firstOffset
+                tpDistanceToOtherScroll = tpDistance + timeElapsed * scrollDifference
+                if scrollIndex == 1 then tpDistanceToOtherScroll = -tpDistanceToOtherScroll end
             end
-            if goingFrom1To2 then
-                extraDisplacement = -extraDisplacement
-            end
-            local svBefore = currentScrollSpeed + (thisHeight + extraDisplacement) * noteMultiplier
-            local svAt = currentScrollSpeed - (thisHeight + extraDisplacement) * noteMultiplier
+            local noteDisplacement = noteHeight + tpDistanceToOtherScroll
+            local svBefore = currentScrollSpeed + noteDisplacement * noteMultiplier
+            local svAt = currentScrollSpeed - noteDisplacement * noteMultiplier
             local svAfter = currentScrollSpeed
-            table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeBefore, svBefore))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAt, svAt))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAfter, svAfter))
+            addSVToList(svsToAdd, noteTimeBefore, svBefore, true)
+            addSVToList(svsToAdd, noteTimeAt, svAt, true)
+            addSVToList(svsToAdd, noteTimeAfter, svAfter, true)
             noteIndex = noteIndex + 1
             noteOffset = noteOffsets[noteIndex]
         end
-        local sv2 = nextScrollSpeed + tpDistance * multiplier
+        local svAt = nextScrollSpeed + frameTpDistance * multiplier
         if noteOffset == timeAt then
-            local thisHeight = height1
-            if isNoteOffsetFor2nd[noteOffset] then
-                thisHeight = height2
-            end
-            local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
-                                      (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
-            local sv1 = currentScrollSpeed + thisHeight * multiplier
-            sv2 = nextScrollSpeed - thisHeight * multiplier
+            local noteScrollIndex = noteOffsetToScrollIndex[noteOffset]
+            local noteHeight = noteHeights[noteScrollIndex]
+            local noteInOtherScroll = noteScrollIndex ~= scrollIndex
+            local displacementBefore = noteHeight
+            local displacementAt = -noteHeight
             if noteInOtherScroll then
-                sv1 = sv1 + tpDistance * multiplier
-                if i == numFrames + 1 and isNoteOffsetFor2nd[noteOffset] then
-                    sv2 = sv2 - tpDistance * multiplier
+                displacementBefore = displacementBefore + frameTpDistance
+                if isLastFrame and noteScrollIndex == 2 then
+                    displacementAt = displacementAt - frameTpDistance
                 end
-            else
-                if i ~= numFrames + 1 or isNoteOffsetFor2nd[noteOffset] then
-                    sv2 = sv2 + tpDistance * multiplier
-                end
+            elseif (not isLastFrame) or noteScrollIndex == 2 then
+                displacementAt = displacementAt + frameTpDistance
             end
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, sv1))
+            local svBefore = currentScrollSpeed + displacementBefore * multiplier
+            svAt = nextScrollSpeed + displacementAt * multiplier
+            addSVToList(svsToAdd, timeBefore, svBefore, true)
             noteIndex = noteIndex + 1
         end
-        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, sv2))
-        table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, nextScrollSpeed))
-        goingFrom1To2 = not goingFrom1To2
+        addSVToList(svsToAdd, timeAt, svAt, true)
+        addSVToList(svsToAdd, timeAfter, nextScrollSpeed, true)
     end
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
@@ -5730,7 +5877,7 @@ end
 -- Pastes copied SVs at selected notes
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
---    menuVars : list of variables used for the current menu [Table]
+--    menuVars   : list of variables used for the current menu [Table]
 function pasteSVs(globalVars, menuVars)
     local offsets = uniqueSelectedNoteOffsets()
     local startOffset = offsets[1]
@@ -5962,7 +6109,8 @@ function reverseScrollSVs(menuVars)
     local endOffset = offsets[#offsets]
     local svsToAdd = {}
     local almostSVsToAdd = {}
-    local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset + 2) -- a jank + 2, but meh...
+    local extraOffset = 2 / getUsableDisplacementMultiplier(endOffset)
+    local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset + extraOffset)
     local svTimeIsAdded = {}
     local svsBetweenOffsets = getSVsBetweenOffsets(startOffset, endOffset)
     addStartSVIfMissing(svsBetweenOffsets, startOffset)
