@@ -1,4 +1,4 @@
--- amoguSV v6.1.1 (5 February 2024)
+-- amoguSV v6.2 (11 February 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -40,6 +40,7 @@ PLOT_GRAPH_SIZE = {255, 100}        -- dimensions of the plot graph for SVs and 
 HALF_ACTION_BUTTON_SIZE = {125, 42} -- dimensions of a button that does kinda important things
 SECONDARY_BUTTON_SIZE = {48, 24}    -- dimensions of a button that does less important things
 EXPORT_BUTTON_SIZE = {40, 24}       -- dimensions of the export menu settings button
+BEEG_BUTTON_SIZE = {255, 24}        -- beeg button
 
 ------------------------------------------------------------------------------- Number restrictions
 
@@ -47,6 +48,7 @@ MIN_RGB_CYCLE_TIME = 6              -- minimum seconds for one complete RGB colo
 MAX_RGB_CYCLE_TIME = 300            -- maximum seconds for one complete RGB color cycle
 MAX_CURSOR_TRAIL_POINTS = 100       -- maximum number of points for cursor trail effects
 MAX_SV_POINTS = 1000                -- maximum number of SV points allowed
+MAX_ANIMATION_FRAMES = 999          -- maximum number of animation frames allowed
 
 -------------------------------------------------------------------------------------- Menu related
 
@@ -110,7 +112,7 @@ EMOTICONS = {                       -- emoticons to visually clutter the plugin 
     "( + x + )",
     "( o _ 0 )",
     "[mwm]",
-    "( > . < )",
+--    "( > . < )", -- RIP reverse scroll emoticon
     "( v . ^ )",
     "( ^ o v )",
     "( ; A ; )"
@@ -122,6 +124,11 @@ FINAL_SV_TYPES = {                  -- options for the last SV placed at the tai
 FLICKER_TYPES = {                   -- types of flickers
     "Normal",
     "Delayed"
+}
+NOTE_SKIN_TYPES = {                 -- types of note skins
+    "Bar",
+    "Circle"
+    --,    "Arrow"
 }
 PLACE_TYPES = {                     -- general categories of SVs to place
     "Standard",
@@ -141,7 +148,8 @@ SPECIAL_SVS = {                     -- types of special SVs
     "Stutter",
     "Teleport Stutter",
     "Splitscroll (Basic)",
-    "Splitscroll (Advanced)"
+    "Splitscroll (Advanced)",
+    "Frames Setup"
 }
 STANDARD_SVS = {                    -- types of standard SVs
     "Linear",
@@ -1608,11 +1616,31 @@ function getSettingVars(svType, label)
         }
     elseif svType == "Splitscroll (Advanced)" then
         settingVars = {
+            numScrolls = 2,
+            scrollIndex = 1,
             distanceBack = 1000000,
+            distanceBack2 = 1000000,
+            distanceBack3 = 1000000,
             msPerFrame = 16,
             noteTimes2 = {},
+            noteTimes3 = {},
+            noteTimes4 = {},
             svsInScroll1 = {},
-            svsInScroll2 = {}
+            svsInScroll2 = {},
+            svsInScroll3 = {},
+            svsInScroll4 = {}
+        }
+    elseif svType == "Frames Setup" then
+        settingVars = {
+            menuStep = 1,
+            numFrames = 5,
+            frameDistance = 2000,
+            distance = 2000,
+            reverseFrameOrder = false,
+            noteSkinTypeIndex = 1,
+            frameTimes = {},
+            selectedTimeIndex = 1,
+            currentFrame = 1
         }
     end
     local labelText = table.concat({svType, "Settings", label})
@@ -1934,7 +1962,7 @@ function createQuickTabs(globalVars)
         local tabItemFlag = imgui_tab_item_flags.None
         if keysPressedForMenuTab(tabName) then tabItemFlag = imgui_tab_item_flags.SetSelected end
         if imgui.BeginTabItem(tabName, true, tabItemFlag) then
-            imgui.InvisibleButton("SV stands for sv veleocity", {255, 1});
+            imgui.InvisibleButton("SV stands for sv veleocity", {255, 1})
             if tabName == "##info" then
                 imgui.Text("This is keyboard mode (for pro users)")
                 imgui.Text("Tab navigation: Alt + (Z, X, C, A, S, D)")
@@ -2006,6 +2034,9 @@ function placeSpecialSVMenu(globalVars)
     if currentSVType == "Teleport Stutter"       then telportStutterMenu(settingVars) end
     if currentSVType == "Splitscroll (Basic)"    then splitScrollBasicMenu(settingVars) end
     if currentSVType == "Splitscroll (Advanced)" then splitScrollAdvancedMenu(settingVars) end
+    if currentSVType == "Frames Setup"           then
+        animationFramesSetupMenu(globalVars, settingVars)
+    end
     
     local labelText = table.concat({currentSVType, "SettingsSpecial"})
     saveVariables(labelText, settingVars)
@@ -2163,7 +2194,7 @@ function randomSettingsMenu(settingVars, skipFinalSV)
     settingsChanged = chooseRandomType(settingVars) or settingsChanged
     settingsChanged = chooseRandomScale(settingVars) or settingsChanged
     settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if imgui.Button("Generate New Random Set", {ACTION_BUTTON_SIZE[1], 24}) then
+    if imgui.Button("Generate New Random Set", BEEG_BUTTON_SIZE) then
         generateRandomSetMenuSVs(settingVars)
         settingsChanged = true
     end
@@ -2242,7 +2273,7 @@ function comboSettingsMenu(settingVars)
 end
 -- Creates the menu for stutter SV
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function stutterMenu(settingVars)
     local settingsChanged = #settingVars.svMultipliers == 0
     settingsChanged = chooseControlSecondSV(settingVars) or settingsChanged
@@ -2262,7 +2293,7 @@ function stutterMenu(settingVars)
 end
 -- Creates the menu for teleport stutter SV
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function telportStutterMenu(settingVars)
     if settingVars.useDistance then
         chooseDistance(settingVars)
@@ -2282,7 +2313,7 @@ function telportStutterMenu(settingVars)
 end
 -- Creates the menu for basic splitscroll SV
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function splitScrollBasicMenu(settingVars)
     chooseFirstScrollSpeed(settingVars)
     chooseFirstHeight(settingVars)
@@ -2301,26 +2332,103 @@ function splitScrollBasicMenu(settingVars)
 end
 -- Creates the menu for advanced splitscroll SV
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function splitScrollAdvancedMenu(settingVars)
-    chooseDistanceBack(settingVars)
+    chooseNumScrolls(settingVars)
     chooseMSPF(settingVars)
     
     addSeparator()
-    local noNoteTimesInitially = #settingVars.noteTimes2 == 0
-    addOrClearNoteTimes(settingVars, noNoteTimesInitially)
+    chooseScrollIndex(settingVars)
     
     addSeparator()
     local no1stSVsInitially = #settingVars.svsInScroll1 == 0
     local no2ndSVsInitially = #settingVars.svsInScroll2 == 0
-    buttonsForSVsInScroll1(settingVars, no1stSVsInitially)
-    addSeparator()
-    buttonsForSVsInScroll2(settingVars, no2ndSVsInitially)
+    local no3rdSVsInitially = #settingVars.svsInScroll3 == 0
+    local no4thSVsInitially = #settingVars.svsInScroll4 == 0
+    local noNoteTimesInitially = #settingVars.noteTimes2 == 0
+    local noNoteTimesInitially2 = #settingVars.noteTimes3 == 0
+    local noNoteTimesInitially3 = #settingVars.noteTimes4 == 0
+    if settingVars.scrollIndex == 1 then
+        imgui.TextWrapped("Notes not assigned to the other scrolls will be used for 1st scroll")
+        addSeparator()
+        buttonsForSVsInScroll1(settingVars, no1stSVsInitially)
+    elseif settingVars.scrollIndex == 2 then
+        chooseDistanceBack(settingVars)
+        addSeparator()
+        addOrClearNoteTimes(settingVars, noNoteTimesInitially)
+        addSeparator()
+        buttonsForSVsInScroll2(settingVars, no2ndSVsInitially)
+    elseif settingVars.scrollIndex == 3 then
+        chooseDistanceBack2(settingVars)
+        addSeparator()
+        addOrClearNoteTimes2(settingVars, noNoteTimesInitially2)
+        addSeparator()
+        buttonsForSVsInScroll3(settingVars, no3rdSVsInitially)
+    elseif settingVars.scrollIndex == 4 then
+        chooseDistanceBack3(settingVars)
+        addSeparator()
+        addOrClearNoteTimes3(settingVars, noNoteTimesInitially3)
+        addSeparator()
+        buttonsForSVsInScroll4(settingVars, no4thSVsInitially)
+    end
     if noNoteTimesInitially or no1stSVsInitially or no2ndSVsInitially then return end
+    if settingVars.numScrolls > 2 and (noNoteTimesInitially2 or no3rdSVsInitially) then return end
+    if settingVars.numScrolls > 3 and (noNoteTimesInitially3 or no4thSVsInitially) then return end
     
     addSeparator()
     local label = "Place Splitscroll SVs at selected note(s)"
     simpleActionMenu(label, 1, placeAdvancedSplitScrollSVs, nil, settingVars)
+end
+-- Creates the menu for setting up animation frames
+-- Parameters
+--    globalVars  : list of variables used globally across all menus [Table]
+--    settingVars : list of variables used for the current menu [Table]
+function animationFramesSetupMenu(globalVars, settingVars)
+    chooseMenuStep(settingVars)
+    if settingVars.menuStep == 1 then
+        imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.Text("Choose Frame Settings")
+        addSeparator()
+        chooseNumFrames(settingVars)
+        chooseFrameSpacing(settingVars)
+        chooseDistance(settingVars)
+        helpMarker("Initial separating distance from selected note to the first frame")
+        chooseFrameOrder(settingVars)
+        addSeparator()
+        chooseNoteSkinType(settingVars)
+    elseif settingVars.menuStep == 2 then
+        imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.Text("Adjust Notes/Frames")
+        addSeparator()
+        imgui.Columns(2, "Notes and Frames", false)
+        addFrameTimes(settingVars)
+        displayFrameTimes(settingVars)
+        removeSelectedFrameTimeButton(settingVars)
+        addPadding()
+        chooseFrameTimeData(settingVars)
+        imgui.NextColumn()
+        chooseCurrentFrame(settingVars)
+        drawCurrentFrame(globalVars, settingVars)
+        imgui.Columns(1)
+        local invisibleButtonSize = {2 * (ACTION_BUTTON_SIZE[1] + 1.5 * SAMELINE_SPACING), 1}
+        imgui.invisibleButton("sv isnt a real skill", invisibleButtonSize)
+    else
+        imgui.SameLine(0, SAMELINE_SPACING)
+        imgui.Text("Place SVs")
+        addSeparator()
+        if #settingVars.frameTimes == 0 then
+            imgui.Text("No notes added in Step 2, so can't place SVs yet")
+            return
+        end
+        helpMarker("This tool displaces notes into frames after the (first) selected note")
+        helpMarker("Works with pre-existing SVs or no SVs in the map")
+        helpMarker("This is technically an edit SV tool, but it replaces the old animate function")
+        helpMarker("Make sure to prepare an empty area for the frames after the note you select")
+        helpMarker("Note: frame positions and viewing them will break if SV distances change")
+        addSeparator()
+        local label = "Setup frames after selected note"
+        simpleActionMenu(label, 1, displaceNotesForAnimationFrames, nil, settingVars)
+    end
 end
 -- Makes the export and import menu for place SV settings
 -- Parameters
@@ -2338,14 +2446,15 @@ function exportImportSettingsMenu(globalVars, menuVars, settingVars)
         svType = STANDARD_SVS[menuVars.svTypeIndex]
     end
     local isComboType = svType == "Combo"
-    local isSplitscrollSVType = svType == "Splitscroll (Basic)" or
-                                svType == "Splitscroll (Advanced)"
+    local notStutterSVType = svType == "Splitscroll (Basic)" or
+                             svType == "Splitscroll (Advanced)" or
+                             svType == "Frames Setup"
     imgui.Text("Paste exported data here to import")
     _, globalVars.importData = imgui.InputTextMultiline("##placeImport", globalVars.importData,
                                                         999999, multilineWidgetSize)
     importPlaceSVButton(globalVars)
     addSeparator()
-    if isSplitscrollSVType then imgui.Text("No export option") return end
+    if notStutterSVType then imgui.Text("No export option") return end
     
     if not isSpecialPlaceType then
         imgui.Text("Copy + paste exported data somewhere safe")
@@ -2695,7 +2804,7 @@ end
 -- Provides a copy-pastable link to a cubic bezier website and also can parse inputted links
 -- Returns whether new bezier coordinates were parsed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function provideBezierWebsiteLink(settingVars)
     local coordinateParsed = false
     local bezierText = state.GetValue("bezierText") or "https://cubic-bezier.com/"
@@ -2724,7 +2833,7 @@ end
 -- Provides an import box to parse inputted custom SVs
 -- Returns whether new custom SVs were parsed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function importCustomSVs(settingVars)
     local svsParsed = false
     local customSVText = state.GetValue("customSVText") or "Import SV values here"
@@ -2754,7 +2863,7 @@ end
 --    currentSVType : current type of SV being updated [String]
 --    globalVars    : list of variables used globally across all menus [Table]
 --    menuVars      : list of variables used for the place SV menu [Table]
---    settingVars   : list of variables used for the current SV menu [Table]
+--    settingVars   : list of variables used for the current menu [Table]
 function updateMenuSVs(currentSVType, globalVars, menuVars, settingVars)
     local interlaceMultiplier = nil
     if menuVars.interlace then interlaceMultiplier = menuVars.interlaceRatio end
@@ -2843,7 +2952,7 @@ function displayStutterSVStats(svMultipliers, stutterDuration)
 end
 -- Displays stats for the current menu's SVs
 -- Parameters
---    svStats : list of stats for the current SV menu [Table]
+--    svStats : list of stats for the current menu [Table]
 function displaySVStats(svStats)
     imgui.Columns(2, "SV Stats", false)
     imgui.Text("Max SV:")
@@ -2886,7 +2995,7 @@ function adjustNumberOfMultipliers(settingVars)
 end
 -- Updates SVs and SV info stored in the stutter menu
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function updateStutterMenuSVs(settingVars)
     settingVars.svMultipliers = generateSVMultipliers("Stutter1", settingVars, nil)
     local svMultipliersNoEndSV = makeDuplicateList(settingVars.svMultipliers)
@@ -2915,7 +3024,7 @@ function updateStutterMenuSVs(settingVars)
 end
 -- Makes the SV info windows for stutter SV
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function displayStutterSVWindows(settingVars)
     if settingVars.linearlyChange then
         startNextWindowNotCollapsed("svInfo2AutoOpen")
@@ -2934,7 +3043,7 @@ function displayStutterSVWindows(settingVars)
 end
 -- Adds or clears note times for the 2nd scroll for the splitscroll menu
 -- Parameters
---    settingVars          : list of variables used for the current SV menu [Table]
+--    settingVars          : list of variables used for the current menu [Table]
 --    noNoteTimesInitially : whether or not there were note times initially [Boolean]
 function addOrClearNoteTimes(settingVars, noNoteTimesInitially)
     imgui.Text(#settingVars.noteTimes2.." note times assigned for 2nd scroll")
@@ -2946,7 +3055,35 @@ function addOrClearNoteTimes(settingVars, noNoteTimesInitially)
     if not imgui.Button("Clear all 2nd scroll note times", ACTION_BUTTON_SIZE) then return end
     settingVars.noteTimes2 = {}
 end
--- Adds selected note times to the splitscroll 2nd scroll speed list
+-- Adds or clears note times for the 3rd scroll for the splitscroll menu
+-- Parameters
+--    settingVars          : list of variables used for the current menu [Table]
+--    noNoteTimesInitially : whether or not there were note times initially [Boolean]
+function addOrClearNoteTimes2(settingVars, noNoteTimesInitially)
+    imgui.Text(#settingVars.noteTimes3.." note times assigned for 3rd scroll")
+    
+    local buttonText = "Assign selected note times to 3rd scroll"
+    button(buttonText, ACTION_BUTTON_SIZE, addSelectedNoteTimes2, nil, settingVars)
+    
+    if noNoteTimesInitially then return end
+    if not imgui.Button("Clear all 3rd scroll note times", ACTION_BUTTON_SIZE) then return end
+    settingVars.noteTimes3 = {}
+end
+-- Adds or clears note times for the 4th scroll for the splitscroll menu
+-- Parameters
+--    settingVars          : list of variables used for the current menu [Table]
+--    noNoteTimesInitially : whether or not there were note times initially [Boolean]
+function addOrClearNoteTimes3(settingVars, noNoteTimesInitially)
+    imgui.Text(#settingVars.noteTimes4.." note times assigned for 4th scroll")
+    
+    local buttonText = "Assign selected note times to 4th scroll"
+    button(buttonText, ACTION_BUTTON_SIZE, addSelectedNoteTimes3, nil, settingVars)
+    
+    if noNoteTimesInitially then return end
+    if not imgui.Button("Clear all 4th scroll note times", ACTION_BUTTON_SIZE) then return end
+    settingVars.noteTimes4 = {}
+end
+-- Adds selected note times to the splitscroll 2nd scroll list
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function addSelectedNoteTimes(settingVars)
@@ -2956,9 +3093,29 @@ function addSelectedNoteTimes(settingVars)
     settingVars.noteTimes2 = removeDuplicateValues(settingVars.noteTimes2)
     settingVars.noteTimes2 = table.sort(settingVars.noteTimes2, sortAscending)
 end
+-- Adds selected note times to the splitscroll 3rd scroll list
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function addSelectedNoteTimes2(settingVars)
+    for _, hitObject in pairs(state.SelectedHitObjects) do
+        table.insert(settingVars.noteTimes3, hitObject.StartTime)
+    end
+    settingVars.noteTimes3 = removeDuplicateValues(settingVars.noteTimes3)
+    settingVars.noteTimes3 = table.sort(settingVars.noteTimes3, sortAscending)
+end
+-- Adds selected note times to the splitscroll 4th scroll list
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function addSelectedNoteTimes3(settingVars)
+    for _, hitObject in pairs(state.SelectedHitObjects) do
+        table.insert(settingVars.noteTimes4, hitObject.StartTime)
+    end
+    settingVars.noteTimes4 = removeDuplicateValues(settingVars.noteTimes4)
+    settingVars.noteTimes4 = table.sort(settingVars.noteTimes4, sortAscending)
+end
 -- Makes buttons for adding and clearing SVs for the 1st scroll for the splitscroll menu
 -- Parameters
---    settingVars    : list of variables used for the current SV menu [Table]
+--    settingVars    : list of variables used for the current menu [Table]
 --    noSVsInitially : whether or not there were SVs initially [Boolean]
 function buttonsForSVsInScroll1(settingVars, noSVsInitially)
     imgui.Text(#settingVars.svsInScroll1.." SVs assigned for 1st scroll")
@@ -2973,11 +3130,11 @@ function buttonsForSVsInScroll1(settingVars, noSVsInitially)
     if noSVsInitially then addFirstScrollSVs(settingVars) return end
     buttonClear1stScrollSVs(settingVars)
     imgui.SameLine(0, SAMELINE_SPACING)
-    buttonPlace1stScrollSVs(settingVars)
+    buttonPlaceScrollSVs(settingVars.svsInScroll1, "Re-place assigned\n1st scroll SVs")
 end
 -- Makes buttons for adding and clearing SVs for the 2nd scroll for the splitscroll menu
 -- Parameters
---    settingVars    : list of variables used for the current SV menu [Table]
+--    settingVars    : list of variables used for the current menu [Table]
 --    noSVsInitially : whether or not there were SVs initially [Boolean]
 function buttonsForSVsInScroll2(settingVars, noSVsInitially)
     imgui.Text(#settingVars.svsInScroll2.." SVs assigned for 2nd scroll")
@@ -2992,47 +3149,85 @@ function buttonsForSVsInScroll2(settingVars, noSVsInitially)
     if noSVsInitially then addSecondScrollSVs(settingVars) return end
     buttonClear2ndScrollSVs(settingVars)
     imgui.SameLine(0, SAMELINE_SPACING)
-    buttonPlace2ndScrollSVs(settingVars)
+    buttonPlaceScrollSVs(settingVars.svsInScroll2, "Re-place assigned\n2nd scroll SVs")
+end
+-- Makes buttons for adding and clearing SVs for the 3rd scroll for the splitscroll menu
+-- Parameters
+--    settingVars    : list of variables used for the current menu [Table]
+--    noSVsInitially : whether or not there were SVs initially [Boolean]
+function buttonsForSVsInScroll3(settingVars, noSVsInitially)
+    imgui.Text(#settingVars.svsInScroll3.." SVs assigned for 3rd scroll")
+    local function addThirdScrollSVs(settingVars)
+        local buttonText = "Assign SVs between\nselected notes to 3rd scroll"
+        if not imgui.Button(buttonText, ACTION_BUTTON_SIZE) then return end
+        local offsets = uniqueSelectedNoteOffsets()
+        if #offsets < 2 then return end
+        
+        settingVars.svsInScroll3 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
+    end
+    if noSVsInitially then addThirdScrollSVs(settingVars) return end
+    buttonClear3rdScrollSVs(settingVars)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    buttonPlaceScrollSVs(settingVars.svsInScroll3, "Re-place assigned\n3rd scroll SVs")
+end
+-- Makes buttons for adding and clearing SVs for the 4th scroll for the splitscroll menu
+-- Parameters
+--    settingVars    : list of variables used for the current menu [Table]
+--    noSVsInitially : whether or not there were SVs initially [Boolean]
+function buttonsForSVsInScroll4(settingVars, noSVsInitially)
+    imgui.Text(#settingVars.svsInScroll4.." SVs assigned for 4th scroll")
+    local function addFourthScrollSVs(settingVars)
+        local buttonText = "Assign SVs between\nselected notes to 4th scroll"
+        if not imgui.Button(buttonText, ACTION_BUTTON_SIZE) then return end
+        local offsets = uniqueSelectedNoteOffsets()
+        if #offsets < 2 then return end
+        
+        settingVars.svsInScroll4 = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
+    end
+    if noSVsInitially then addFourthScrollSVs(settingVars) return end
+    buttonClear4thScrollSVs(settingVars)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    buttonPlaceScrollSVs(settingVars.svsInScroll4, "Re-place assigned\n4th scroll SVs")
 end
 -- Makes a button that clears SVs for the 1st scroll for the splitscroll menu
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function buttonClear1stScrollSVs(settingVars)
     local buttonText = "Clear assigned\n 1st scroll SVs"
     if not imgui.Button(buttonText, HALF_ACTION_BUTTON_SIZE) then return end
     settingVars.svsInScroll1 = {}
 end
--- Makes a button that places SVs assigned for 1st scroll for the splitscroll menu
--- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
-function buttonPlace1stScrollSVs(settingVars)
-    local buttonText = "Re-place assigned\n1st scroll SVs"
-    if not imgui.Button(buttonText, HALF_ACTION_BUTTON_SIZE) then return end
-    
-    local svsToAdd = settingVars.svsInScroll1
-    local startOffset = svsToAdd[1].StartTime
-    local extraOffset = 1/128
-    local endOffset = svsToAdd[#svsToAdd].StartTime + extraOffset
-    local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset)
-    removeAndAddSVs(svsToRemove, svsToAdd)
-end
 -- Makes a button that clears SVs for the 2nd scroll for the splitscroll menu
 -- Parameters
---    settingVars    : list of variables used for the current SV menu [Table]
---    noSVsInitially : whether or not there were SVs initially [Boolean]
+--    settingVars : list of variables used for the current menu [Table]
 function buttonClear2ndScrollSVs(settingVars)
     local buttonText = "Clear assigned\n2nd scroll SVs"
     if not imgui.Button(buttonText, HALF_ACTION_BUTTON_SIZE) then return end
     settingVars.svsInScroll2 = {}
 end
--- Makes a button that places SVs assigned for 2nd scroll for the splitscroll menu
+-- Makes a button that clears SVs for the 3rd scroll for the splitscroll menu
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
-function buttonPlace2ndScrollSVs(settingVars)
-    local buttonText = "Re-place assigned\n2nd scroll SVs"
+--    settingVars : list of variables used for the current menu [Table]
+function buttonClear3rdScrollSVs(settingVars)
+    local buttonText = "Clear assigned\n3rd scroll SVs"
     if not imgui.Button(buttonText, HALF_ACTION_BUTTON_SIZE) then return end
-    
-    local svsToAdd = settingVars.svsInScroll2
+    settingVars.svsInScroll3 = {}
+end
+-- Makes a button that clears SVs for the 4th scroll for the splitscroll menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function buttonClear4thScrollSVs(settingVars)
+    local buttonText = "Clear assigned\n4th scroll SVs"
+    if not imgui.Button(buttonText, HALF_ACTION_BUTTON_SIZE) then return end
+    settingVars.svsInScroll4 = {}
+end
+-- Makes a button that places SVs assigned for a scroll for the splitscroll menu
+-- Parameters
+--    svList : list of SVs of the target scroll [Table]
+--    buttonText : text for the button [String]
+function buttonPlaceScrollSVs(svList, buttonText)
+    if not imgui.Button(buttonText, HALF_ACTION_BUTTON_SIZE) then return end
+    local svsToAdd = svList
     local startOffset = svsToAdd[1].StartTime
     local extraOffset = 1/128
     local endOffset = svsToAdd[#svsToAdd].StartTime + extraOffset
@@ -3377,6 +3572,134 @@ function importPlaceSVButton(globalVars)
     globalVars.importData = ""
     globalVars.showExportImportMenu = false
 end
+-- Creates a button that adds frameTime objects to the list in the frames setup menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function addFrameTimes(settingVars)
+    if not imgui.Button("Add selected notes to use for frames", ACTION_BUTTON_SIZE) then return end
+    
+    local hasAlreadyAddedLaneTime = {}
+    for i = 1, map.GetKeyCount() do
+        table.insert(hasAlreadyAddedLaneTime, {})
+    end
+    local frameTimeToIndex = {}
+    local totalTimes = #settingVars.frameTimes
+    for i = 1, totalTimes do
+        local frameTime = settingVars.frameTimes[i]
+        local time = frameTime.time
+        local lanes = frameTime.lanes
+        frameTimeToIndex[time] = i
+        for j = 1, #lanes do
+            local lane = lanes[j]
+            hasAlreadyAddedLaneTime[lane][time] = true
+        end
+    end
+    for _, hitObject in pairs(state.SelectedHitObjects) do
+        local lane = hitObject.Lane
+        local time = hitObject.StartTime
+        if (not hasAlreadyAddedLaneTime[lane][time]) then
+            hasAlreadyAddedLaneTime[lane][time] = true
+            if frameTimeToIndex[time] then
+                local index = frameTimeToIndex[time]
+                local frameTime = settingVars.frameTimes[index]
+                table.insert(frameTime.lanes, lane)
+                frameTime.lanes = table.sort(frameTime.lanes, sortAscending)
+            else
+                local defaultFrame = 1
+                local defaultPosition = 0
+                local newFrameTime = createFrameTime(time, {lane}, defaultFrame, defaultPosition)
+                table.insert(settingVars.frameTimes, newFrameTime)
+                frameTimeToIndex[time] = #settingVars.frameTimes
+            end  
+        end
+    end
+    settingVars.frameTimes = table.sort(settingVars.frameTimes, sortAscendingTime)
+end
+-- Displays all existing frameTimes for the frames setup menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function displayFrameTimes(settingVars)
+    if #settingVars.frameTimes == 0 then
+        imgui.Text("Add notes to fill the selection box below")
+    else
+        imgui.Text("time | lanes | frame # | position")
+    end
+    helpMarker("Make sure to select ALL lanes from a chord with multiple notes, not just one lane")
+    addPadding()
+    local frameTimeSelectionArea = {ACTION_BUTTON_SIZE[1], 120}
+    imgui.BeginChild("FrameTimes", frameTimeSelectionArea, true)
+    for i = 1, #settingVars.frameTimes do
+        local frameTimeData = {}
+        local frameTime = settingVars.frameTimes[i]
+        frameTimeData[1] = frameTime.time
+        frameTimeData[2] = table.concat(frameTime.lanes, ", ")
+        frameTimeData[3] = frameTime.frame
+        frameTimeData[4] = frameTime.position
+        local selectableText = table.concat(frameTimeData, " | ")
+        if imgui.Selectable(selectableText, settingVars.selectedTimeIndex == i) then
+            settingVars.selectedTimeIndex = i
+        end
+    end
+    imgui.EndChild()
+end
+-- Makes the button that removes the currently selected frame time for the frames setup menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function removeSelectedFrameTimeButton(settingVars)
+    if #settingVars.frameTimes == 0 then return end
+    if not imgui.Button("Removed currently selected time", BEEG_BUTTON_SIZE) then return end
+    table.remove(settingVars.frameTimes, settingVars.selectedTimeIndex)
+    local maxIndex = math.max(1, #settingVars.frameTimes)
+    settingVars.selectedTimeIndex = clampToInterval(settingVars.selectedTimeIndex, 1, maxIndex)
+end
+-- Draws notes from the currently selected frame for the frames setup menu
+-- Parameters
+--    globalVars  : list of variables used globally across all menus [Table]
+--    settingVars : list of variables used for the current menu [Table]
+function drawCurrentFrame(globalVars, settingVars)
+    local mapKeyCount = map.GetKeyCount()
+    local noteWidth = 200 / mapKeyCount
+    local noteSpacing = 5
+    local barNoteHeight = round(2 * noteWidth / 5, 0)
+    local noteColor = rgbaToUint(117, 117, 117, 255)
+    local noteSkinType = NOTE_SKIN_TYPES[settingVars.noteSkinTypeIndex]
+    local drawlist = imgui.GetWindowDrawList()
+    local childHeight = 250
+    imgui.BeginChild("Current Frame", {255, childHeight}, true)
+    for _, frameTime in pairs(settingVars.frameTimes) do 
+        if frameTime.frame == settingVars.currentFrame then
+            for _, lane in pairs(frameTime.lanes) do
+                if noteSkinType == "Bar" then
+                    local x1 = 2 * noteSpacing + (noteWidth + noteSpacing) * (lane - 1)
+                    local y1 = (childHeight - 2 * noteSpacing) - (frameTime.position / 2)
+                    local x2 = x1 + noteWidth
+                    local y2 = y1 - barNoteHeight
+                    if globalVars.upscroll then
+                        y1 = childHeight - y1
+                        y2 = y1 + barNoteHeight
+                    end
+                    local p1 = coordsRelativeToWindow(x1, y1)
+                    local p2 = coordsRelativeToWindow(x2, y2)
+                    drawlist.AddRectFilled(p1, p2, noteColor)
+                elseif noteSkinType == "Circle" then
+                    local circleRadius = noteWidth / 2
+                    local leftBlankSpace = 2 * noteSpacing + circleRadius
+                    local yBlankSpace = 2 * noteSpacing + circleRadius + frameTime.position / 2
+                    local x1 = leftBlankSpace + (noteWidth + noteSpacing) * (lane - 1)
+                    local y1 = childHeight - yBlankSpace
+                    if globalVars.upscroll then
+                        y1 = childHeight - y1
+                    end
+                    local p1 = coordsRelativeToWindow(x1, y1)
+                    drawlist.AddCircleFilled(p1, circleRadius, noteColor, 20)
+                elseif noteSkinType == "Arrow" then
+                    local fuckArrows
+                end
+            end
+        end
+    end
+    imgui.EndChild()
+end
 
 ---------------------------------------------------------------------------------------------------
 -- General Utility Functions ----------------------------------------------------------------------
@@ -3424,6 +3747,15 @@ function checkIfMouseMoved(currentMousePosition)
     oldMousePosition.y = currentMousePosition.y
     saveVariables("oldMousePosition", oldMousePosition)
     return mousePositionChanged
+end
+-- Returns coordinates relative to the plugin window [Table]
+-- Parameters
+--    x : x coordinate relative to the plugin window [Int]
+--    y : y coordinate relative to the plugin window [Int]
+function coordsRelativeToWindow(x, y)
+    local newX = x + imgui.GetWindowPos()[1]
+    local newY = y + imgui.GetWindowPos()[2]
+    return {newX, newY}
 end
 -- Draws an equilateral triangle
 -- Parameters
@@ -3915,6 +4247,11 @@ function sortAscending(a, b) return a < b end
 --    a : first SV
 --    b : second SV
 function sortAscendingStartTime(a, b) return a.StartTime < b.StartTime end
+-- Sorting function for objects 'a' and 'b' that returns whether a.time < b.time [Boolean]
+-- Parameters
+--    a : first object
+--    b : second object
+function sortAscendingTime(a, b) return a.time < b.time end
 -- Restricts a number to be within a closed interval that wraps around
 -- Returns the result of the restriction [Int/Float]
 -- Parameters
@@ -4054,6 +4391,21 @@ function combo(label, list, listIndex)
     local _, newComboIndex = imgui.Combo(label, oldComboIndex, list, #list)
     return newComboIndex + 1
     --]]
+end
+-- Creates and returns a frameTime object [Table]
+-- Parameters
+--    thisTime     : time in milliseconds [Int]
+--    thisLanes    : note lanes [Table]
+--    thisFrame    : frame number [Int]
+--    thisPosition : msx position (height) on the frame [Int/Float]
+function createFrameTime(thisTime, thisLanes, thisFrame, thisPosition)
+    local frameTime = {
+        time = thisTime,
+        lanes = thisLanes,
+        frame = thisFrame,
+        position = thisPosition
+    }
+    return frameTime
 end
 -- Executes a function if a key is pressed
 -- Parameters
@@ -4253,7 +4605,8 @@ function chooseConstantShift(settingVars, defaultShift)
     end
     imgui.SameLine(0, SAMELINE_SPACING)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH * 0.7 - SAMELINE_SPACING)
-    local _, newShift = imgui.InputFloat("Vertical Shift", settingVars.verticalShift, 0, 0, "%.3fx")
+    local inputText = "Vertical Shift"
+    local _, newShift = imgui.InputFloat(inputText, settingVars.verticalShift, 0, 0, "%.3fx")
     imgui.PopItemWidth()
     settingVars.verticalShift = newShift
     return oldShift ~= newShift
@@ -4271,6 +4624,28 @@ function chooseControlSecondSV(settingVars)
     local choiceChanged = oldChoice ~= settingVars.controlLastSV
     if choiceChanged then settingVars.stutterDuration = 100 - settingVars.stutterDuration end
     return choiceChanged
+end
+-- Lets you choose the current frame
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseCurrentFrame(settingVars)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Previewing frame:")
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(35)
+    imgui.PushButtonRepeat(true)
+    if imgui.ArrowButton("##leftFrame", imgui_dir.Left) then
+        settingVars.currentFrame = settingVars.currentFrame - 1
+    end
+    imgui.SameLine(0, SAMELINE_SPACING)
+    _, settingVars.currentFrame = imgui.InputInt("##currentFrame", settingVars.currentFrame, 0, 0)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    if imgui.ArrowButton("##rightFrame", imgui_dir.Right) then
+        settingVars.currentFrame = settingVars.currentFrame + 1
+    end
+    imgui.PopButtonRepeat()
+    settingVars.currentFrame = wrapToInterval(settingVars.currentFrame, 1, settingVars.numFrames)
+    imgui.PopItemWidth()
 end
 -- Lets you choose the cursor trail of the mouse
 -- Parameters
@@ -4364,13 +4739,29 @@ end
 function chooseDistance(menuVars)
     _, menuVars.distance = imgui.InputFloat("Distance", menuVars.distance, 0, 0, "%.3f msx")
 end
--- Lets you choose the distance back for splitscroll
+-- Lets you choose the distance back for splitscroll between scroll1 and scroll2
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function chooseDistanceBack(settingVars)
     _, settingVars.distanceBack = imgui.InputFloat("Split Distance", settingVars.distanceBack,
                                                    0, 0, "%.3f msx")
-    helpMarker("Splitscroll distance to separate the two scrolls planes\n(1,000,000 = default)")
+    helpMarker("Splitscroll distance separating scroll1 and scroll2 planes")
+end
+-- Lets you choose the distance back for splitscroll between scroll2 and scroll3
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseDistanceBack2(settingVars)
+    _, settingVars.distanceBack2 = imgui.InputFloat("Split Dist 2", settingVars.distanceBack2,
+                                                   0, 0, "%.3f msx")
+    helpMarker("Splitscroll distance separating scroll2 and scroll3 planes")
+end
+-- Lets you choose the distance back for splitscroll between scroll3 and scroll4
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseDistanceBack3(settingVars)
+    _, settingVars.distanceBack3 = imgui.InputFloat("Split Dist 3", settingVars.distanceBack3,
+                                                   0, 0, "%.3f msx")
+    helpMarker("Splitscroll distance separating scroll3 and scroll4 planes")
 end
 -- Lets you choose whether or not to replace SVs when placing SVs
 -- Parameters
@@ -4430,7 +4821,7 @@ end
 -- Lets you choose the final SV to place at the end of SV sets
 -- Returns whether or not the final SV type/value changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseFinalSV(settingVars)
     local oldIndex = settingVars.finalSVIndex
     local oldCustomSV = settingVars.customSV
@@ -4472,10 +4863,35 @@ end
 function chooseFlickerType(menuVars)
     menuVars.flickerTypeIndex = combo("Flicker Type", FLICKER_TYPES, menuVars.flickerTypeIndex)
 end
+-- Lets you choose whether or not to reverse the frame order for the frame setup menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseFrameOrder(settingVars)
+    local checkBoxText = "Reverse frame order when placing SVs"
+    _, settingVars.reverseFrameOrder = imgui.Checkbox(checkBoxText, settingVars.reverseFrameOrder)
+end
+-- Lets you choose the distance between frames
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseFrameSpacing(settingVars)
+    _, settingVars.frameDistance = imgui.InputFloat("Frame Spacing", settingVars.frameDistance,
+                                                    0, 0, "%.0f msx")
+    settingVars.frameDistance = clampToInterval(settingVars.frameDistance, 2000, 100000)
+end
+-- Lets you choose the values for the selected frameTime
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseFrameTimeData(settingVars)
+    if #settingVars.frameTimes == 0 then return end
+    local frameTime = settingVars.frameTimes[settingVars.selectedTimeIndex]
+    _, frameTime.frame = imgui.InputInt("Frame #", frameTime.frame)
+    frameTime.frame = clampToInterval(frameTime.frame, 1, settingVars.numFrames)
+    _, frameTime.position = imgui.InputInt("Note height", frameTime.position)
+end
 -- Lets you choose the intensity of something from 1 to 100
 -- Returns whether or not the intensity changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseIntensity(settingVars)
     local oldIntensity = settingVars.intensity
     local _, newIntensity = imgui.SliderInt("Intensity", oldIntensity, 1, 100, oldIntensity.."%%")
@@ -4552,6 +4968,28 @@ function chooseMeasuredStatsView(menuVars)
         menuVars.unrounded = true
     end
 end
+-- Lets you choose the menu step # for the frames setup menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseMenuStep(settingVars)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Step # :")
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(24)
+    imgui.PushButtonRepeat(true)
+    if imgui.ArrowButton("##leftMenuStep", imgui_dir.Left) then
+        settingVars.menuStep = settingVars.menuStep - 1
+    end
+    imgui.SameLine(0, SAMELINE_SPACING)
+    _, settingVars.menuStep = imgui.InputInt("##currentMenuStep", settingVars.menuStep, 0, 0)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    if imgui.ArrowButton("##rightMenuStep", imgui_dir.Right) then
+        settingVars.menuStep = settingVars.menuStep + 1
+    end
+    imgui.PopButtonRepeat()
+    imgui.PopItemWidth()
+    settingVars.menuStep = wrapToInterval(settingVars.menuStep, 1, 3)
+end
 -- Lets you choose the mspf (milliseconds per frame) for splitscroll
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
@@ -4566,7 +5004,7 @@ end
 -- Lets you choose to not normalize values
 -- Returns whether or not the setting changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseNoNormalize(settingVars)
     addPadding()
     local oldChoice = settingVars.dontNormalize
@@ -4574,13 +5012,20 @@ function chooseNoNormalize(settingVars)
     settingVars.dontNormalize = newChoice
     return oldChoice ~= newChoice
 end
+-- Lets you choose the note skin type for the preview of the frames in the frame setup menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseNoteSkinType(settingVars)
+    settingVars.noteSkinTypeIndex = combo("Preview skin", NOTE_SKIN_TYPES,
+                                          settingVars.noteSkinTypeIndex)
+    helpMarker("Note skin type for the preview of the frames")
+end
 -- Lets you choose the note spacing
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
 function chooseNoteSpacing(menuVars)
     _, menuVars.noteSpacing = imgui.InputFloat("Note Spacing", menuVars.noteSpacing, 0, 0, "%.2fx")
 end
--- Lets you
 -- Lets you choose the number of flickers
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
@@ -4588,10 +5033,17 @@ function chooseNumFlickers(menuVars)
     _, menuVars.numFlickers = imgui.InputInt("Flickers", menuVars.numFlickers, 1, 1)
     menuVars.numFlickers = clampToInterval(menuVars.numFlickers, 1, 9999)
 end
+-- Lets you choose the number of frames
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseNumFrames(settingVars)
+    _, settingVars.numFrames = imgui.InputInt("Total # Frames", settingVars.numFrames)
+    settingVars.numFrames = clampToInterval(settingVars.numFrames, 1, MAX_ANIMATION_FRAMES)
+end
 -- Lets you choose the number of periods for a sinusoidal wave
 -- Returns whether or not the number of periods changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseNumPeriods(settingVars)
     local oldPeriods = settingVars.periods
     local _, newPeriods = imgui.InputFloat("Periods/Cycles", oldPeriods, 0.25, 0.25, "%.2f")
@@ -4600,10 +5052,17 @@ function chooseNumPeriods(settingVars)
     settingVars.periods = newPeriods
     return oldPeriods ~= newPeriods
 end
+-- Lets you choose the number of scrolls for advanced splitscroll
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseNumScrolls(settingVars)
+    _, settingVars.numScrolls = imgui.InputInt("# of scrolls", settingVars.numScrolls, 1, 1)
+    settingVars.numScrolls = clampToInterval(settingVars.numScrolls, 2, 4)
+end
 -- Lets you choose the number of periods to shift over for a sinusoidal wave
 -- Returns whether or not the period shift value changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function choosePeriodShift(settingVars)
     local oldShift = settingVars.periodsShift
     local _, newShift = imgui.InputFloat("Phase Shift", oldShift, 0.25, 0.25, "%.2f")
@@ -4626,7 +5085,7 @@ end
 -- Lets you choose the variability scale of randomness
 -- Returns whether or not the variability value changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseRandomScale(settingVars)
     local oldScale = settingVars.randomScale
     local _, newScale = imgui.InputFloat("Random Scale", oldScale, 0, 0, "%.2fx")
@@ -4636,7 +5095,7 @@ end
 -- Lets you choose the type of random generation
 -- Returns whether or not the type of random generation changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseRandomType(settingVars)
     local oldIndex = settingVars.randomTypeIndex
     settingVars.randomTypeIndex = combo("Random Type", RANDOM_TYPES, settingVars.randomTypeIndex)
@@ -4688,6 +5147,28 @@ function chooseScaleType(menuVars)
     if scaleType == "Average SV"        then chooseAverageSV(menuVars) end
     if scaleType == "Absolute Distance" then chooseDistance(menuVars) end
     if scaleType == "Relative Ratio"    then chooseRatio(menuVars) end
+end
+-- Lets you choose a scroll to make changes to for advanced splitscroll
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseScrollIndex(settingVars)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Currently viewing scroll #:")
+    imgui.SameLine(0, SAMELINE_SPACING)
+    imgui.PushItemWidth(35)
+    if imgui.ArrowButton("##leftScrollIndex", imgui_dir.Left) then
+        settingVars.scrollIndex = settingVars.scrollIndex - 1
+    end
+    imgui.SameLine(0, SAMELINE_SPACING)
+    local inputText = "##currentScrollIndex"
+    _, settingVars.scrollIndex = imgui.InputInt(inputText, settingVars.scrollIndex, 0, 0)
+    imgui.SameLine(0, SAMELINE_SPACING)
+    if imgui.ArrowButton("##rightScrollIndex", imgui_dir.Right) then
+        settingVars.scrollIndex = settingVars.scrollIndex + 1
+    end
+    helpMarker("Assign notes and SVs for every single scroll in order to place splitscroll SVs")
+    settingVars.scrollIndex = wrapToInterval(settingVars.scrollIndex, 1, settingVars.numScrolls)
+    imgui.PopItemWidth()
 end
 -- Lets you choose the "spring constant" for the snake
 -- Parameters
@@ -4844,7 +5325,7 @@ end
 -- Lets you choose the number of SV points per quarter period of a sinusoidal wave
 -- Returns whether or not the number of SV points changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseSVPerQuarterPeriod(settingVars)
     local oldPoints = settingVars.svsPerQuarterPeriod
     local _, newPoints = imgui.InputInt("SV Points##perQuarter", oldPoints, 1, 1)
@@ -4857,7 +5338,7 @@ end
 -- Lets you choose the number of SV points
 -- Returns whether or not the number of SV points changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current SV menu [Table]
+--    settingVars : list of variables used for the current menu [Table]
 function chooseSVPoints(settingVars)
     local oldPoints = settingVars.svPoints
     _, settingVars.svPoints = imgui.InputInt("SV Points##regular", oldPoints, 1, 1)
@@ -4910,8 +5391,8 @@ function generateSVMultipliers(svType, settingVars, interlaceMultiplier)
                                              settingVars.intensity, settingVars.verticalShift)
     elseif svType == "Bezier" then
         multipliers = generateBezierSet(settingVars.x1, settingVars.y1, settingVars.x2,
-                                        settingVars.y2, settingVars.avgSV, settingVars.svPoints + 1,
-                                        settingVars.verticalShift)
+                                        settingVars.y2, settingVars.avgSV,
+                                        settingVars.svPoints + 1, settingVars.verticalShift)
     elseif svType == "Hermite" then
         multipliers = generateHermiteSet(settingVars.startSV, settingVars.endSV,
                                          settingVars.verticalShift, settingVars.avgSV, 
@@ -5576,63 +6057,102 @@ function placeSplitScrollSVs(settingVars)
     end
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
--- Places advanced split scroll SVs 
+-- Places advanced split scroll SVs
+--[[ **NOTE**
+    Due to how quaver stores(? or calculates?) SVs that are super big,
+    some sv distances will be imprecise but close enough when using the
+    svMultiplier + tpDistance * useableMultiplier. The svMultiplier is so small compared
+    to the other number that Quaver ends up not using it. If you want to be extra precise
+    when preserving relative note positions, you can place another set of SVs after placing
+    the splitscoll SVs that corrects this discrepency by calculating
+    the idealTargetDistance - actualDistancesWithFirstSplitscrollSVsPlace, then
+    adding an svBeforeBefore or svBefore that accounts for the difference.
+    The current code doesn't do that, but you can code it in. Same applies to basic splitscroll.
+--]]
 -- Parameters
---    menuVars : list of variables used for the current menu [Table]
-function placeAdvancedSplitScrollSVs(menuVars)
-    local isNoteOffsetFor2nd = {}
-    local offsets = uniqueNoteOffsetsBetweenSelected()
-    for _, offset in pairs(menuVars.noteTimes2) do
-        table.insert(offsets, offset)
+--    settingVars : list of variables used for the current menu [Table]
+function placeAdvancedSplitScrollSVs(settingVars)
+    local numScrolls = settingVars.numScrolls
+    local noteOffsetToScrollIndex = {}
+    local tempOffsets = {
+        uniqueNoteOffsetsBetweenSelected(),
+        settingVars.noteTimes2,
+        settingVars.noteTimes3,
+        settingVars.noteTimes4
+    }
+    for i = 2, numScrolls do
+        for _, offset in pairs(tempOffsets[i]) do
+            table.insert(tempOffsets[1], offset)
+        end
     end
-    offsets = table.sort(offsets, function(a, b) return a < b end)
-    local firstOffset = offsets[1]
-    local lastOffset = offsets[#offsets]
+    tempOffsets[1] = table.sort(tempOffsets[1], sortAscending)
+    local firstOffset = tempOffsets[1][1]
+    local lastOffset = tempOffsets[1][#tempOffsets[1]]
     local totalTime = lastOffset - firstOffset
     local noteOffsets = uniqueNoteOffsetsBetween(firstOffset, lastOffset)
-    for _, noteOffset in pairs(menuVars.noteTimes2) do
-        isNoteOffsetFor2nd[noteOffset] = true
+    tempOffsets[1] = makeDuplicateList(noteOffsets)
+    for i = 1, numScrolls do
+        for _, offset in pairs(tempOffsets[i]) do
+            noteOffsetToScrollIndex[offset] = i
+        end
     end
     local svsToAdd = {}
-    local svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset + 2) -- a jank + 2, but meh...
-    local initialDistance = menuVars.distanceBack
-    local msPerFrame = menuVars.msPerFrame
-    local numFrames = math.floor((totalTime - 1) / msPerFrame)
-    local noteIndex = 2
-    local sv1Index = 1
-    local sv2Index = 1
-    local svsIn1 = menuVars.svsInScroll1
-    local svsIn2 = menuVars.svsInScroll2
-    if #svsIn1 == 0 or svsIn1[1].StartTime ~= firstOffset then
-        local newStartSV = utils.CreateScrollVelocity(firstOffset, getSVMultiplierAt(firstOffset))
-        table.insert(svsIn1, 1, newStartSV)
+    local lastDuration = 1 / getUsableDisplacementMultiplier(lastOffset)
+    local svsToRemove = getSVsBetweenOffsets(firstOffset, lastOffset + 2 * lastDuration)
+    local distanceBacks = {
+        -settingVars.distanceBack,
+        -settingVars.distanceBack2,
+        -settingVars.distanceBack3
+    }
+    local totalDistanceBack = 0
+    for i = 1, numScrolls - 1 do
+        totalDistanceBack = totalDistanceBack - distanceBacks[i]
     end
-    if #svsIn2 == 0 or svsIn2[1].StartTime ~= firstOffset then
-        local newStartSV = utils.CreateScrollVelocity(firstOffset, getSVMultiplierAt(firstOffset))
-        table.insert(svsIn2, 1, newStartSV)
+    local tpDistances = {}
+    for i = 1, numScrolls - 1 do
+        tpDistances[i] = distanceBacks[i]
+    end
+    tpDistances[#tpDistances + 1] = totalDistanceBack
+    local msPerFrame = settingVars.msPerFrame
+    local numFrames = math.floor((totalTime - 1) / msPerFrame) + 1
+    local noteIndex = 2
+    local svIndexesForScrolls = {}
+    for i = 1, numScrolls do
+        svIndexesForScrolls[i] = 1
+    end
+    local svsInScroll = {
+        settingVars.svsInScroll1,
+        settingVars.svsInScroll2,
+        settingVars.svsInScroll3,
+        settingVars.svsInScroll4
+    }
+    for i = 1, numScrolls do
+        addStartSVIfMissing(svsInScroll[i], firstOffset)
     end
     local splitscrollOffsets = {}
-    for i = 0, numFrames do
+    for i = 0, numFrames - 1 do
         local timePassed = i * msPerFrame
         table.insert(splitscrollOffsets, timePassed + firstOffset)
     end
     table.insert(splitscrollOffsets, lastOffset)
-    local distancesIn1 = calculateDisplacementsFromSVs(svsIn1, splitscrollOffsets)
-    local distancesIn2 = calculateDisplacementsFromSVs(svsIn2, splitscrollOffsets)
+    local frameDistancesInScroll = {}
+    local noteDistancesInScroll = {}
+    for i = 1, numScrolls do
+        frameDistancesInScroll[i] = calculateDisplacementsFromSVs(svsInScroll[i], splitscrollOffsets)
+        noteDistancesInScroll[i] = calculateDisplacementsFromSVs(svsInScroll[i], noteOffsets)
+    end
     local splitscrollDistances = {}
-    for i = 1, #distancesIn1 do
-        splitscrollDistances[i] = distancesIn1[i] - distancesIn2[i] + initialDistance
-        if i % 2 == 0 then splitscrollDistances[i] = -splitscrollDistances[i] end
+    for i = 1, numFrames + 1 do
+        local scrollIndex = ((i - 2) % numScrolls) + 1
+        local nextScrollIndex = ((i - 1) % numScrolls) + 1
+        local currentFrameDistance = frameDistancesInScroll[scrollIndex][i]
+        local nextFrameDistance = frameDistancesInScroll[nextScrollIndex][i]
+        splitscrollDistances[i] = nextFrameDistance - currentFrameDistance + tpDistances[scrollIndex]
     end
-    splitscrollDistances[1] = 0
-    local goingFrom1To2 = false
-    local noteDistancesIn1 = calculateDisplacementsFromSVs(svsIn1, noteOffsets)
-    local noteDistancesIn2 = calculateDisplacementsFromSVs(svsIn2, noteOffsets)
-    local noteDistances = {}
-    for i = 1, #noteDistancesIn1 do
-        noteDistances[i] = noteDistancesIn1[i] - noteDistancesIn2[i] + initialDistance
-    end
-    for i = 0, numFrames + 1 do
+    for i = 1, numFrames do
+        local isFinalFrame = i == numFrames
+        local scrollIndex = ((i - 1) % numScrolls) + 1
+        local nextScrollIndex = (scrollIndex % numScrolls) + 1
         local timeAt = splitscrollOffsets[i + 1]
         local multiplier = getUsableDisplacementMultiplier(timeAt)
         local duration = 1 / multiplier
@@ -5640,192 +6160,221 @@ function placeAdvancedSplitScrollSVs(menuVars)
         local timeAfter = timeAt + duration
         local noteOffset = noteOffsets[noteIndex]
         while noteOffset < timeAt do
-            local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
-                                      (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
+            local noteScrollIndex = noteOffsetToScrollIndex[noteOffset]
+            local noteInSameScroll = noteScrollIndex == scrollIndex
             local noteMultiplier = getUsableDisplacementMultiplier(noteOffset)
             local noteDuration = 1 / noteMultiplier
             local noteTimeBefore = noteOffset - noteDuration
             local noteTimeAt = noteOffset
             local noteTimeAfter = noteOffset + noteDuration
-            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime < noteTimeBefore do
-                if goingFrom1To2 then
-                    table.insert(svsToAdd, svsIn1[sv1Index])
-                end
-                sv1Index = sv1Index + 1
-            end
-            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime < noteTimeBefore do
-                if not goingFrom1To2 then
-                    table.insert(svsToAdd, svsIn2[sv2Index])
-                end
-                sv2Index = sv2Index + 1
-            end
-            if noteInOtherScroll then
-                local sv1 = svsIn2[sv2Index - 1]
-                local sv2 = svsIn2[sv2Index - 1]
-                local sv3 = svsIn2[sv2Index - 1]
-                if goingFrom1To2 then
-                    sv1 = svsIn1[sv1Index - 1]
-                    sv2 = svsIn1[sv1Index - 1]
-                    sv3 = svsIn1[sv1Index - 1]
-                end
-                while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= noteTimeAfter do
-                    if goingFrom1To2 then
-                        local svTime = svsIn1[sv1Index].StartTime 
-                        if svTime <= noteTimeBefore then
-                            sv1 = svsIn1[sv1Index]
-                        end
-                        if svTime <= noteTimeAt then
-                            sv2 = svsIn1[sv1Index]
-                        end
-                        if svTime <= noteTimeAfter then
-                            sv3 = svsIn1[sv1Index]
-                        end
+            for j = 1, numScrolls do
+                local currentSVsInScroll = svsInScroll[j]
+                while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                        currentSVsInScroll[svIndexesForScrolls[j]].StartTime < noteTimeBefore do
+                    if j == scrollIndex then
+                        table.insert(svsToAdd, currentSVsInScroll[svIndexesForScrolls[j]])
                     end
-                    sv1Index = sv1Index + 1
+                    svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
                 end
-                while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= noteTimeAfter do
-                    if not goingFrom1To2 then
-                        local svTime = svsIn2[sv2Index].StartTime 
-                        if svTime <= noteTimeBefore then
-                            sv1 = svsIn2[sv2Index]
+            end
+            if noteInSameScroll then
+                for j = 1, numScrolls do
+                    local currentSVsInScroll = svsInScroll[j]
+                    while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                            currentSVsInScroll[svIndexesForScrolls[j]].StartTime <= noteTimeAfter do
+                        if j == scrollIndex then
+                            table.insert(svsToAdd, currentSVsInScroll[svIndexesForScrolls[j]])
                         end
-                        if svTime <= noteTimeAt then
-                            sv2 = svsIn2[sv2Index]
-                        end
-                        if svTime <= noteTimeAfter then
-                            sv3 = svsIn2[sv2Index]
-                        end
+                        svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
                     end
-                    sv2Index = sv2Index + 1
                 end
-                local noteDistance = noteDistances[noteIndex]
-                if goingFrom1To2 then noteDistance = -noteDistance end
-                local svBefore = sv1.Multiplier + noteDistance * noteMultiplier
-                local svAt = sv2.Multiplier - noteDistance * noteMultiplier
-                local svAfter = sv3.Multiplier
-                table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeBefore, svBefore))
-                table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAt, svAt))
-                table.insert(svsToAdd, utils.CreateScrollVelocity(noteTimeAfter, svAfter))
             else
-                while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= noteTimeAfter do
-                    if goingFrom1To2 then
-                        table.insert(svsToAdd, svsIn1[sv1Index])
+                local currentSVsList = svsInScroll[scrollIndex]
+                local safeCurrentSVsListIndex = svIndexesForScrolls[scrollIndex] - 1
+                local currentSVBefore = currentSVsList[safeCurrentSVsListIndex]
+                local currentSVAt = currentSVsList[safeCurrentSVsListIndex]
+                local currentSVAfter = currentSVsList[safeCurrentSVsListIndex]
+                for j = 1, numScrolls do
+                    local currentSVsInScroll = svsInScroll[j]
+                    while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                            currentSVsInScroll[svIndexesForScrolls[j]].StartTime <= noteTimeAfter do
+                        if j == scrollIndex then
+                            local svTime = currentSVsInScroll[svIndexesForScrolls[j]].StartTime 
+                            if svTime <= noteTimeBefore then
+                                currentSVBefore = currentSVsInScroll[svIndexesForScrolls[j]]
+                            end
+                            if svTime <= noteTimeAt then
+                                currentSVAt = currentSVsInScroll[svIndexesForScrolls[j]]
+                            end
+                            if svTime <= noteTimeAfter then
+                                currentSVAfter = currentSVsInScroll[svIndexesForScrolls[j]]
+                            end
+                        end
+                        svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
                     end
-                    sv1Index = sv1Index + 1
                 end
-                while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= noteTimeAfter do
-                    if not goingFrom1To2 then
-                        table.insert(svsToAdd, svsIn2[sv2Index])
+                local targetNoteDistance = noteDistancesInScroll[noteScrollIndex][noteIndex]
+                local currentNoteDistance = noteDistancesInScroll[scrollIndex][noteIndex]
+                local noteDistance = targetNoteDistance - currentNoteDistance
+                if noteScrollIndex > scrollIndex then
+                    for j = scrollIndex, noteScrollIndex - 1 do
+                        noteDistance = noteDistance + tpDistances[j]
                     end
-                    sv2Index = sv2Index + 1
+                else
+                    for j = noteScrollIndex, scrollIndex - 1 do
+                        noteDistance = noteDistance - tpDistances[j]
+                    end
                 end
+                local svBefore = currentSVBefore.Multiplier + noteDistance * noteMultiplier
+                local svAt = currentSVAt.Multiplier - noteDistance * noteMultiplier
+                local svAfter = currentSVAfter.Multiplier
+                addSVToList(svsToAdd, noteTimeBefore, svBefore, true)
+                addSVToList(svsToAdd, noteTimeAt, svAt, true)
+                addSVToList(svsToAdd, noteTimeAfter, svAfter, true)
             end
             noteIndex = noteIndex + 1
             noteOffset = noteOffsets[noteIndex]
         end
-        while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime < timeBefore do
-            if goingFrom1To2 then
-                table.insert(svsToAdd, svsIn1[sv1Index])
+        for j = 1, numScrolls do
+            local currentSVsInScroll = svsInScroll[j]
+            while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                    currentSVsInScroll[svIndexesForScrolls[j]].StartTime < timeBefore do
+                if j == scrollIndex then
+                    table.insert(svsToAdd, currentSVsInScroll[svIndexesForScrolls[j]])
+                end
+                svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
             end
-            sv1Index = sv1Index + 1
-        end
-        while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime < timeBefore do
-            if not goingFrom1To2 then
-                table.insert(svsToAdd, svsIn2[sv2Index])
-            end
-            sv2Index = sv2Index + 1
         end
         if noteOffset == timeAt then
-            local noteInOtherScroll = (isNoteOffsetFor2nd[noteOffset] and goingFrom1To2) or
-                                      (not isNoteOffsetFor2nd[noteOffset] and not goingFrom1To2)
-            local sv1in1 = svsIn1[sv1Index - 1]
-            local sv2in1 = svsIn1[sv1Index - 1]
-            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= timeAfter do
-                if svsIn1[sv1Index].StartTime <= timeBefore then sv1in1 = svsIn1[sv1Index] end
-                if svsIn1[sv1Index].StartTime <= timeAt then sv2in1 = svsIn1[sv1Index] end
-                sv1Index = sv1Index + 1
-            end
-            local sv3in1 = svsIn1[sv1Index - 1]
-            local sv1in2 = svsIn2[sv2Index - 1]
-            local sv2in2 = svsIn2[sv2Index - 1]
-            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= timeAfter do
-                if svsIn2[sv2Index].StartTime <= timeBefore then sv1in2 = svsIn2[sv2Index] end
-                if svsIn2[sv2Index].StartTime <= timeAt then sv2in2 = svsIn2[sv2Index] end
-                sv2Index = sv2Index + 1
-            end
-            local sv3in2 = svsIn2[sv2Index - 1]
-            local svBefore = 0
-            local svAt = 0
-            local svAfter = 0
-            if noteInOtherScroll then
-                svBefore = svBefore + splitscrollDistances[i + 1] * multiplier
-                if i == numFrames + 1 and isNoteOffsetFor2nd[noteOffset] then
-                    svAt = svAt - splitscrollDistances[i + 1] * multiplier
-                end
-            else
-                svAt = svAt + splitscrollDistances[i + 1] * multiplier
-                if i == numFrames + 1 and not isNoteOffsetFor2nd[noteOffset] then
-                    svAt = svAt - splitscrollDistances[i + 1] * multiplier
+            local noteScrollIndex = noteOffsetToScrollIndex[noteOffset]
+            local noteInSameScroll = noteScrollIndex == scrollIndex
+            local svBefore = svsInScroll[scrollIndex][svIndexesForScrolls[scrollIndex] - 1]
+            local svAt = svsInScroll[nextScrollIndex][svIndexesForScrolls[nextScrollIndex] - 1]
+            for j = 1, numScrolls do
+                local currentSVsInScroll = svsInScroll[j]
+                while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                        currentSVsInScroll[svIndexesForScrolls[j]].StartTime <= timeAfter do
+                    local currentSVStartTime = currentSVsInScroll[svIndexesForScrolls[j]].StartTime
+                    local beforeCandidate = currentSVStartTime <= timeBefore
+                    local atCandidate = currentSVStartTime <= timeAt
+                    local forCurrentScroll = (j == scrollIndex)
+                    local forNextScroll = (j == nextScrollIndex)
+                    if forCurrentScroll and beforeCandidate then
+                        svBefore = currentSVsInScroll[svIndexesForScrolls[j]]
+                    end
+                    if forNextScroll and atCandidate then
+                        svAt = currentSVsInScroll[svIndexesForScrolls[j]]
+                    end
+                    svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
                 end
             end
-            if goingFrom1To2 then
-                svBefore = svBefore + sv1in1.Multiplier
-                svAt = svAt + sv2in2.Multiplier
-                svAfter = sv3in2.Multiplier
+            local svAfter = svsInScroll[nextScrollIndex][svIndexesForScrolls[nextScrollIndex] - 1]
+            local targetNoteDistance = noteDistancesInScroll[noteScrollIndex][noteIndex]
+            local currentNoteDistance = noteDistancesInScroll[scrollIndex][noteIndex]
+            local noteDistance = targetNoteDistance - currentNoteDistance
+            if noteScrollIndex > scrollIndex then
+                for j = scrollIndex, noteScrollIndex - 1 do
+                    noteDistance = noteDistance + tpDistances[j]
+                end
             else
-                svBefore = svBefore + sv1in2.Multiplier
-                svAt = svAt + sv2in1.Multiplier
-                svAfter = sv3in1.Multiplier
+                for j = noteScrollIndex, scrollIndex - 1 do
+                    noteDistance = noteDistance - tpDistances[j]
+                end
             end
-            if i == numFrames + 1 then 
-                svAfter = 1
+            if noteInSameScroll then noteDistance = 0 end
+            local tpDistanceAt = tpDistances[scrollIndex] - noteDistance
+            local svMultiplierBefore = svBefore.Multiplier + noteDistance * multiplier
+            local svMultiplierAt = svAt.Multiplier + tpDistanceAt * multiplier
+            local svMultiplierAfter = svAfter.Multiplier
+            if isFinalFrame then
+                local distanceBackToScroll1 = 0
+                for j = 1, noteScrollIndex - 1 do
+                    distanceBackToScroll1 = distanceBackToScroll1 - tpDistances[j]
+                end
+                svMultiplierAt = getSVMultiplierAt(lastOffset) + distanceBackToScroll1 * multiplier
+                svMultiplierAfter = getSVMultiplierAt(lastOffset + lastDuration)
             end
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeBefore, svBefore))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, svAt))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, svAfter))
+            addSVToList(svsToAdd, timeBefore, svMultiplierBefore, true)
+            addSVToList(svsToAdd, timeAt, svMultiplierAt, true)
+            addSVToList(svsToAdd, timeAfter, svMultiplierAfter, true)
             noteIndex = noteIndex + 1
         else
-            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime < timeAt do
-                if goingFrom1To2 then
-                    table.insert(svsToAdd, svsIn1[sv1Index])
+            for j = 1, numScrolls do
+                local currentSVsInScroll = svsInScroll[j]
+                while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                        currentSVsInScroll[svIndexesForScrolls[j]].StartTime < timeAt do
+                    if j == scrollIndex then
+                        table.insert(svsToAdd, currentSVsInScroll[svIndexesForScrolls[j]])
+                    end
+                    svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
                 end
-                sv1Index = sv1Index + 1
             end
-            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime < timeAt do
-                if not goingFrom1To2 then
-                    table.insert(svsToAdd, svsIn2[sv2Index])
+            local svAt = svsInScroll[nextScrollIndex][svIndexesForScrolls[nextScrollIndex] - 1]
+            for j = 1, numScrolls do
+                local currentSVsInScroll = svsInScroll[j]
+                while svIndexesForScrolls[j] <= #currentSVsInScroll and
+                        currentSVsInScroll[svIndexesForScrolls[j]].StartTime <= timeAfter do
+                    if j == nextScrollIndex then
+                        svAt = currentSVsInScroll[svIndexesForScrolls[j]]
+                    end
+                    svIndexesForScrolls[j] = svIndexesForScrolls[j] + 1
                 end
-                sv2Index = sv2Index + 1
             end
-            
-            local sv1 = svsIn1[sv1Index - 1]
-            if goingFrom1To2 then
-                sv1 = svsIn2[sv2Index - 1]
-            end
-            while sv1Index <= #svsIn1 and svsIn1[sv1Index].StartTime <= timeAfter do
-                if not goingFrom1To2 and svsIn1[sv1Index].StartTime <= timeAt then
-                    sv1 = svsIn1[sv1Index]
-                end
-                sv1Index = sv1Index + 1
-            end
-            while sv2Index <= #svsIn2 and svsIn2[sv2Index].StartTime <= timeAfter do
-                if goingFrom1To2 and svsIn2[sv2Index].StartTime <= timeAt then
-                    sv1 = svsIn2[sv2Index]
-                end
-                sv2Index = sv2Index + 1
-            end
-            local sv2 = svsIn1[sv1Index - 1]
-            if goingFrom1To2 then
-                sv2 = svsIn2[sv2Index - 1]
-            end
-            local svMultiplierAt = sv1.Multiplier + splitscrollDistances[i + 1] * multiplier
-            local svMultiplierAfter = sv2.Multiplier
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAt, svMultiplierAt))
-            table.insert(svsToAdd, utils.CreateScrollVelocity(timeAfter, svMultiplierAfter))
+            local svAfter = svsInScroll[nextScrollIndex][svIndexesForScrolls[nextScrollIndex] - 1]
+            local svMultiplierAt = svAt.Multiplier + splitscrollDistances[i + 1] * multiplier
+            local svMultiplierAfter = svAfter.Multiplier
+            addSVToList(svsToAdd, timeAt, svMultiplierAt, true)
+            addSVToList(svsToAdd, timeAfter, svMultiplierAfter, true)
         end
-        goingFrom1To2 = not goingFrom1To2
     end
     removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Adds displacing SVs to mave notes to animation frames relative to the first selected note
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function displaceNotesForAnimationFrames(settingVars)
+    local frameDistance = settingVars.frameDistance
+    local initialDistance = settingVars.distance
+    local numFrames = settingVars.numFrames
+    local svsToAdd = {}
+    local svsToRemove = {}
+    local svTimeIsAdded = {}
+    local selectedStartTime = uniqueSelectedNoteOffsets()[1]
+    local firstFrameTimeTime = settingVars.frameTimes[1].time
+    local lastFrameTimeTime = settingVars.frameTimes[#settingVars.frameTimes].time
+    local firstOffset = math.min(selectedStartTime, firstFrameTimeTime)
+    local lastOffset = math.max(selectedStartTime, lastFrameTimeTime)
+    for i = 1, #settingVars.frameTimes do
+        local frameTime = settingVars.frameTimes[i]
+        local noteOffset = frameTime.time
+        local frame = frameTime.frame
+        local position = frameTime.position
+        
+        local startOffset = math.min(selectedStartTime, noteOffset)
+        local endOffset = math.max(selectedStartTime, noteOffset)
+        local svsBetweenOffsets = getSVsBetweenOffsets(startOffset, endOffset)
+        addStartSVIfMissing(svsBetweenOffsets, startOffset)
+        local distanceBetweenOffsets = calculateDisplacementFromSVs(svsBetweenOffsets, startOffset,
+                                                                    endOffset)
+        local distanceToTargetNote = distanceBetweenOffsets
+        if selectedStartTime < noteOffset then distanceToTargetNote = -distanceBetweenOffsets end
+        
+        local numFrameDistances = frame - 1
+        if settingVars.reverseFrameOrder then numFrameDistances = numFrames - frame end
+        local totalFrameDistances = frameDistance * numFrameDistances
+        local distanceAfterTargetNote = initialDistance + totalFrameDistances + position
+        
+        local noteDisplaceAmount = distanceToTargetNote + distanceAfterTargetNote
+        local beforeDisplacement = noteDisplaceAmount
+        local atDisplacement = -noteDisplaceAmount
+        local afterDisplacement = 0
+        prepareDisplacingSVs(noteOffset, svsToAdd, svTimeIsAdded, beforeDisplacement,
+                             atDisplacement, afterDisplacement)
+    end
+    getRemovableSVs(svsToRemove, svTimeIsAdded, firstOffset, lastOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
+    -- Maybe add in future: use svbeforebefore + isnotetimeadded to
+    -- account for displacement discrepancies (if discrepancy is above certain amount)
 end
 -- Adds teleport SVs at selected notes
 -- Parameters
