@@ -39,6 +39,7 @@ Special types of SVs:
 * Teleport Stutter
 * Splitscroll (Basic)
 * Splitscroll (Advanced)
+* Frames Setup
 
 ### Edit SVs
 * Add Teleport
