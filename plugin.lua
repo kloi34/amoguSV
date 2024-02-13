@@ -1,4 +1,4 @@
--- amoguSV v6.2 (11 February 2024)
+-- amoguSV v6.2.1 (13 February 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -3605,7 +3605,7 @@ function addFrameTimes(settingVars)
                 table.insert(frameTime.lanes, lane)
                 frameTime.lanes = table.sort(frameTime.lanes, sortAscending)
             else
-                local defaultFrame = 1
+                local defaultFrame = settingVars.currentFrame
                 local defaultPosition = 0
                 local newFrameTime = createFrameTime(time, {lane}, defaultFrame, defaultPosition)
                 table.insert(settingVars.frameTimes, newFrameTime)
