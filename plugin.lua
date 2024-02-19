@@ -1,4 +1,4 @@
--- amoguSV v6.2.1 (13 February 2024)
+-- amoguSV v6.2.2 (20 February 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -71,6 +71,8 @@ COLOR_THEMES = {                    -- available color themes for the plugin
 }
 COMBO_SV_TYPE = {                   -- options for overlapping combo SVs
     "Add",
+    "SV Type 1 Only",
+    "SV Type 2 Only",
     "Cross Multiply",
     "Remove",
     "Min",
@@ -2256,10 +2258,7 @@ function comboSettingsMenu(settingVars)
     local maxComboPhase = settingVars1.svPoints + settingVars2.svPoints
     
     settingsChanged = chooseStandardSVTypes(settingVars) or settingsChanged
-    settingsChanged = chooseComboPhase(settingVars, maxComboPhase) or settingsChanged
-    if settingVars.comboPhase ~= 0 and settingVars.comboPhase ~= maxComboPhase then
-        settingsChanged = chooseComboSVOption(settingVars) or settingsChanged
-    end
+    settingsChanged = chooseComboSVOption(settingVars, maxComboPhase) or settingsChanged
     
     addSeparator()
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
@@ -4582,14 +4581,18 @@ end
 -- Lets you choose the combo SV combo interaction type
 -- Returns whether or not the interaction type changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current menu [Table]
-function chooseComboSVOption(settingVars)
+--    settingVars   : list of variables used for the current menu [Table]
+--    maxComboPhase : maximum value allowed for combo phase [Int]
+function chooseComboSVOption(settingVars, maxComboPhase)
     local oldIndex = settingVars.comboTypeIndex
     settingVars.comboTypeIndex = combo("Combo Type", COMBO_SV_TYPE, settingVars.comboTypeIndex)
     local currentComboType = COMBO_SV_TYPE[settingVars.comboTypeIndex]
     local addTypeChanged = false
+    if currentComboType ~= "SV Type 1 Only" and currentComboType ~= "SV Type 2 Only" then
+        addTypeChanged = chooseComboPhase(settingVars, maxComboPhase) or addTypeChanged
+    end
     if currentComboType == "Add" then
-        addTypeChanged = chooseAddComboMultipliers(settingVars)
+        addTypeChanged = chooseAddComboMultipliers(settingVars) or addTypeChanged
     end
     return (oldIndex ~= settingVars.comboTypeIndex) or addTypeChanged
 end
@@ -5207,8 +5210,8 @@ end
 function chooseStandardSVTypes(settingVars)
     local oldIndex1 = settingVars.svType1Index
     local oldIndex2 = settingVars.svType2Index
-    settingVars.svType1Index = combo("SV type 1", STANDARD_SVS_COMBOLESS, settingVars.svType1Index)
-    settingVars.svType2Index = combo("SV type 2", STANDARD_SVS_COMBOLESS, settingVars.svType2Index)
+    settingVars.svType1Index = combo("SV Type 1", STANDARD_SVS_COMBOLESS, settingVars.svType1Index)
+    settingVars.svType2Index = combo("SV Type 2", STANDARD_SVS_COMBOLESS, settingVars.svType2Index)
     return (oldIndex2 ~= settingVars.svType2Index) or (oldIndex1 ~= settingVars.svType1Index)
 end
 -- Lets you choose a start and an end SV
@@ -5696,67 +5699,72 @@ end
 --    verticalShift    : constant to add to each value in the set at very the end [Int/Float]
 function generateComboSet(values1, values2, comboPhase, comboType, comboMultiplier1,
                           comboMultiplier2, dontNormalize, avgValue, verticalShift)
-    local lastValue1 = table.remove(values1)
-    local lastValue2 = table.remove(values2)
     local comboValues = {}
-    
-    local endIndex1 = #values1 - comboPhase
-    local startIndex1 = comboPhase + 1
-    local endIndex2 = comboPhase - #values1
-    local startIndex2 = #values1 + #values2 + 1 - comboPhase
-    
-    for i = 1, endIndex1 do
-        table.insert(comboValues, values1[i])
-    end
-    for i = 1, endIndex2 do
-        table.insert(comboValues, values2[i])
-    end
-    
-    if comboType ~= "Remove" then
-        local comboValues1StartIndex = endIndex1 + 1
-        local comboValues1EndIndex = startIndex2 - 1
-        local comboValues2StartIndex = endIndex2 + 1
-        local comboValues2EndIndex = startIndex1 - 1
-        
-        local comboValues1 = {}
-        for i = comboValues1StartIndex, comboValues1EndIndex do
-            table.insert(comboValues1, values1[i])
-        end
-        local comboValues2 = {}
-        for i = comboValues2StartIndex, comboValues2EndIndex do
-            table.insert(comboValues2, values2[i])
-        end
-        for i = 1, #comboValues1 do
-            local comboValue1 = comboValues1[i]
-            local comboValue2 = comboValues2[i]
-            local finalValue
-            if comboType == "Add" then
-                finalValue = comboMultiplier1 * comboValue1 + comboMultiplier2 * comboValue2
-            elseif comboType == "Cross Multiply" then
-                finalValue = comboValue1 * comboValue2
-            elseif comboType == "Min" then
-                finalValue = math.min(comboValue1, comboValue2)
-            elseif comboType == "Max" then
-                finalValue = math.max(comboValue1, comboValue2)
-            end
-            table.insert(comboValues, finalValue)
-        end
-    end
-    
-    for i = startIndex1, #values2 do
-        table.insert(comboValues, values2[i])
-    end
-    for i = startIndex2, #values1 do
-        table.insert(comboValues, values1[i])
-    end
-    
-    if #comboValues == 0 then table.insert(comboValues, 1) end
-    if (comboPhase - #values2 >= 0) then
-        table.insert(comboValues, lastValue1)
+    if comboType == "SV Type 1 Only" then
+        comboValues = makeDuplicateList(values1)
+    elseif comboType == "SV Type 2 Only" then
+        comboValues = makeDuplicateList(values2)
     else
-        table.insert(comboValues, lastValue2)
+        local lastValue1 = table.remove(values1)
+        local lastValue2 = table.remove(values2)
+        
+        local endIndex1 = #values1 - comboPhase
+        local startIndex1 = comboPhase + 1
+        local endIndex2 = comboPhase - #values1
+        local startIndex2 = #values1 + #values2 + 1 - comboPhase
+        
+        for i = 1, endIndex1 do
+            table.insert(comboValues, values1[i])
+        end
+        for i = 1, endIndex2 do
+            table.insert(comboValues, values2[i])
+        end
+        
+        if comboType ~= "Remove" then
+            local comboValues1StartIndex = endIndex1 + 1
+            local comboValues1EndIndex = startIndex2 - 1
+            local comboValues2StartIndex = endIndex2 + 1
+            local comboValues2EndIndex = startIndex1 - 1
+            
+            local comboValues1 = {}
+            for i = comboValues1StartIndex, comboValues1EndIndex do
+                table.insert(comboValues1, values1[i])
+            end
+            local comboValues2 = {}
+            for i = comboValues2StartIndex, comboValues2EndIndex do
+                table.insert(comboValues2, values2[i])
+            end
+            for i = 1, #comboValues1 do
+                local comboValue1 = comboValues1[i]
+                local comboValue2 = comboValues2[i]
+                local finalValue
+                if comboType == "Add" then
+                    finalValue = comboMultiplier1 * comboValue1 + comboMultiplier2 * comboValue2
+                elseif comboType == "Cross Multiply" then
+                    finalValue = comboValue1 * comboValue2
+                elseif comboType == "Min" then
+                    finalValue = math.min(comboValue1, comboValue2)
+                elseif comboType == "Max" then
+                    finalValue = math.max(comboValue1, comboValue2)
+                end
+                table.insert(comboValues, finalValue)
+            end
+        end
+        
+        for i = startIndex1, #values2 do
+            table.insert(comboValues, values2[i])
+        end
+        for i = startIndex2, #values1 do
+            table.insert(comboValues, values1[i])
+        end
+        
+        if #comboValues == 0 then table.insert(comboValues, 1) end
+        if (comboPhase - #values2 >= 0) then
+            table.insert(comboValues, lastValue1)
+        else
+            table.insert(comboValues, lastValue2)
+        end
     end
-    
     avgValue = avgValue - verticalShift
     if not dontNormalize then
         normalizeValues(comboValues, avgValue, false)
