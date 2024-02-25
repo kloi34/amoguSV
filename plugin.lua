@@ -1,4 +1,4 @@
--- amoguSV v6.2.2 (20 February 2024)
+-- amoguSV v6.3 (25 February 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -71,12 +71,12 @@ COLOR_THEMES = {                    -- available color themes for the plugin
 }
 COMBO_SV_TYPE = {                   -- options for overlapping combo SVs
     "Add",
-    "SV Type 1 Only",
-    "SV Type 2 Only",
     "Cross Multiply",
     "Remove",
     "Min",
-    "Max"
+    "Max",
+    "SV Type 1 Only",
+    "SV Type 2 Only"
 }
 CURSOR_TRAILS = {                   -- available cursor trail types
     "None",
@@ -93,6 +93,7 @@ EDIT_SV_TOOLS = {                   -- tools for editing SVs
     "Copy & Paste",
     "Displace Note",
     "Displace View",
+    "Dynamic Scale",
     "Fix LN Ends",
     "Flicker",
     "Measure",
@@ -164,7 +165,7 @@ STANDARD_SVS = {                    -- types of standard SVs
     "Custom",
     "Combo"
 }
-STANDARD_SVS_COMBOLESS = {          -- types of standard SVs (excluding combo)
+STANDARD_SVS_NO_COMBO = {           -- types of standard SVs (excluding combo)
     "Linear",
     "Exponential",
     "Bezier",
@@ -1926,6 +1927,7 @@ function editSVTab(globalVars)
     if toolName == "Displace View"    then displaceViewMenu() end
     if toolName == "Fix LN Ends"      then fixLNEndsMenu() end
     if toolName == "Flicker"          then flickerMenu() end
+    if toolName == "Dynamic Scale"    then dynamicScaleMenu(globalVars) end
     if toolName == "Measure"          then measureMenu() end
     if toolName == "Merge"            then mergeMenu() end
     if toolName == "Reverse Scroll"   then reverseScrollMenu() end
@@ -1986,7 +1988,7 @@ function placeStandardSVMenu(globalVars)
     local menuVars = getStandardPlaceMenuVars()
     local needSVUpdate = changeSVTypeIfKeysPressed(menuVars)
     needSVUpdate = needSVUpdate or #menuVars.svMultipliers == 0
-    needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
+    needSVUpdate = chooseStandardSVType(menuVars, false) or needSVUpdate
     
     addSeparator()
     local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
@@ -1997,15 +1999,15 @@ function placeStandardSVMenu(globalVars)
         return
     end
     
-    needSVUpdate = showSettingsMenu(currentSVType, settingVars, false) or needSVUpdate
+    needSVUpdate = showSettingsMenu(currentSVType, settingVars, false, nil) or needSVUpdate
     
     addSeparator()
     needSVUpdate = chooseInterlace(menuVars) or needSVUpdate
-    if needSVUpdate then updateMenuSVs(currentSVType, globalVars, menuVars, settingVars) end
+    if needSVUpdate then updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, false) end
     
     startNextWindowNotCollapsed("svInfoAutoOpen")
     makeSVInfoWindow("SV Info", menuVars.svGraphStats, menuVars.svStats, menuVars.svDistances,
-                     menuVars.svMultipliers, nil)
+                     menuVars.svMultipliers, nil, false)
     
     addSeparator()
     simpleActionMenu("Place SVs between selected notes", 2, placeSVs, globalVars, menuVars)
@@ -2052,7 +2054,7 @@ function placeStillSVMenu(globalVars)
     local menuVars = getStillPlaceMenuVars()
     local needSVUpdate = changeSVTypeIfKeysPressed(menuVars)
     needSVUpdate = needSVUpdate or #menuVars.svMultipliers == 0
-    needSVUpdate = chooseStandardSVType(menuVars) or needSVUpdate
+    needSVUpdate = chooseStandardSVType(menuVars, false) or needSVUpdate
     
     addSeparator()
     local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
@@ -2067,15 +2069,15 @@ function placeStillSVMenu(globalVars)
     chooseStillType(menuVars)
     
     addSeparator()
-    needSVUpdate = showSettingsMenu(currentSVType, settingVars, false) or needSVUpdate
+    needSVUpdate = showSettingsMenu(currentSVType, settingVars, false, nil) or needSVUpdate
     
     addSeparator()
     needSVUpdate = chooseInterlace(menuVars) or needSVUpdate
-    if needSVUpdate then updateMenuSVs(currentSVType, globalVars, menuVars, settingVars) end
+    if needSVUpdate then updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, false) end
     
     startNextWindowNotCollapsed("svInfoAutoOpen")
     makeSVInfoWindow("SV Info", menuVars.svGraphStats, menuVars.svStats, menuVars.svDistances,
-                     menuVars.svMultipliers, nil)
+                     menuVars.svMultipliers, nil, false)
     
     addSeparator()
     simpleActionMenu("Place SVs between selected notes", 2, placeSVs, globalVars, menuVars)
@@ -2087,73 +2089,70 @@ end
 -- Creates the menu for linear SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this linear menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function linearSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this linear menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function linearSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     settingsChanged = chooseStartEndSVs(settingVars) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if skipFinalSV then return settingsChanged end
-    
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for exponential SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this exponential menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function exponentialSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this exponential menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function exponentialSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     settingsChanged = chooseSVBehavior(settingVars) or settingsChanged
     settingsChanged = chooseIntensity(settingVars) or settingsChanged
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if skipFinalSV then return settingsChanged end
-    
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for bezier SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this bezier menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function bezierSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this bezier menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function bezierSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     settingsChanged = provideBezierWebsiteLink(settingVars) or settingsChanged
     settingsChanged = chooseBezierPoints(settingVars) or settingsChanged
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if skipFinalSV then return settingsChanged end
-    
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for hermite SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this hermite menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function hermiteSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this hermite menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function hermiteSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     settingsChanged = chooseStartEndSVs(settingVars) or settingsChanged
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if skipFinalSV then return settingsChanged end
-    
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for sinusoidal SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this sinusoidal menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function sinusoidalSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this sinusoidal menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function sinusoidalSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     imgui.Text("Amplitude:")
     settingsChanged = chooseStartEndSVs(settingVars) or settingsChanged
@@ -2162,40 +2161,38 @@ function sinusoidalSettingsMenu(settingVars, skipFinalSV)
     settingsChanged = chooseNumPeriods(settingVars) or settingsChanged
     settingsChanged = choosePeriodShift(settingVars) or settingsChanged
     settingsChanged = chooseSVPerQuarterPeriod(settingVars) or settingsChanged
-    if skipFinalSV then return settingsChanged end
-    
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for circular SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this circular menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function circularSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this circular menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function circularSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     settingsChanged = chooseSVBehavior(settingVars) or settingsChanged
     settingsChanged = chooseArcPercent(settingVars) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     settingsChanged = chooseConstantShift(settingVars, 0) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if not skipFinalSV then
-        settingsChanged = chooseFinalSV(settingVars) or settingsChanged
-    end
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     settingsChanged = chooseNoNormalize(settingVars) or settingsChanged
     return settingsChanged
 end
 -- Creates the menu for random SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this random menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function randomSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this random menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function randomSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     
     settingsChanged = chooseRandomType(settingVars) or settingsChanged
     settingsChanged = chooseRandomScale(settingVars) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
     if imgui.Button("Generate New Random Set", BEEG_BUTTON_SIZE) then
         generateRandomSetMenuSVs(settingVars)
         settingsChanged = true
@@ -2206,9 +2203,7 @@ function randomSettingsMenu(settingVars, skipFinalSV)
     if not settingVars.dontNormalize then
         settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     end
-    if not skipFinalSV then
-        settingsChanged = chooseFinalSV(settingVars) or settingsChanged
-    end
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     settingsChanged = chooseNoNormalize(settingVars) or settingsChanged
     
     return settingsChanged
@@ -2216,16 +2211,16 @@ end
 -- Creates the menu for custom SV settings
 -- Returns whether settings have changed or not [Boolean]
 -- Parameters
---    settingVars : list of setting variables for this custom menu [Table]
---    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
-function customSettingsMenu(settingVars, skipFinalSV)
+--    settingVars   : list of setting variables for this custom menu [Table]
+--    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
+--    svPointsForce : number of SV points to force [Int or nil]
+function customSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     local settingsChanged = false
     settingsChanged = importCustomSVs(settingVars) or settingsChanged
     settingsChanged = chooseCustomMultipliers(settingVars) or settingsChanged
-    settingsChanged = chooseSVPoints(settingVars) or settingsChanged
-    if not skipFinalSV then
-        settingsChanged = chooseFinalSV(settingVars) or settingsChanged
-    end
+    if not (svPointsForce and skipFinalSV) then addSeparator() end
+    settingsChanged = chooseSVPoints(settingVars, svPointsForce) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, skipFinalSV) or settingsChanged
     adjustNumberOfMultipliers(settingVars)
     return settingsChanged
 end
@@ -2240,7 +2235,7 @@ function comboSettingsMenu(settingVars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     local svType1 = STANDARD_SVS[settingVars.svType1Index]
     local settingVars1 = getSettingVars(svType1, "Combo1")
-    settingsChanged = showSettingsMenu(svType1, settingVars1, true) or settingsChanged
+    settingsChanged = showSettingsMenu(svType1, settingVars1, true, nil) or settingsChanged
     local labelText1 = table.concat({svType1, "SettingsCombo1"})
     saveVariables(labelText1, settingVars1)
     imgui.End()
@@ -2250,7 +2245,7 @@ function comboSettingsMenu(settingVars)
     imgui.PushItemWidth(DEFAULT_WIDGET_WIDTH)
     local svType2 = STANDARD_SVS[settingVars.svType2Index]
     local settingVars2 = getSettingVars(svType2, "Combo2")
-    settingsChanged = showSettingsMenu(svType2, settingVars2, true) or settingsChanged
+    settingsChanged = showSettingsMenu(svType2, settingVars2, true, nil) or settingsChanged
     local labelText2 = table.concat({svType2, "SettingsCombo2"})
     saveVariables(labelText2, settingVars2)
     imgui.End()
@@ -2265,7 +2260,7 @@ function comboSettingsMenu(settingVars)
     if not settingVars.dontNormalize then
         settingsChanged = chooseAverageSV(settingVars) or settingsChanged
     end
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, false) or settingsChanged
     settingsChanged = chooseNoNormalize(settingVars) or settingsChanged
     
     return settingsChanged
@@ -2283,7 +2278,7 @@ function stutterMenu(settingVars)
     addSeparator()
     settingsChanged = chooseStuttersPerSection(settingVars) or settingsChanged
     settingsChanged = chooseAverageSV(settingVars) or settingsChanged
-    settingsChanged = chooseFinalSV(settingVars) or settingsChanged
+    settingsChanged = chooseFinalSV(settingVars, false) or settingsChanged
     if settingsChanged then updateStutterMenuSVs(settingVars) end
     displayStutterSVWindows(settingVars)
     
@@ -2302,7 +2297,7 @@ function telportStutterMenu(settingVars)
     end
     chooseMainSV(settingVars)
     chooseAverageSV(settingVars)
-    chooseFinalSV(settingVars)
+    chooseFinalSV(settingVars, false)
     chooseUseDistance(settingVars)
     chooseLinearlyChange(settingVars)
     
@@ -2544,6 +2539,67 @@ function fixLNEndsMenu()
     simpleActionMenu("Fix flipped LN ends", 0, fixFlippedLNEnds, nil, menuVars)
     saveVariables("fixLNEndsMenu", menuVars)
 end
+-- Creates the dynamic scale menu
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function dynamicScaleMenu(globalVars)
+    local menuVars = {
+        noteTimes = {},
+        svTypeIndex = 1,
+        svMultipliers = {},
+        svDistances = {},
+        svGraphStats = createSVGraphStats(),
+        svStats = createSVStats()
+    }
+    getVariables("dynamicScaleMenu", menuVars)
+    local numNoteTimes = #menuVars.noteTimes
+    local noNoteTimesInitially = numNoteTimes == 0
+    imgui.Text(#menuVars.noteTimes.." note times assigned to scale SVs between")
+    addNoteTimesToDynamicScaleButton(menuVars)
+    if noNoteTimesInitially then 
+        saveVariables("dynamicScaleMenu", menuVars)
+        return 
+    else
+        clearNoteTimesButton(menuVars)
+    end
+    
+    addSeparator()
+    if #menuVars.noteTimes < 3 then
+        imgui.Text("Not enough note times assigned")
+        imgui.Text("Assign 3 or more note times instead")
+        saveVariables("dynamicScaleMenu", menuVars)
+        return
+    end
+    
+    local needSVUpdate = #menuVars.svMultipliers == 0 or (numNoteTimes ~= #menuVars.noteTimes)
+    imgui.AlignTextToFramePadding()
+    imgui.Text("Shape:")
+    imgui.SameLine(0, SAMELINE_SPACING)
+    needSVUpdate = chooseStandardSVType(menuVars, true) or needSVUpdate
+    
+    addSeparator()
+    local currentSVType = STANDARD_SVS[menuVars.svTypeIndex]
+    if currentSVType == "Sinusoidal" then
+        imgui.Text("Import sinusoidal values using 'Custom' instead")
+        saveVariables("dynamicScaleMenu", menuVars)
+        return
+    end
+    
+    local settingVars = getSettingVars(currentSVType, "DynamicScale")
+    needSVUpdate = showSettingsMenu(currentSVType, settingVars, true, numNoteTimes) or needSVUpdate
+    if needSVUpdate then updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, true) end
+    
+    startNextWindowNotCollapsed("svInfoAutoOpen")
+    makeSVInfoWindow("SV Info", menuVars.svGraphStats, menuVars.svStats, menuVars.svDistances,
+                     menuVars.svMultipliers, nil, true)
+    
+    local labelText = table.concat({currentSVType, "SettingsDynamicScale"})
+    saveVariables(labelText, settingVars)
+    saveVariables("dynamicScaleMenu", menuVars)
+    
+    addSeparator()
+    simpleActionMenu("Scale spacing between assigned notes", 0, dynamicScaleSVs, nil, menuVars)
+end
 -- Creates the flicker menu
 function flickerMenu()
     local menuVars = {
@@ -2779,23 +2835,24 @@ end
 --    currentSVType : current SV type to choose the settings for [String]
 --    settingVars   : list of variables used for the current menu [Table]
 --    skipFinalSV   : whether or not to skip choosing the final SV [Boolean]
-function showSettingsMenu(currentSVType, settingVars, skipFinalSV)
+--    svPointsForce : number of SV points to force [Int or nil]
+function showSettingsMenu(currentSVType, settingVars, skipFinalSV, svPointsForce)
     if currentSVType == "Linear" then
-        return linearSettingsMenu(settingVars, skipFinalSV)
+        return linearSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Exponential" then
-        return exponentialSettingsMenu(settingVars, skipFinalSV)
+        return exponentialSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Bezier" then
-        return bezierSettingsMenu(settingVars, skipFinalSV)
+        return bezierSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Hermite" then
-        return hermiteSettingsMenu(settingVars, skipFinalSV)
+        return hermiteSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Sinusoidal" then
-        return sinusoidalSettingsMenu(settingVars, skipFinalSV)
+        return sinusoidalSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Circular" then
-        return circularSettingsMenu(settingVars, skipFinalSV)
+        return circularSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Random" then
-        return randomSettingsMenu(settingVars, skipFinalSV)
+        return randomSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Custom" then
-        return customSettingsMenu(settingVars, skipFinalSV)
+        return customSettingsMenu(settingVars, skipFinalSV, svPointsForce)
     elseif currentSVType == "Combo" then
         return comboSettingsMenu(settingVars)
     end
@@ -2863,7 +2920,8 @@ end
 --    globalVars    : list of variables used globally across all menus [Table]
 --    menuVars      : list of variables used for the place SV menu [Table]
 --    settingVars   : list of variables used for the current menu [Table]
-function updateMenuSVs(currentSVType, globalVars, menuVars, settingVars)
+--    skipFinalSV   : whether or not to skip the final SV for updating menu SVs [Boolean]
+function updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, skipFinalSV)
     local interlaceMultiplier = nil
     if menuVars.interlace then interlaceMultiplier = menuVars.interlaceRatio end
     menuVars.svMultipliers = generateSVMultipliers(currentSVType, settingVars, interlaceMultiplier)
@@ -2871,7 +2929,8 @@ function updateMenuSVs(currentSVType, globalVars, menuVars, settingVars)
     table.remove(svMultipliersNoEndSV)
     menuVars.svDistances = calculateDistanceVsTime(globalVars, svMultipliersNoEndSV)
     
-    updateFinalSV(settingVars.finalSVIndex, menuVars.svMultipliers, settingVars.customSV)
+    updateFinalSV(settingVars.finalSVIndex, menuVars.svMultipliers, settingVars.customSV,
+                  skipFinalSV)
     updateSVStats(menuVars.svGraphStats, menuVars.svStats, menuVars.svMultipliers,
                   svMultipliersNoEndSV, menuVars.svDistances)
 end
@@ -2880,7 +2939,10 @@ end
 --    finalSVIndex  : index value for the type of final SV [Int]
 --    svMultipliers : list of SV multipliers [Table]
 --    customSV      : custom SV value [Int/Float]
-function updateFinalSV(finalSVIndex, svMultipliers, customSV)
+--    skipFinalSV   : whether or not to skip the final SV for updating menu SVs [Boolean]
+function updateFinalSV(finalSVIndex, svMultipliers, customSV, skipFinalSV)
+    if skipFinalSV then table.remove(svMultipliers) return end
+    
     local finalSVType = FINAL_SV_TYPES[finalSVIndex]
     if finalSVType == "Normal" then return end
     svMultipliers[#svMultipliers] = customSV
@@ -2915,13 +2977,18 @@ end
 --    svDistances     : distance vs time list [Table]
 --    svMultipliers   : multiplier values of the SVs [Table]
 --    stutterDuration : percent duration of first stutter (nil if not stutter SV) [Int]
+--    skipDistGraph   : whether or not to skip showing the distance graph [Boolean]
 function makeSVInfoWindow(windowText, svGraphStats, svStats, svDistances, svMultipliers,
-                          stutterDuration)
+                          stutterDuration, skipDistGraph)
     imgui.Begin(windowText, imgui_window_flags.AlwaysAutoResize)
-    imgui.Text("Projected Note Motion:")
-    helpMarker("Distance vs Time graph of notes")
-    plotSVMotion(svDistances, svGraphStats.distMinScale, svGraphStats.distMaxScale)
-    imgui.Text("Projected SVs:")
+    if not skipDistGraph then
+        imgui.Text("Projected Note Motion:")
+        helpMarker("Distance vs Time graph of notes")
+        plotSVMotion(svDistances, svGraphStats.distMinScale, svGraphStats.distMaxScale)
+    end
+    local projectedText = "Projected SVs:"
+    if skipDistGraph then projectedText = "Projected Scaling:" end
+    imgui.Text(projectedText)
     plotSVs(svMultipliers, svGraphStats.minScale, svGraphStats.maxScale)
     if stutterDuration then
         displayStutterSVStats(svMultipliers, stutterDuration)
@@ -3012,10 +3079,12 @@ function updateStutterMenuSVs(settingVars)
                                                              settingVars.stuttersPerSection)
     
     if settingVars.linearlyChange then
-        updateFinalSV(settingVars.finalSVIndex, settingVars.svMultipliers2, settingVars.customSV)
+        updateFinalSV(settingVars.finalSVIndex, settingVars.svMultipliers2, settingVars.customSV,
+                      false)
         table.remove(settingVars.svMultipliers)
     else
-        updateFinalSV(settingVars.finalSVIndex, settingVars.svMultipliers, settingVars.customSV)
+        updateFinalSV(settingVars.finalSVIndex, settingVars.svMultipliers, settingVars.customSV,
+                      false)
     end
     updateGraphStats(settingVars.svGraphStats, settingVars.svMultipliers, settingVars.svDistances)
     updateGraphStats(settingVars.svGraph2Stats, settingVars.svMultipliers2,
@@ -3029,18 +3098,18 @@ function displayStutterSVWindows(settingVars)
         startNextWindowNotCollapsed("svInfo2AutoOpen")
         makeSVInfoWindow("SV Info (Starting first SV)", settingVars.svGraphStats, nil,
                          settingVars.svDistances, settingVars.svMultipliers,
-                         settingVars.stutterDuration)
+                         settingVars.stutterDuration, false)
         startNextWindowNotCollapsed("svInfo3AutoOpen")
         makeSVInfoWindow("SV Info (Ending first SV)", settingVars.svGraph2Stats, nil,
                          settingVars.svDistances2, settingVars.svMultipliers2,
-                         settingVars.stutterDuration)
+                         settingVars.stutterDuration, false)
     else
         startNextWindowNotCollapsed("svInfo1AutoOpen")
         makeSVInfoWindow("SV Info", settingVars.svGraphStats, nil, settingVars.svDistances,
-                         settingVars.svMultipliers, settingVars.stutterDuration)
+                         settingVars.svMultipliers, settingVars.stutterDuration, false)
     end
 end
--- Adds or clears note times for the 2nd scroll for the splitscroll menu
+-- Creates a button that adds or clears note times for the 2nd scroll for the splitscroll menu
 -- Parameters
 --    settingVars          : list of variables used for the current menu [Table]
 --    noNoteTimesInitially : whether or not there were note times initially [Boolean]
@@ -3051,10 +3120,10 @@ function addOrClearNoteTimes(settingVars, noNoteTimesInitially)
     button(buttonText, ACTION_BUTTON_SIZE, addSelectedNoteTimes, nil, settingVars)
     
     if noNoteTimesInitially then return end
-    if not imgui.Button("Clear all 2nd scroll note times", ACTION_BUTTON_SIZE) then return end
+    if not imgui.Button("Clear all 2nd scroll note times", BEEG_BUTTON_SIZE) then return end
     settingVars.noteTimes2 = {}
 end
--- Adds or clears note times for the 3rd scroll for the splitscroll menu
+-- Creates a button that adds or clears note times for the 3rd scroll for the splitscroll menu
 -- Parameters
 --    settingVars          : list of variables used for the current menu [Table]
 --    noNoteTimesInitially : whether or not there were note times initially [Boolean]
@@ -3065,10 +3134,10 @@ function addOrClearNoteTimes2(settingVars, noNoteTimesInitially)
     button(buttonText, ACTION_BUTTON_SIZE, addSelectedNoteTimes2, nil, settingVars)
     
     if noNoteTimesInitially then return end
-    if not imgui.Button("Clear all 3rd scroll note times", ACTION_BUTTON_SIZE) then return end
+    if not imgui.Button("Clear all 3rd scroll note times", BEEG_BUTTON_SIZE) then return end
     settingVars.noteTimes3 = {}
 end
--- Adds or clears note times for the 4th scroll for the splitscroll menu
+-- Creates a button that adds or clears note times for the 4th scroll for the splitscroll menu
 -- Parameters
 --    settingVars          : list of variables used for the current menu [Table]
 --    noNoteTimesInitially : whether or not there were note times initially [Boolean]
@@ -3079,10 +3148,10 @@ function addOrClearNoteTimes3(settingVars, noNoteTimesInitially)
     button(buttonText, ACTION_BUTTON_SIZE, addSelectedNoteTimes3, nil, settingVars)
     
     if noNoteTimesInitially then return end
-    if not imgui.Button("Clear all 4th scroll note times", ACTION_BUTTON_SIZE) then return end
+    if not imgui.Button("Clear all 4th scroll note times", BEEG_BUTTON_SIZE) then return end
     settingVars.noteTimes4 = {}
 end
--- Adds selected note times to the splitscroll 2nd scroll list
+-- Creates a button that adds selected note times to the splitscroll 2nd scroll list
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function addSelectedNoteTimes(settingVars)
@@ -3092,7 +3161,7 @@ function addSelectedNoteTimes(settingVars)
     settingVars.noteTimes2 = removeDuplicateValues(settingVars.noteTimes2)
     settingVars.noteTimes2 = table.sort(settingVars.noteTimes2, sortAscending)
 end
--- Adds selected note times to the splitscroll 3rd scroll list
+-- Creates a button that adds selected note times to the splitscroll 3rd scroll list
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function addSelectedNoteTimes2(settingVars)
@@ -3102,7 +3171,7 @@ function addSelectedNoteTimes2(settingVars)
     settingVars.noteTimes3 = removeDuplicateValues(settingVars.noteTimes3)
     settingVars.noteTimes3 = table.sort(settingVars.noteTimes3, sortAscending)
 end
--- Adds selected note times to the splitscroll 4th scroll list
+-- Creates a button that adds selected note times to the splitscroll 4th scroll list
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
 function addSelectedNoteTimes3(settingVars)
@@ -3548,11 +3617,11 @@ function importPlaceSVButton(globalVars)
     end
     
     if standardPlaceType then
-        updateMenuSVs(currentSVType, globalVars, menuVars, settingVars)
+        updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, false)
         local labelText = table.concat({currentSVType, "SettingsStandard"})
         saveVariables(labelText, settingVars)
     elseif stillPlaceType then
-        updateMenuSVs(currentSVType, globalVars, menuVars, settingVars)
+        updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, false)
         local labelText = table.concat({currentSVType, "SettingsStill"})
         saveVariables(labelText, settingVars)
     elseif stutterSVType then
@@ -3698,6 +3767,30 @@ function drawCurrentFrame(globalVars, settingVars)
         end
     end
     imgui.EndChild()
+end
+-- Creates a button that adds note times for the dynamic scale menu
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function addNoteTimesToDynamicScaleButton(menuVars)
+    local buttonText = "Assign selected note times"
+    button(buttonText, ACTION_BUTTON_SIZE, addSelectedNoteTimesToList, nil, menuVars)
+end
+-- Adds selected note times to the noteTimes list in menuVars
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function addSelectedNoteTimesToList(menuVars)
+    for _, hitObject in pairs(state.SelectedHitObjects) do
+        table.insert(menuVars.noteTimes, hitObject.StartTime)
+    end
+    menuVars.noteTimes = removeDuplicateValues(menuVars.noteTimes)
+    menuVars.noteTimes = table.sort(menuVars.noteTimes, sortAscending)
+end
+-- Creates a button that lets you clear all assigned note times for the current menu
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function clearNoteTimesButton(menuVars)
+    if not imgui.Button("Clear all assigned note times", BEEG_BUTTON_SIZE) then return end
+    menuVars.noteTimes = {}
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -4733,7 +4826,6 @@ function chooseCustomMultipliers(settingVars)
     local oldMultiplier = settingVars.svMultipliers[index]
     local _, newMultiplier = imgui.InputFloat("SV Multiplier", oldMultiplier, 0, 0, "%.2fx")
     settingVars.svMultipliers[index] = newMultiplier
-    addSeparator()
     return oldMultiplier ~= newMultiplier
 end
 -- Lets you choose a distance
@@ -4803,6 +4895,7 @@ function chooseEditTool(globalVars)
     if svTool == "Displace View"    then toolTip("Temporarily displace the playfield view") end
     if svTool == "Fix LN Ends"      then toolTip("Fix flipped LN ends") end 
     if svTool == "Flicker"          then toolTip("Flash notes on and off the screen") end
+    if svTool == "Dynamic Scale"    then toolTip("Dynamically scale SVs across notes") end
     if svTool == "Measure"          then toolTip("Get stats about SVs in a section") end
     if svTool == "Merge"            then toolTip("Combine SVs that overlap") end
     if svTool == "Reverse Scroll"   then toolTip("Reverse the scroll direction using SVs") end
@@ -4825,7 +4918,10 @@ end
 -- Returns whether or not the final SV type/value changed [Boolean]
 -- Parameters
 --    settingVars : list of variables used for the current menu [Table]
-function chooseFinalSV(settingVars)
+--    skipFinalSV : whether or not to skip choosing the final SV [Boolean]
+function chooseFinalSV(settingVars, skipFinalSV)
+    if skipFinalSV then return false end
+    
     local oldIndex = settingVars.finalSVIndex
     local oldCustomSV = settingVars.customSV
     local finalSVType = FINAL_SV_TYPES[settingVars.finalSVIndex]
@@ -5196,11 +5292,14 @@ end
 -- Lets you choose the standard SV type
 -- Returns whether or not the SV type changed [Boolean]
 -- Parameters
---    menuVars : list of variables used for the current menu [Table]
-function chooseStandardSVType(menuVars)
+--    menuVars     : list of variables used for the current menu [Table]
+--    excludeCombo : whether or not to exclude the combo option from SV types [Boolean]
+function chooseStandardSVType(menuVars, excludeCombo)
     local oldIndex = menuVars.svTypeIndex
     local label = " "..EMOTICONS[oldIndex]
-    menuVars.svTypeIndex = combo(label, STANDARD_SVS, menuVars.svTypeIndex)
+    local svTypeList = STANDARD_SVS
+    if excludeCombo then svTypeList = STANDARD_SVS_NO_COMBO end
+    menuVars.svTypeIndex = combo(label, svTypeList, menuVars.svTypeIndex)
     return oldIndex ~= menuVars.svTypeIndex
 end
 -- Lets you choose the standard SV types
@@ -5210,8 +5309,8 @@ end
 function chooseStandardSVTypes(settingVars)
     local oldIndex1 = settingVars.svType1Index
     local oldIndex2 = settingVars.svType2Index
-    settingVars.svType1Index = combo("SV Type 1", STANDARD_SVS_COMBOLESS, settingVars.svType1Index)
-    settingVars.svType2Index = combo("SV Type 2", STANDARD_SVS_COMBOLESS, settingVars.svType2Index)
+    settingVars.svType1Index = combo("SV Type 1", STANDARD_SVS_NO_COMBO, settingVars.svType1Index)
+    settingVars.svType2Index = combo("SV Type 2", STANDARD_SVS_NO_COMBO, settingVars.svType2Index)
     return (oldIndex2 ~= settingVars.svType2Index) or (oldIndex1 ~= settingVars.svType1Index)
 end
 -- Lets you choose a start and an end SV
@@ -5341,8 +5440,11 @@ end
 -- Lets you choose the number of SV points
 -- Returns whether or not the number of SV points changed [Boolean]
 -- Parameters
---    settingVars : list of variables used for the current menu [Table]
-function chooseSVPoints(settingVars)
+--    settingVars  : list of variables used for the current menu [Table]
+--   svPointsForce : number of SV points to force [Int or nil]
+function chooseSVPoints(settingVars, svPointsForce)
+    if svPointsForce then settingVars.svPoints = svPointsForce return false end
+    
     local oldPoints = settingVars.svPoints
     _, settingVars.svPoints = imgui.InputInt("SV Points##regular", oldPoints, 1, 1)
     settingVars.svPoints = clampToInterval(settingVars.svPoints, 1, MAX_SV_POINTS)
@@ -6548,6 +6650,35 @@ function fixFlippedLNEnds(menuVars)
     
     menuVars.fixedText = table.concat({"Fixed ", fixedLNEndsCount, " flipped LN ends"})
 end
+-- Dynamically scales SVs between assigned notes
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function dynamicScaleSVs(menuVars)
+    local offsets = menuVars.noteTimes
+    local targetAvgSVs = menuVars.svMultipliers
+    local svsToAdd = {}
+    local svsToRemove = getSVsBetweenOffsets(offsets[1], offsets[#offsets])
+    for i = 1, (#offsets - 1) do
+        local startOffset = offsets[i]
+        local endOffset = offsets[i + 1]
+        local targetAvgSV = targetAvgSVs[i]
+        local svsBetweenOffsets = getSVsBetweenOffsets(startOffset, endOffset)
+        addStartSVIfMissing(svsBetweenOffsets, startOffset)
+        local currentDistance = calculateDisplacementFromSVs(svsBetweenOffsets, startOffset,
+                                                             endOffset)
+        --[[
+        local currentAvgSV = currentDistance / (endOffset - startOffset)
+        local scalingFactor = targetAvgSV / currentAvgSV
+        --]]
+        local targetDistance = targetAvgSV * (endOffset - startOffset)
+        local scalingFactor = targetDistance / currentDistance
+        for _, sv in pairs(svsBetweenOffsets) do
+            local newSVMultiplier = scalingFactor * sv.Multiplier
+            addSVToList(svsToAdd, sv.StartTime, newSVMultiplier, true)
+        end
+    end
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
 -- Adds flicker SVs between selected notes
 -- Parameters
 --    menuVars : list of variables used for the current menu [Table]
@@ -6761,7 +6892,7 @@ function scaleMultiplySVs(menuVars)
         addStartSVIfMissing(svsBetweenOffsets, startOffset)
         local scalingFactor = menuVars.ratio
         local currentDistance = calculateDisplacementFromSVs(svsBetweenOffsets, startOffset,
-                                endOffset)
+                                                             endOffset)
         local scaleType = SCALE_TYPES[menuVars.scaleTypeIndex]
         if scaleType == "Average SV" then
             local currentAvgSV = currentDistance / (endOffset - startOffset)
