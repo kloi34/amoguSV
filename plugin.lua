@@ -2553,10 +2553,9 @@ function dynamicScaleMenu(globalVars)
     }
     getVariables("dynamicScaleMenu", menuVars)
     local numNoteTimes = #menuVars.noteTimes
-    local noNoteTimesInitially = numNoteTimes == 0
     imgui.Text(#menuVars.noteTimes.." note times assigned to scale SVs between")
     addNoteTimesToDynamicScaleButton(menuVars)
-    if noNoteTimesInitially then 
+    if numNoteTimes == 0 then 
         saveVariables("dynamicScaleMenu", menuVars)
         return 
     else
@@ -2570,8 +2569,8 @@ function dynamicScaleMenu(globalVars)
         saveVariables("dynamicScaleMenu", menuVars)
         return
     end
-    
-    local needSVUpdate = #menuVars.svMultipliers == 0 or (numNoteTimes ~= #menuVars.noteTimes)
+    local numSVPoints = numNoteTimes - 1
+    local needSVUpdate = #menuVars.svMultipliers == 0 or (#menuVars.svMultipliers ~= numSVPoints)
     imgui.AlignTextToFramePadding()
     imgui.Text("Shape:")
     imgui.SameLine(0, SAMELINE_SPACING)
@@ -2586,7 +2585,7 @@ function dynamicScaleMenu(globalVars)
     end
     
     local settingVars = getSettingVars(currentSVType, "DynamicScale")
-    needSVUpdate = showSettingsMenu(currentSVType, settingVars, true, numNoteTimes) or needSVUpdate
+    needSVUpdate = showSettingsMenu(currentSVType, settingVars, true, numSVPoints) or needSVUpdate
     if needSVUpdate then updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, true) end
     
     startNextWindowNotCollapsed("svInfoAutoOpen")
