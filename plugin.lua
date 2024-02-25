@@ -1925,9 +1925,9 @@ function editSVTab(globalVars)
     if toolName == "Copy & Paste"     then copyNPasteMenu(globalVars) end
     if toolName == "Displace Note"    then displaceNoteMenu() end
     if toolName == "Displace View"    then displaceViewMenu() end
+    if toolName == "Dynamic Scale"    then dynamicScaleMenu(globalVars) end
     if toolName == "Fix LN Ends"      then fixLNEndsMenu() end
     if toolName == "Flicker"          then flickerMenu() end
-    if toolName == "Dynamic Scale"    then dynamicScaleMenu(globalVars) end
     if toolName == "Measure"          then measureMenu() end
     if toolName == "Merge"            then mergeMenu() end
     if toolName == "Reverse Scroll"   then reverseScrollMenu() end
@@ -2987,7 +2987,7 @@ function makeSVInfoWindow(windowText, svGraphStats, svStats, svDistances, svMult
         plotSVMotion(svDistances, svGraphStats.distMinScale, svGraphStats.distMaxScale)
     end
     local projectedText = "Projected SVs:"
-    if skipDistGraph then projectedText = "Projected Scaling:" end
+    if skipDistGraph then projectedText = "Projected Scaling (Avg SVs):" end
     imgui.Text(projectedText)
     plotSVs(svMultipliers, svGraphStats.minScale, svGraphStats.maxScale)
     if stutterDuration then
@@ -4893,9 +4893,9 @@ function chooseEditTool(globalVars)
     if svTool == "Copy & Paste"     then toolTip("Copy SVs and paste them somewhere else") end
     if svTool == "Displace Note"    then toolTip("Move where notes are hit on the screen") end
     if svTool == "Displace View"    then toolTip("Temporarily displace the playfield view") end
+    if svTool == "Dynamic Scale"    then toolTip("Dynamically scale SVs across notes") end
     if svTool == "Fix LN Ends"      then toolTip("Fix flipped LN ends") end 
     if svTool == "Flicker"          then toolTip("Flash notes on and off the screen") end
-    if svTool == "Dynamic Scale"    then toolTip("Dynamically scale SVs across notes") end
     if svTool == "Measure"          then toolTip("Get stats about SVs in a section") end
     if svTool == "Merge"            then toolTip("Combine SVs that overlap") end
     if svTool == "Reverse Scroll"   then toolTip("Reverse the scroll direction using SVs") end
