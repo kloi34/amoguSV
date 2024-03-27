@@ -1,4 +1,4 @@
--- amoguSV v6.4 (11 March 2024)
+-- amoguSV v6.5 (28 March 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -1125,6 +1125,72 @@ function drawCapybara2(globalVars)
     o.AddTriangleFilled(p94, p95, p96, color10)
     o.AddTriangleFilled(p97, p98, p99, color10)
 end
+-- Draws a capybara???!?!??!!!!?
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function drawCapybara312(globalVars)
+    if not globalVars.drawCapybara312 then return end
+    local o = imgui.GetOverlayDrawList()
+    --local sz = state.WindowSize
+    local rgbColors = getCurrentRGBColors(globalVars.rgbPeriod)
+    local redRounded = round(255 * rgbColors.red, 0)
+    local greenRounded = round(255 * rgbColors.green, 0)
+    local blueRounded = round(255 * rgbColors.blue, 0)
+    local outlineColor =  rgbaToUint(redRounded, greenRounded, blueRounded, 255)
+    
+    local p1 = {42, 32}
+    local p2 = {100, 78}
+    local p3 = {141, 32}
+    local p4 = {83, 63}
+    local p5 = {83, 78}
+    local p6 = {70, 82}
+    local p7 = {85, 88}
+    local hairlineThickness = 1
+    o.AddTriangleFilled(p1, p2, p3, outlineColor)
+    o.AddTriangleFilled(p1, p4, p5, outlineColor)
+    o.AddLine(p5, p6, outlineColor, hairlineThickness)
+    o.AddLine(p6, p7, outlineColor, hairlineThickness)
+    
+    local p8 = {21, 109}
+    local p9 = {0, 99}
+    local p10 = {16, 121}
+    local p11 = {5, 132}
+    local p12 = {162, 109}
+    local p13 = {183, 99}
+    local p14 = {167, 121}
+    local p15 = {178, 132}
+    o.AddTriangleFilled(p1, p8, p9, outlineColor)
+    o.AddTriangleFilled(p9, p10, p11, outlineColor)
+    o.AddTriangleFilled(p3, p12, p13, outlineColor)
+    o.AddTriangleFilled(p13, p14, p15, outlineColor)
+    
+    local p16 = {25, 139}
+    local p17 = {32, 175}
+    local p18 = {158, 139}
+    local p19 = {151, 175}
+    local p20 = {150, 215}
+    o.AddTriangleFilled(p11, p16, p17, outlineColor)
+    o.AddTriangleFilled(p15, p18, p19, outlineColor)
+    o.AddTriangleFilled(p17, p19, p20, outlineColor)
+    
+    local p21 = {84, 148}
+    local p22 = {88, 156}
+    local p23 = {92, 153}
+    local p24 = {96, 156}
+    local p25 = {100, 148}
+    local mouthLineThickness = 2
+    o.AddLine(p21, p22, outlineColor, mouthLineThickness)
+    o.AddLine(p22, p23, outlineColor, mouthLineThickness)
+    o.AddLine(p23, p24, outlineColor, mouthLineThickness)
+    o.AddLine(p24, p25, outlineColor, mouthLineThickness)
+    
+    local p26 = {61, 126}
+    local p27 = {122, 126}
+    local eyeRadius = 9
+    local numSements = 16
+    o.AddCircleFilled(p26, eyeRadius, outlineColor, numSements)
+    o.AddCircleFilled(p27, eyeRadius, outlineColor, numSements)
+end
 -- Draws the currently selected cursor trail
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -1858,6 +1924,7 @@ function draw()
         rgbPeriod = 60,
         drawCapybara = false,
         drawCapybara2 = false,
+        drawCapybara312 = false,
         placeTypeIndex = 1,
         editToolIndex = 1,
         showExportImportMenu = false,
@@ -1870,6 +1937,7 @@ function draw()
     
     drawCapybara(globalVars)
     drawCapybara2(globalVars)
+    drawCapybara312(globalVars)
     drawCursorTrail(globalVars)
     setPluginAppearance(globalVars)
     startNextWindowNotCollapsed("amoguSVAutoOpen")
@@ -2784,6 +2852,7 @@ function choosePluginAppearance(globalVars)
     chooseDrawCapybara(globalVars)
     imgui.SameLine(0, RADIO_BUTTON_SPACING)
     chooseDrawCapybara2(globalVars)
+    chooseDrawCapybara312(globalVars)
 end
 -- Gives basic info about how to use the plugin
 function provideBasicPluginInfo()
@@ -4963,6 +5032,13 @@ function chooseDrawCapybara2(globalVars)
     _, globalVars.drawCapybara2 = imgui.Checkbox("Capybara 2", globalVars.drawCapybara2)
     helpMarker("Draws a capybara at the bottom left of the screen")
 end
+-- Lets you choose whether or not to draw capybara 312 on screen
+-- Parameters
+--    globalVars : list of variables used globally across all menus [Table]
+function chooseDrawCapybara312(globalVars)
+    _, globalVars.drawCapybara312 = imgui.Checkbox("Capybara 312", globalVars.drawCapybara312)
+    helpMarker("Draws a capybara???!?!??!!!!?")
+end
 -- Lets you choose which edit tool to use
 -- Parameters
 --    globalVars : list of variables used globally across all menus [Table]
@@ -6558,17 +6634,17 @@ function placeAdvancedSplitScrollSVs(settingVars)
                 end
             end
             if noteInSameScroll then noteDistance = 0 end
-            local tpDistanceAt = tpDistances[scrollIndex] - noteDistance
+            local tpDistanceAt = splitscrollDistances[i + 1] - noteDistance
             local svMultiplierBefore = svBefore.Multiplier + noteDistance * multiplier
             local svMultiplierAt = svAt.Multiplier + tpDistanceAt * multiplier
             local svMultiplierAfter = svAfter.Multiplier
             if isFinalFrame then
-                local distanceBackToScroll1 = 0
+                local distanceBackToScroll1 = -frameDistancesInScroll[scrollIndex][numFrames + 1]
                 for j = 1, noteScrollIndex - 1 do
                     distanceBackToScroll1 = distanceBackToScroll1 - tpDistances[j]
                 end
                 svMultiplierAt = getSVMultiplierAt(lastOffset) + distanceBackToScroll1 * multiplier
-                svMultiplierAfter = getSVMultiplierAt(lastOffset + lastDuration)
+                svMultiplierAfter = getSVMultiplierAt(lastOffset + lastDuration) 
             end
             addSVToList(svsToAdd, timeBefore, svMultiplierBefore, true)
             addSVToList(svsToAdd, timeAt, svMultiplierAt, true)
