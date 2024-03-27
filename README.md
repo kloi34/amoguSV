@@ -72,4 +72,5 @@ Also, some cursor effects were inspired (stolen) from https://github.com/tholman
 * [KeepStill](https://github.com/Illuminati-CRAZ/KeepStill) by Illuminati-CRAZ
 * [Vibrato](https://github.com/Illuminati-CRAZ/Vibrato) by Illuminati-CRAZ
 * [Displacer](https://github.com/Illuminati-CRAZ/Displacer) by Illuminati-CRAZ
+* [AFFINE](https://github.com/ESV-Sweetplum/AFFINE) by ESV-Sweetplum
 * [Goofy SV mapping guide](https://docs.google.com/document/d/1ug_WV_BI720617ybj4zuHhjaQMwa0PPekZyJoa17f-I)
