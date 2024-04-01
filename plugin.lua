@@ -1,4 +1,4 @@
--- amoguSV v6.5.1 (31 March 2024)
+-- amoguSV v6.6 (1 April 2024)
 -- by kloi34
 
 -- Many SV tool ideas were stolen from other plugins, so here is credit to those plugins and the
@@ -49,6 +49,7 @@ MAX_RGB_CYCLE_TIME = 300            -- maximum seconds for one complete RGB colo
 MAX_CURSOR_TRAIL_POINTS = 100       -- maximum number of points for cursor trail effects
 MAX_SV_POINTS = 1000                -- maximum number of SV points allowed
 MAX_ANIMATION_FRAMES = 999          -- maximum number of animation frames allowed
+MAX_IMPORT_CHARACTER_LIMIT = 999999 -- maximum number of characters allowed for import text
 
 -------------------------------------------------------------------------------------- Menu related
 
@@ -110,7 +111,8 @@ EDIT_SV_TOOLS = {                   -- tools for editing SVs
     "Reverse Scroll",
     "Scale (Displace)",
     "Scale (Multiply)",
-    "Swap Notes"
+    "Swap Notes",
+    "Vertical Shift"
 }
 EMOTICONS = {                       -- emoticons to visually clutter the plugin and confuse users
     "( - _ - )",
@@ -126,6 +128,7 @@ EMOTICONS = {                       -- emoticons to visually clutter the plugin 
     "( o _ 0 )",
     "[mwm]",
     "( v . ^ )",
+    "( ^ o v )",
     "( ^ o v )",
     "( ; A ; )"
 }
@@ -161,6 +164,7 @@ SPECIAL_SVS = {                     -- types of special SVs
     "Teleport Stutter",
     "Splitscroll (Basic)",
     "Splitscroll (Advanced)",
+    "Splitscroll (Adv v2)",
     "Frames Setup"
 }
 STANDARD_SVS = {                    -- types of standard SVs
@@ -1712,11 +1716,11 @@ function getSettingVars(svType, label)
     elseif svType == "Splitscroll (Advanced)" then
         settingVars = {
             numScrolls = 2,
+            msPerFrame = 16,
             scrollIndex = 1,
             distanceBack = 1000000,
             distanceBack2 = 1000000,
             distanceBack3 = 1000000,
-            msPerFrame = 16,
             noteTimes2 = {},
             noteTimes3 = {},
             noteTimes4 = {},
@@ -1724,6 +1728,16 @@ function getSettingVars(svType, label)
             svsInScroll2 = {},
             svsInScroll3 = {},
             svsInScroll4 = {}
+        }
+    elseif svType == "Splitscroll (Adv v2)" then
+        settingVars = {
+            numScrolls = 2,
+            msPerFrame = 16,
+            scrollIndex = 1,
+            distanceBack = 1000000,
+            distanceBack2 = 1000000,
+            distanceBack3 = 1000000,
+            splitscrollLayers = {}
         }
     elseif svType == "Frames Setup" then
         settingVars = {
@@ -2028,6 +2042,7 @@ function editSVTab(globalVars)
     if toolName == "Scale (Displace)" then scaleDisplaceMenu() end
     if toolName == "Scale (Multiply)" then scaleMultiplyMenu() end
     if toolName == "Swap Notes"       then swapNotesMenu() end
+    if toolName == "Vertical Shift"   then verticalShiftMenu() end
 end
 -- Creates the "Delete SVs" tab
 -- Parameters
@@ -2132,6 +2147,7 @@ function placeSpecialSVMenu(globalVars)
     if currentSVType == "Teleport Stutter"       then telportStutterMenu(settingVars) end
     if currentSVType == "Splitscroll (Basic)"    then splitScrollBasicMenu(settingVars) end
     if currentSVType == "Splitscroll (Advanced)" then splitScrollAdvancedMenu(settingVars) end
+    if currentSVType == "Splitscroll (Adv v2)"   then splitScrollAdvancedV2Menu(settingVars) end
     if currentSVType == "Frames Setup"           then
         animationFramesSetupMenu(globalVars, settingVars)
     end
@@ -2484,6 +2500,36 @@ function splitScrollAdvancedMenu(settingVars)
     local label = "Place Splitscroll SVs at selected note(s)"
     simpleActionMenu(label, 1, placeAdvancedSplitScrollSVs, nil, settingVars)
 end
+-- Creates the 2nd version menu for advanced splitscroll SV
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function splitScrollAdvancedV2Menu(settingVars)
+    chooseNumScrolls(settingVars)
+    chooseMSPF(settingVars)
+    
+    addSeparator()
+    chooseScrollIndex(settingVars)
+    
+    addSeparator()
+    if settingVars.scrollIndex == 2 then
+        chooseDistanceBack(settingVars)
+    elseif settingVars.scrollIndex == 3 then
+        chooseDistanceBack2(settingVars)
+    elseif settingVars.scrollIndex == 4 then
+        chooseDistanceBack3(settingVars)
+    end
+    if settingVars.scrollIndex ~= 1 then addSeparator() end
+    
+    chooseSplitscrollLayers(settingVars)
+    if settingVars.splitscrollLayers[1] == nil then return end
+    if settingVars.splitscrollLayers[2] == nil then return end
+    if settingVars.numScrolls > 2 and settingVars.splitscrollLayers[3] == nil then return end
+    if settingVars.numScrolls > 3 and settingVars.splitscrollLayers[4] == nil then return end
+    
+    addSeparator()
+    local label = "Place Splitscroll SVs"
+    simpleActionMenu(label, 0, placeAdvancedSplitScrollSVsV2, nil, settingVars)
+end
 -- Creates the menu for setting up animation frames
 -- Parameters
 --    globalVars  : list of variables used globally across all menus [Table]
@@ -2551,15 +2597,16 @@ function exportImportSettingsMenu(globalVars, menuVars, settingVars)
         svType = STANDARD_SVS[menuVars.svTypeIndex]
     end
     local isComboType = svType == "Combo"
-    local notStutterSVType = svType == "Splitscroll (Basic)" or
-                             svType == "Splitscroll (Advanced)" or
-                             svType == "Frames Setup"
+    local noExportOption = svType == "Splitscroll (Basic)" or
+                           svType == "Splitscroll (Advanced)" or
+                           svType == "Frames Setup"
     imgui.Text("Paste exported data here to import")
     _, globalVars.importData = imgui.InputTextMultiline("##placeImport", globalVars.importData,
-                                                        999999, multilineWidgetSize)
+                                                        MAX_IMPORT_CHARACTER_LIMIT,
+                                                        multilineWidgetSize)
     importPlaceSVButton(globalVars)
     addSeparator()
-    if notStutterSVType then imgui.Text("No export option") return end
+    if noExportOption then imgui.Text("No export option") return end
     
     if not isSpecialPlaceType then
         imgui.Text("Copy + paste exported data somewhere safe")
@@ -2815,6 +2862,19 @@ end
 -- Creates the menu for swapping notes
 function swapNotesMenu()
      simpleActionMenu("Swap selected notes using SVs", 2, swapNoteSVs, nil, nil)
+end
+-- Creates the menu for vertical shifts of SVs
+function verticalShiftMenu()
+    local menuVars = {
+        verticalShift = 1
+    }
+    getVariables("verticalShiftMenu", menuVars)
+    chooseConstantShift(menuVars, 0)
+    saveVariables("verticalShiftMenu", menuVars)
+    
+    addSeparator()
+    local buttonText = "Vertically shift SVs between selected notes"
+    simpleActionMenu(buttonText, 2, verticalShiftSVs, nil, menuVars)
 end
 
 -------------------------------------------------------------------------------------- Menu related
@@ -3548,6 +3608,47 @@ function exportPlaceSVButton(globalVars, menuVars, settingVars)
         table.insert(exportList, settingVars.avgSV)
         table.insert(exportList, settingVars.finalSVIndex)
         table.insert(exportList, settingVars.customSV)
+    elseif currentSVType == "Splitscroll (Adv v2)" then
+        table.insert(exportList, settingVars.numScrolls)
+        table.insert(exportList, settingVars.msPerFrame)
+        table.insert(exportList, settingVars.scrollIndex)
+        table.insert(exportList, settingVars.distanceBack)
+        table.insert(exportList, settingVars.distanceBack2)
+        table.insert(exportList, settingVars.distanceBack3)
+        local splitscrollLayers = settingVars.splitscrollLayers
+        local totalLayersSupported = 4
+        for i = 1, totalLayersSupported do
+            local currentLayer = settingVars.splitscrollLayers[i]
+            if currentLayer ~= nil then
+                local currentLayerSVs = currentLayer.svs
+                local svsStringTable = {}
+                for j = 1, #currentLayerSVs do
+                    local currentSV = currentLayerSVs[j]
+                    local svStringTable = {}
+                    table.insert(svStringTable, currentSV.StartTime)
+                    table.insert(svStringTable, currentSV.Multiplier)
+                    local svString = table.concat(svStringTable, "+")
+                    table.insert(svsStringTable, svString)
+                end
+                local svsString = table.concat(svsStringTable, " ")
+                
+                local currentLayerNotes = currentLayer.notes
+                local notesStringTable = {}
+                for j = 1, #currentLayerNotes do
+                    local currentNote = currentLayerNotes[j]
+                    local noteStringTable = {}
+                    table.insert(noteStringTable, currentNote.StartTime)
+                    table.insert(noteStringTable, currentNote.Lane)
+                    -- could add other stuff like editor layer, but too much work
+                    local noteString = table.concat(noteStringTable, "+")
+                    table.insert(notesStringTable, noteString)
+                end
+                local notesString = table.concat(notesStringTable, " ")
+                local layersDataTable = {i, svsString, notesString}
+                local layersString = table.concat(layersDataTable, ":")
+                table.insert(exportList, layersString)
+            end
+        end
     end
     globalVars.exportData = table.concat(exportList, "|")
 end
@@ -3611,13 +3712,14 @@ function importPlaceSVButton(globalVars)
     local chinchillaSVType  = currentSVType == "Chinchilla"
     local stutterSVType     = currentSVType == "Stutter"
     local tpStutterSVType   = currentSVType == "Teleport Stutter"
+    local advSplitV2SVType  = currentSVType == "Splitscroll (Adv v2)"
     
     local settingVars
     if standardPlaceType then
         settingVars = getSettingVars(currentSVType, "Standard")
     elseif stillPlaceType then
         settingVars = getSettingVars(currentSVType, "Still")
-    elseif stutterSVType or tpStutterSVType then
+    else
         settingVars = getSettingVars(currentSVType, "Special")
     end
     
@@ -3637,6 +3739,7 @@ function importPlaceSVButton(globalVars)
     
     if stutterSVType     then menuVars.svTypeIndex = 1 end
     if tpStutterSVType   then menuVars.svTypeIndex = 2 end
+    if advSplitV2SVType  then menuVars.svTypeIndex = 5 end
     
     if standardPlaceType or stillPlaceType then
         menuVars.interlace = table.remove(settingsTable, 1)
@@ -3747,8 +3850,49 @@ function importPlaceSVButton(globalVars)
         settingVars.avgSV = table.remove(settingsTable, 1)
         settingVars.finalSVIndex = table.remove(settingsTable, 1)
         settingVars.customSV = table.remove(settingsTable, 1)
+    elseif advSplitV2SVType then
+        settingVars.numScrolls = table.remove(settingsTable, 1)
+        settingVars.msPerFrame = table.remove(settingsTable, 1)
+        settingVars.scrollIndex = table.remove(settingsTable, 1)
+        settingVars.distanceBack = table.remove(settingsTable, 1)
+        settingVars.distanceBack2 = table.remove(settingsTable, 1)
+        settingVars.distanceBack3 = table.remove(settingsTable, 1)
+        settingVars.splitscrollLayers = {}
+        while #settingsTable > 0 do
+            local splitscrollLayerString = table.remove(settingsTable)
+            local layerDataStringTable = {}
+            for str in string.gmatch(splitscrollLayerString, "([^:]+)") do
+                table.insert(layerDataStringTable, str)
+            end
+            local layerNumber = tonumber(layerDataStringTable[1])
+            local layerSVs = {}
+            local svDataString = layerDataStringTable[2]
+            for str in string.gmatch(svDataString, "([^%s]+)") do
+                local svDataTable = {}
+                for svData in string.gmatch(str, "([^%+]+)") do
+                    table.insert(svDataTable, tonumber(svData))
+                end
+                local svStartTime = svDataTable[1]
+                local svMultiplier = svDataTable[2]
+                addSVToList(layerSVs, svStartTime, svMultiplier, true)
+            end
+            local layerNotes = {}
+            local noteDataString = layerDataStringTable[3]
+            for str in string.gmatch(noteDataString, "([^%s]+)") do
+                local noteDataTable = {}
+                for noteData in string.gmatch(str, "([^%+]+)") do
+                    table.insert(noteDataTable, tonumber(noteData))
+                end
+                local noteStartTime = noteDataTable[1]
+                local noteLane = noteDataTable[2]
+                table.insert(layerNotes, utils.CreateHitObject(noteStartTime, noteLane))
+            end
+            settingVars.splitscrollLayers[layerNumber] = {
+                svs = layerSVs,
+                notes = layerNotes
+            }
+        end
     end
-    
     if standardPlaceType then
         updateMenuSVs(currentSVType, globalVars, menuVars, settingVars, false)
         local labelText = table.concat({currentSVType, "SettingsStandard"})
@@ -3761,7 +3905,7 @@ function importPlaceSVButton(globalVars)
         updateStutterMenuSVs(settingVars)
         local labelText = table.concat({currentSVType, "SettingsSpecial"})
         saveVariables(labelText, settingVars)
-    elseif tpStutterSVType then
+    else
         local labelText = table.concat({currentSVType, "SettingsSpecial"})
         saveVariables(labelText, settingVars)
     end
@@ -5062,6 +5206,7 @@ function chooseEditTool(globalVars)
     if svTool == "Scale (Multiply)" then toolTip("Scale SV values by multiplying") end
     if svTool == "Scale (Displace)" then toolTip("Scale SV values by adding teleport SVs") end
     if svTool == "Swap Notes"       then toolTip("Swap positions of notes using SVs") end
+    if svTool == "Vertical Shift"   then toolTip("Adds a constant value to SVs in a range") end
 end
 -- Lets you choose the frames per second of a plugin cursor effect
 -- Parameters
@@ -5448,6 +5593,73 @@ function chooseSpecialSVType(menuVars)
     local emoticonIndex = menuVars.svTypeIndex + #STANDARD_SVS
     local label = "  "..EMOTICONS[emoticonIndex]
     menuVars.svTypeIndex = combo(label, SPECIAL_SVS, menuVars.svTypeIndex)
+end
+-- Lets you choose the current splitscroll layer
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function chooseSplitscrollLayers(settingVars)
+    local currentLayerNum = settingVars.scrollIndex
+    local currentLayer = settingVars.splitscrollLayers[currentLayerNum]
+    if currentLayer == nil then
+        imgui.Text("0 SVs, 0 notes assigned")
+        local buttonText = "Assign SVs and notes between\nselected notes to scroll "..currentLayerNum
+        if imgui.Button(buttonText, ACTION_BUTTON_SIZE) then
+            local offsets = uniqueSelectedNoteOffsets()
+            local startOffset = offsets[1]
+            local endOffset = offsets[#offsets]
+            local svsBetweenOffsets = getSVsBetweenOffsets(startOffset, endOffset)
+            addStartSVIfMissing(svsBetweenOffsets, startOffset)
+            local newNotes = {}
+            for i, hitObject in pairs(state.SelectedHitObjects) do
+                local newNote = utils.CreateHitObject(hitObject.StartTime, hitObject.Lane,
+                                                      hitObject.EndTime, hitObject.HitSound,
+                                                      hitObject.EditorLayer)
+                table.insert(newNotes, newNote)
+            end
+            newNotes = table.sort(newNotes, sortAscendingStartTime)
+            settingVars.splitscrollLayers[currentLayerNum] = {
+                svs = svsBetweenOffsets,
+                notes = newNotes
+            }
+            local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset)
+            local editorActions = {
+                actionRemoveNotesBetween(startOffset, endOffset),
+                utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove)
+            }
+            actions.PerformBatch(editorActions)
+        end
+    else
+        local currentLayerSVs = currentLayer.svs
+        local currentLayerNotes = currentLayer.notes
+        imgui.Text(table.concat({#currentLayerSVs, " SVs, ", #currentLayerNotes, " notes assigned"}))
+        if imgui.Button("Clear assigned\nnotes and SVs", HALF_ACTION_BUTTON_SIZE) then
+            settingVars.splitscrollLayers[currentLayerNum] = nil
+        end
+        imgui.SameLine(0, SAMELINE_SPACING)
+        if imgui.Button("Re-place assigned\nnotes and SVs", HALF_ACTION_BUTTON_SIZE) then
+            local svStartOffset = currentLayerSVs[1].StartTime
+            local svEndOffset = currentLayerSVs[#currentLayerSVs].StartTime
+            local svsToRemove = getSVsBetweenOffsets(svStartOffset, svEndOffset)
+            local noteStartOffset = currentLayerNotes[1].StartTime
+            local noteEndOffset = currentLayerNotes[#currentLayerNotes].StartTime
+            local editorActions = {
+                actionRemoveNotesBetween(noteStartOffset, noteEndOffset),
+                utils.CreateEditorAction(action_type.RemoveScrollVelocityBatch, svsToRemove),
+                utils.CreateEditorAction(action_type.AddScrollVelocityBatch, currentLayerSVs),
+                utils.CreateEditorAction(action_type.PlaceHitObjectBatch, currentLayerNotes)
+            }
+            actions.PerformBatch(editorActions)
+        end
+    end
+end
+function actionRemoveNotesBetween(startOffset, endOffset)
+    local notesToRemove = {}
+    for _, hitObject in pairs(map.HitObjects) do
+        if hitObject.StartTime >= startOffset and hitObject.StartTime <= endOffset then
+            table.insert(notesToRemove, hitObject)
+        end
+    end
+    return utils.CreateEditorAction(action_type.RemoveHitObjectBatch, notesToRemove)
 end
 -- Lets you choose the standard SV type
 -- Returns whether or not the SV type changed [Boolean]
@@ -6410,6 +6622,27 @@ function placeSplitScrollSVs(settingVars)
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Places advanced split scroll SVs
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function placeAdvancedSplitScrollSVs(settingVars)
+    local tempOffsets = {
+        uniqueNoteOffsetsBetweenSelected(),
+        settingVars.noteTimes2,
+        settingVars.noteTimes3,
+        settingVars.noteTimes4
+    }
+    for i = 2, settingVars.numScrolls do
+        for _, offset in pairs(tempOffsets[i]) do
+            table.insert(tempOffsets[1], offset)
+        end
+    end
+    tempOffsets[1] = table.sort(tempOffsets[1], sortAscending)
+    local firstOffset = tempOffsets[1][1]
+    local lastOffset = tempOffsets[1][#tempOffsets[1]]
+    local allNoteOffsets = uniqueNoteOffsetsBetween(firstOffset, lastOffset)
+    placeAdvancedSplitScrollSVsActual(settingVars, allNoteOffsets)
+end
+-- Places advanced split scroll SVs
 --[[ **NOTE**
     Due to how quaver stores(? or calculates?) SVs that are super big,
     some sv distances will be imprecise but close enough when using the
@@ -6422,27 +6655,21 @@ end
     The current code doesn't do that, but you can code it in. Same applies to basic splitscroll.
 --]]
 -- Parameters
---    settingVars : list of variables used for the current menu [Table]
-function placeAdvancedSplitScrollSVs(settingVars)
+--    settingVars    : list of variables used for the current menu [Table]
+--    allNoteOffsets : all note offsets used for splitscroll
+function placeAdvancedSplitScrollSVsActual(settingVars, allNoteOffsets)
     local numScrolls = settingVars.numScrolls
     local noteOffsetToScrollIndex = {}
     local tempOffsets = {
-        uniqueNoteOffsetsBetweenSelected(),
+        allNoteOffsets,
         settingVars.noteTimes2,
         settingVars.noteTimes3,
         settingVars.noteTimes4
     }
-    for i = 2, numScrolls do
-        for _, offset in pairs(tempOffsets[i]) do
-            table.insert(tempOffsets[1], offset)
-        end
-    end
-    tempOffsets[1] = table.sort(tempOffsets[1], sortAscending)
     local firstOffset = tempOffsets[1][1]
     local lastOffset = tempOffsets[1][#tempOffsets[1]]
     local totalTime = lastOffset - firstOffset
-    local noteOffsets = uniqueNoteOffsetsBetween(firstOffset, lastOffset)
-    tempOffsets[1] = makeDuplicateList(noteOffsets)
+    local noteOffsets = allNoteOffsets
     for i = 1, numScrolls do
         for _, offset in pairs(tempOffsets[i]) do
             noteOffsetToScrollIndex[offset] = i
@@ -6639,10 +6866,7 @@ function placeAdvancedSplitScrollSVs(settingVars)
             local svMultiplierAt = svAt.Multiplier + tpDistanceAt * multiplier
             local svMultiplierAfter = svAfter.Multiplier
             if isFinalFrame then
-                local distanceBackToScroll1 = -frameDistancesInScroll[scrollIndex][numFrames + 1] + frameDistancesInScroll[1][numFrames + 1]
-                if scrollIndex == 1 then
-                    distanceBackToScroll1 = 0
-                end
+                local distanceBackToScroll1 = -frameDistancesInScroll[noteScrollIndex][numFrames + 1] + frameDistancesInScroll[1][numFrames + 1]
                 for j = 1, noteScrollIndex - 1 do
                     distanceBackToScroll1 = distanceBackToScroll1 - tpDistances[j]
                 end
@@ -6683,6 +6907,94 @@ function placeAdvancedSplitScrollSVs(settingVars)
         end
     end
     removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Places advanced splitscroll SVs from the 2nd version of the menu
+-- Parameters
+--    settingVars : list of variables used for the current menu [Table]
+function placeAdvancedSplitScrollSVsV2(settingVars)
+    local splitscrollLayers = settingVars.splitscrollLayers
+    local convertedSettingVars = {
+        numScrolls = settingVars.numScrolls,
+        msPerFrame = settingVars.msPerFrame,
+        scrollIndex = settingVars.scrollIndex,
+        distanceBack = settingVars.distanceBack,
+        distanceBack2 = settingVars.distanceBack2,
+        distanceBack3 = settingVars.distanceBack3,
+        noteTimes2 = {},
+        noteTimes3 = {},
+        noteTimes4 = {},
+        svsInScroll1 = {},
+        svsInScroll2 = {},
+        svsInScroll3 = {},
+        svsInScroll4 = {}
+    }
+    local allLayerNotes = {}
+    if splitscrollLayers[1] ~= nil then
+        local layerNotes = splitscrollLayers[1].notes
+        convertedSettingVars.svsInScroll1 = splitscrollLayers[1].svs
+        for i = 1, #layerNotes do
+            table.insert(allLayerNotes, layerNotes[i])
+        end
+    end
+    if splitscrollLayers[2] ~= nil then
+        local layerNotes = splitscrollLayers[2].notes
+        convertedSettingVars.svsInScroll2 = splitscrollLayers[2].svs
+        for i = 1, #layerNotes do
+            table.insert(allLayerNotes, layerNotes[i])
+            table.insert(convertedSettingVars.noteTimes2, layerNotes[i].StartTime)
+        end
+        convertedSettingVars.noteTimes2 = removeDuplicateValues(convertedSettingVars.noteTimes2)
+        convertedSettingVars.noteTimes2 = table.sort(convertedSettingVars.noteTimes2, sortAscending)
+    end
+    if splitscrollLayers[3] ~= nil then
+        local layerNotes = splitscrollLayers[3].notes
+        convertedSettingVars.svsInScroll3 = splitscrollLayers[3].svs
+        for i = 1, #layerNotes do
+            table.insert(allLayerNotes, layerNotes[i])
+            table.insert(convertedSettingVars.noteTimes3, layerNotes[i].StartTime)
+        end
+        convertedSettingVars.noteTimes3 = removeDuplicateValues(convertedSettingVars.noteTimes3)
+        convertedSettingVars.noteTimes3 = table.sort(convertedSettingVars.noteTimes3, sortAscending)
+    end
+    if splitscrollLayers[4] ~= nil then
+        local layerNotes = splitscrollLayers[4].notes
+        convertedSettingVars.noteTimes4 = layerNotes
+        convertedSettingVars.svsInScroll4 = splitscrollLayers[4].svs
+        for i = 1, #layerNotes do
+            table.insert(allLayerNotes, layerNotes[i])
+            table.insert(convertedSettingVars.noteTimes4, layerNotes[i].StartTime)
+        end
+        convertedSettingVars.noteTimes4 = removeDuplicateValues(convertedSettingVars.noteTimes4)
+        convertedSettingVars.noteTimes4 = table.sort(convertedSettingVars.noteTimes4, sortAscending)
+    end
+    allLayerNotes = table.sort(allLayerNotes, sortAscendingStartTime)
+    local startOffset = allLayerNotes[1].StartTime
+    local endOffset = allLayerNotes[#allLayerNotes].StartTime
+    local hasAddedLaneTime = {}
+    for i = 1, map.GetKeyCount() do
+        table.insert(hasAddedLaneTime, {})
+    end
+    local notesToPlace = {}
+    local allNoteTimes = {}
+    for i = 1, #allLayerNotes do
+        local note = allLayerNotes[i]
+        local lane = note.Lane
+        local startTime = note.startTime
+        if hasAddedLaneTime[lane][startTime] == nil then
+            table.insert(notesToPlace, note)
+            table.insert(allNoteTimes, startTime)
+            hasAddedLaneTime[lane][startTime] = true
+        end
+    end
+    allNoteTimes = removeDuplicateValues(allNoteTimes)
+    allNoteTimes = table.sort(allNoteTimes, sortAscending)
+    local editorActions = {
+        actionRemoveNotesBetween(startOffset, endOffset),
+        utils.CreateEditorAction(action_type.PlaceHitObjectBatch, notesToPlace)
+    }
+    actions.PerformBatch(editorActions)
+    actions.SetHitObjectSelection(notesToPlace)
+    placeAdvancedSplitScrollSVsActual(convertedSettingVars, allNoteTimes)
 end
 -- Adds displacing SVs to mave notes to animation frames relative to the first selected note
 -- Parameters
@@ -7176,6 +7488,23 @@ function swapNoteSVs()
                              atDisplacement, afterDisplacement)
     end
     getRemovableSVs(svsToRemove, svTimeIsAdded, startOffset, endOffset)
+    removeAndAddSVs(svsToRemove, svsToAdd)
+end
+-- Vertically shifts SVs between selected notes
+-- Parameters
+--    menuVars : list of variables used for the current menu [Table]
+function verticalShiftSVs(menuVars)
+    local offsets = uniqueSelectedNoteOffsets()
+    local startOffset = offsets[1]
+    local endOffset = offsets[#offsets]
+    local svsToAdd = {}
+    local svsToRemove = getSVsBetweenOffsets(startOffset, endOffset)
+    local svsBetweenOffsets = getSVsBetweenOffsets(startOffset, endOffset)
+    addStartSVIfMissing(svsBetweenOffsets, startOffset)
+    for _, sv in pairs(svsBetweenOffsets) do
+        local newSVMultiplier = sv.Multiplier + menuVars.verticalShift
+        addSVToList(svsToAdd, sv.StartTime, newSVMultiplier, true)
+    end
     removeAndAddSVs(svsToRemove, svsToAdd)
 end
 -- Deletes SVs between selected notes
