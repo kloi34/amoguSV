@@ -5461,7 +5461,7 @@ end
 --    settingVars : list of variables used for the current menu [Table]
 function chooseNumScrolls(settingVars)
     _, settingVars.numScrolls = imgui.InputInt("# of scrolls", settingVars.numScrolls, 1, 1)
-    settingVars.numScrolls = clampToInterval(settingVars.numScrolls, 2, 4)
+    settingVars.numScrolls = wrapToInterval(settingVars.numScrolls, 2, 4)
 end
 -- Lets you choose the number of periods to shift over for a sinusoidal wave
 -- Returns whether or not the period shift value changed [Boolean]
@@ -5471,7 +5471,7 @@ function choosePeriodShift(settingVars)
     local oldShift = settingVars.periodsShift
     local _, newShift = imgui.InputFloat("Phase Shift", oldShift, 0.25, 0.25, "%.2f")
     newShift = forceQuarter(newShift)
-    newShift = clampToInterval(newShift, -0.75, 0.75)
+    newShift = wrapToInterval(newShift, -0.75, 1)
     settingVars.periodsShift = newShift
     return oldShift ~= newShift
 end
