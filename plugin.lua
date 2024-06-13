@@ -3158,6 +3158,15 @@ function makeSVInfoWindow(windowText, svGraphStats, svStats, svDistances, svMult
         imgui.Text("Projected Note Motion:")
         helpMarker("Distance vs Time graph of notes")
         plotSVMotion(svDistances, svGraphStats.distMinScale, svGraphStats.distMaxScale)
+        if imgui.CollapsingHeader("New All -w-") then
+            for i = 1, #svDistances do
+                local svDistance = svDistances[i]
+                local content = tostring(svDistance)
+                imgui.PushItemWidth(imgui.GetContentRegionAvailWidth())
+                imgui.InputText("##"..i, content, #content, imgui_input_text_flags.AutoSelectAll)
+                imgui.PopItemWidth()
+            end
+        end
     end
     local projectedText = "Projected SVs:"
     if skipDistGraph then projectedText = "Projected Scaling (Avg SVs):" end
