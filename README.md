@@ -1,3 +1,5 @@
+Note: this repository is archived and no longer getting updated. Use [plumoguSV](https://github.com/ESV-Sweetplum/plumoguSV) instead.
+
 # amoguSV
 <img src="https://user-images.githubusercontent.com/53842237/126182216-381a7104-7814-4661-8f80-fcb3a5034398.png" alt="amoguSV Logo" width=320px height=160px>
 
